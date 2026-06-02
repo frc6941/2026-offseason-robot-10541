@@ -84,6 +84,20 @@ dependencies {
     // AdvantageKit
     def akitJson = new groovy.json.JsonSlurper().parseText(new File(projectDir.getAbsolutePath() + "/vendordeps/AdvantageKit.json").text)
     annotationProcessor "org.littletonrobotics.akit:akit-autolog:$akitJson.version"
+
+    // Lombok — generates getters, setters, builders at compile time
+    compileOnly 'org.projectlombok:lombok:1.18.32'
+    annotationProcessor 'org.projectlombok:lombok:1.18.32'
+   
+    // JGraphT — graph algorithms used by DecisionTree command
+    implementation 'org.jgrapht:jgrapht-core:1.5.1'
+   
+    // JAMA — matrix math library used by math utilities
+    implementation 'gov.nist.math:jama:1.0.3'
+
+    // AutoService — annotation processor used by ntext NTParameter registry
+    annotationProcessor 'com.google.auto.service:auto-service:1.1.1'
+    compileOnly 'com.google.auto.service:auto-service:1.1.1'
 }
 
 test {
@@ -118,6 +132,7 @@ tasks.withType(JavaCompile) {
 }
 
 // Generates BuildConstants.java with git SHA, build date, etc.
+project.compileJava.dependsOn('createVersionFile')
 gversion {
     srcDir = "src/main/java/"
     classPackage = "frc.robot"
