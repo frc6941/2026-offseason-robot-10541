@@ -5,19 +5,23 @@
 package frc.robot;
 
 import frc.robot.Constants.OperatorConstants;
-import frc.robot.subsystems.Intaker.IntakerRollerSubsystem;
-import frc.robot.subsystems.Shooter.HoodSubsystem;
-import frc.robot.subsystems.Shooter.ShooterSubsystem;
+import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
 import frc.robot.subsystems.Intaker.IntakerExtensionSubsystem;
-import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
-import lib.ironpulse.subsystem.velocity.VelocityParamSources;
+import frc.robot.subsystems.Intaker.IntakerRollerSubsystem;
+import frc.robot.subsystems.Shooter.HoodSubsystem;
+import frc.robot.subsystems.Shooter.ShooterSubsystem;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
+import lib.ironpulse.limelight.DeviationParamSources;
+import lib.ironpulse.limelight.LimelightIOConfig;
+import lib.ironpulse.limelight.LimelightIOReal;
+import lib.ironpulse.limelight.LimelightSubsystem;
 import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ironpulse.subsystem.position.PositionParamSources;
+import lib.ironpulse.subsystem.velocity.VelocityParamSources;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveCommands;
 import lib.ironpulse.swerve.mk5n.ImuIOPigeon;
@@ -34,7 +38,6 @@ import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -49,6 +52,7 @@ public class RobotContainer {
   private final FloorRollerSubsystem floorRollerSubsystem = buildFloorRoller();
   private final ShooterSubsystem shooterSubsystem = buildShooter();
   private final HoodSubsystem hoodSubsystem = buildHood();
+  private final LimelightSubsystem limelightSubsystem = buildLimelight();
   
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
@@ -82,6 +86,21 @@ public class RobotContainer {
 
     // Roller Floor
     floorRollerSubsystem.setDefaultCommand(floorRollerSubsystem.idle());
+
+    // Shooter and hood (fixed angle)
+    driverController.rightBumper().whileTrue(Commands.parallel(shooterSubsystem.spinUp(), hoodSubsystem.setMaxAngle(), floorRollerSubsystem.feed()));
+    driverController.rightBumper().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
+
+    // Auto-aim: left bumper — swerve rotates to face hub, hood adjusts angle by distance
+    driverController.a().whileTrue(Commands.parallel(
+        new AutoAimCommand(swerve, driverController::getLeftX, driverController::getLeftY),
+        shooterSubsystem.spinUp(),
+        hoodSubsystem.runMotionMagic(() -> HoodSubsystem.getAngleForDistance(
+            AutoAimCommand.getDistanceToTarget(
+                swerve.getEstimatedPose().toPose2d().getTranslation()))),
+        floorRollerSubsystem.feed()
+    ));
+    driverController.a().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
   }
 
   /**
@@ -148,6 +167,27 @@ public class RobotContainer {
           public double kI() { return 0.0; }
           public double kD() { return 0.0; }
         });
+  }
+
+  private LimelightSubsystem buildLimelight() {
+    LimelightIOConfig config = LimelightIOConfig.builder()
+        .name("limelight")
+        .useMegaTag2(true)
+        .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
+        .build();
+    LimelightIOReal io = new LimelightIOReal(
+        config,
+        swerve::getIMUYaw,
+        swerve::getYawVelocityRadPerSec,
+        () -> false,
+        new DeviationParamSources() {
+          public double xStdDev() { return 0.7; }
+          public double yStdDev() { return 0.7; }
+          public double zStdDev() { return 9999.0; }
+          public double angleStdDev() { return 1.0; }
+          public double imuCorrectionReliabilityThreshold() { return 0.9; }
+        });
+    return new LimelightSubsystem(swerve, io);
   }
 
   private HoodSubsystem buildHood() {
