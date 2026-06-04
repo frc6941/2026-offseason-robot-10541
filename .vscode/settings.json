@@ -26,7 +26,7 @@
     },
   ],
   "java.test.defaultConfig": "WPIlibUnitTests",
-  "java.import.gradle.annotationProcessing.enabled": false,
+  "java.import.gradle.annotationProcessing.enabled": true,
   "java.completion.favoriteStaticMembers": [
     "org.junit.Assert.*",
     "org.junit.Assume.*",
@@ -57,5 +57,7 @@
     "edu.wpi.first.math.**.proto.*",
     "edu.wpi.first.math.**.struct.*",
   ],
-  "java.dependency.enableDependencyCheckup": false
+  "java.dependency.enableDependencyCheckup": false,
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.jdt.ls.vmargs": "-javaagent:/home/hanson/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.32/17d46b3e205515e1e8efd3ee4d57ce8018914163/lombok-1.18.32.jar"
 }

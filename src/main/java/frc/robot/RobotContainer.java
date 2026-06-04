@@ -5,11 +5,34 @@
 package frc.robot;
 
 import frc.robot.Constants.OperatorConstants;
-import frc.robot.commands.Autos;
-import frc.robot.commands.ExampleCommand;
-import frc.robot.subsystems.ExampleSubsystem;
-import frc.robot.subsystems.IntakerSubsystem;
+import frc.robot.subsystems.Intaker.IntakerRollerSubsystem;
+import frc.robot.subsystems.Shooter.HoodSubsystem;
+import frc.robot.subsystems.Shooter.ShooterSubsystem;
+import frc.robot.subsystems.Configs.SwerveMK5Config;
+import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
+import frc.robot.subsystems.Intaker.IntakerExtensionSubsystem;
+import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
+import lib.ironpulse.subsystem.velocity.VelocityParamSources;
+import lib.ironpulse.io.MotorIOSim;
+import lib.ironpulse.io.MotorIOTalonFX;
+import lib.ironpulse.io.MotorInputsAutoLogged;
+import lib.ironpulse.subsystem.SubsystemConfig;
+import lib.ironpulse.subsystem.position.PositionParamSources;
+import lib.ironpulse.swerve.Swerve;
+import lib.ironpulse.swerve.SwerveCommands;
+import lib.ironpulse.swerve.mk5n.ImuIOPigeon;
+import lib.ironpulse.swerve.mk5n.SwerveModuleIOMK5N;
+import lib.ironpulse.swerve.sim.ImuIOSim;
+import lib.ironpulse.swerve.sim.SwerveModuleIOSimpleSim;
+
+import static edu.wpi.first.units.Units.DegreesPerSecond;
+import static edu.wpi.first.units.Units.MetersPerSecond;
+
+import com.ctre.phoenix6.signals.InvertedValue;
+
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 
@@ -20,15 +43,16 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
  * subsystems, commands, and trigger mappings) should be declared here.
  */
 public class RobotContainer {
-  // The robot's subsystems and commands are defined here...
-  private final ExampleSubsystem m_exampleSubsystem = new ExampleSubsystem();
-
-  // Trying to write an intaker subsystem
-  private final IntakerSubsystem intakerSubsystem = new IntakerSubsystem();
-
+  private final IntakerRollerSubsystem intakerRollerSubsystem = buildIntakerRoller();
+  private final IntakerExtensionSubsystem intakerExtensionSubsystem = buildIntakerExtension();
+  private final Swerve swerve = buildSwerve();
+  private final FloorRollerSubsystem floorRollerSubsystem = buildFloorRoller();
+  private final ShooterSubsystem shooterSubsystem = buildShooter();
+  private final HoodSubsystem hoodSubsystem = buildHood();
+  
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
-  private final CommandXboxController m_driverController =
+  private final CommandXboxController driverController =
       new CommandXboxController(OperatorConstants.kDriverControllerPort);
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
@@ -47,13 +71,17 @@ public class RobotContainer {
    * joysticks}.
    */
   private void configureBindings() {
-    // Schedule `ExampleCommand` when `exampleCondition` changes to `true`
-    new Trigger(m_exampleSubsystem::exampleCondition)
-        .onTrue(new ExampleCommand(m_exampleSubsystem));
 
-    // Schedule `exampleMethodCommand` when the Xbox controller's B button is pressed,
-    // cancelling on release.
-    m_driverController.b().whileTrue(m_exampleSubsystem.exampleMethodCommand());
+    // Intake and outake
+    driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensionSubsystem.extend(),intakerRollerSubsystem.intake(), floorRollerSubsystem.feed()));
+    driverController.rightTrigger().onFalse(intakerExtensionSubsystem.retract());
+    driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
+
+    // Swerve
+    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, driverController::getLeftX, driverController::getLeftY, driverController::getRightX, swerve::getEstimatedPose, MetersPerSecond.of(0.1), DegreesPerSecond.of(5)));
+
+    // Roller Floor
+    floorRollerSubsystem.setDefaultCommand(floorRollerSubsystem.idle());
   }
 
   /**
@@ -62,7 +90,97 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    // An example command will be run in autonomous
-    return Autos.exampleAuto(m_exampleSubsystem);
+    return null;
+  }
+
+  private IntakerRollerSubsystem buildIntakerRoller() {
+    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
+        "intaker_roller", 15, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.CounterClockwise_Positive);
+    return new IntakerRollerSubsystem(
+        config,
+        new MotorInputsAutoLogged(),
+        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config));
+  }
+
+  private IntakerExtensionSubsystem buildIntakerExtension() {
+    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
+        "intaker_extension", 14, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.CounterClockwise_Positive);
+    return new IntakerExtensionSubsystem(
+        config,
+        new MotorInputsAutoLogged(),
+        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
+        new PositionParamSources() {
+          public double kP() { return 0.0; }
+          public double kI() { return 0.0; }
+          public double kD() { return 0.0; }
+        });
+  }
+
+  private FloorRollerSubsystem buildFloorRoller() {
+    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
+        "floor_roller", 20, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.Clockwise_Positive);
+    return new FloorRollerSubsystem(
+        config,
+        new MotorInputsAutoLogged(),
+        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config));
+  }
+
+  private ShooterSubsystem buildShooter() {
+    SubsystemConfig config = SubsystemConfig.builder()
+      .name("shooter")
+      .mainId(19)
+      .mainBus(RobotConstants.CANIVORE_CAN_BUS)
+      .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
+      .followers(new SubsystemConfig.FollowerConfig[]{
+        SubsystemConfig.FollowerConfig.builder()
+            .id(20)
+            .bus(RobotConstants.CANIVORE_CAN_BUS)
+            .build()
+        }
+      )
+    .build();
+    return new ShooterSubsystem(
+        config,
+        new MotorInputsAutoLogged(),
+        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
+        new VelocityParamSources() {
+          public double kP() { return 0.0; }
+          public double kI() { return 0.0; }
+          public double kD() { return 0.0; }
+        });
+  }
+
+  private HoodSubsystem buildHood() {
+    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
+        "hood", 10, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.CounterClockwise_Positive);
+    return new HoodSubsystem(
+        config,
+        new MotorInputsAutoLogged(),
+        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
+        new PositionParamSources() {
+          public double kP() { return 0.0; }
+          public double kI() { return 0.0; }
+          public double kD() { return 0.0; }
+        });
+  }
+
+  private Swerve buildSwerve() {
+    if (RobotBase.isReal()) {
+      return new Swerve(
+          SwerveMK5Config.kRealConfig,
+          new ImuIOPigeon(SwerveMK5Config.kRealConfig, SwerveMK5Config.pigeonConfig),
+          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 0),
+          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 1),
+          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 2),
+          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 3));
+    } else {
+      return new Swerve(
+          SwerveMK5Config.kRealConfig,
+          new ImuIOSim(),
+          new SwerveModuleIOSimpleSim(SwerveMK5Config.kSimConfig, 0),
+          new SwerveModuleIOSimpleSim(SwerveMK5Config.kSimConfig, 1),
+          new SwerveModuleIOSimpleSim(SwerveMK5Config.kSimConfig, 2),
+          new SwerveModuleIOSimpleSim(SwerveMK5Config.kSimConfig, 3));
+    }
   }
 }
