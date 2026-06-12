@@ -6,6 +6,7 @@ package frc.robot;
 
 import frc.robot.Constants.OperatorConstants;
 import frc.robot.commands.AutoAimCommand;
+import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
 import frc.robot.subsystems.Intaker.IntakerExtensionSubsystem;
@@ -35,6 +36,8 @@ import static edu.wpi.first.units.Units.MetersPerSecond;
 import com.ctre.phoenix6.signals.InvertedValue;
 
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -59,10 +62,16 @@ public class RobotContainer {
   private final CommandXboxController driverController =
       new CommandXboxController(OperatorConstants.kDriverControllerPort);
 
+  // Auto chooser
+  private final SendableChooser<Command> autoChooser = new SendableChooser<>();
+
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
     // Configure the trigger bindings
     configureBindings();
+    autoChooser.setDefaultOption("Do nothing", Commands.none());
+    autoChooser.addOption("Drive Forward", Autos.driveForward(swerve));
+    SmartDashboard.putData("Auto Chooser", autoChooser);
   }
 
   /**
@@ -115,8 +124,12 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    return null;
+    return autoChooser.getSelected();
   }
+
+ 
+
+
 
   private IntakerRollerSubsystem buildIntakerRoller() {
     SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
