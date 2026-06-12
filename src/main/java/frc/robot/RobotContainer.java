@@ -87,18 +87,24 @@ public class RobotContainer {
     // Roller Floor
     floorRollerSubsystem.setDefaultCommand(floorRollerSubsystem.idle());
 
-    // Shooter and hood (fixed angle)
-    driverController.rightBumper().whileTrue(Commands.parallel(shooterSubsystem.spinUp(), hoodSubsystem.setMaxAngle(), floorRollerSubsystem.feed()));
+    // Shooter and hood (fixed angle) — feed only once shooter is up to speed
+    driverController.rightBumper().whileTrue(Commands.parallel(
+        shooterSubsystem.spinUp(),
+        hoodSubsystem.setMaxAngle(),
+        Commands.waitUntil(shooterSubsystem::velocityAtGoal)
+            .andThen(floorRollerSubsystem.feed())
+    ));
     driverController.rightBumper().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
 
-    // Auto-aim: left bumper — swerve rotates to face hub, hood adjusts angle by distance
+    // Auto-aim: swerve rotates to face hub, hood adjusts angle by distance, feed when at speed
     driverController.a().whileTrue(Commands.parallel(
         new AutoAimCommand(swerve, driverController::getLeftX, driverController::getLeftY),
         shooterSubsystem.spinUp(),
         hoodSubsystem.runMotionMagic(() -> HoodSubsystem.getAngleForDistance(
             AutoAimCommand.getDistanceToTarget(
                 swerve.getEstimatedPose().toPose2d().getTranslation()))),
-        floorRollerSubsystem.feed()
+        Commands.waitUntil(shooterSubsystem::velocityAtGoal)
+            .andThen(floorRollerSubsystem.feed())
     ));
     driverController.a().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
   }
