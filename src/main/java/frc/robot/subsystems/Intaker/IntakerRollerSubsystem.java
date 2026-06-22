@@ -13,8 +13,8 @@ public class IntakerRollerSubsystem extends MotorSubsystem<MotorInputsAutoLogged
         super(config, inputs, io);
     }
    
-    public Command intake() {
-        return runDutyCycle(0.7);
+    public Command runintake() {
+
     }
 
     public Command outtake() {

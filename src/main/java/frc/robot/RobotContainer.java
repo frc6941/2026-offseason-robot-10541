@@ -87,7 +87,7 @@ public class RobotContainer {
   private void configureBindings() {
 
     // Intake and outake
-    driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensionSubsystem.extend(),intakerRollerSubsystem.intake(), floorRollerSubsystem.feed()));
+    driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensionSubsystem.extend(),intakerRollerSubsystem.runintake(), floorRollerSubsystem.feed()));
     driverController.rightTrigger().onFalse(intakerExtensionSubsystem.retract());
     driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
 
