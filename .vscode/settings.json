@@ -59,6 +59,7 @@
   ],
   "java.dependency.enableDependencyCheckup": false,
   "java.compile.nullAnalysis.mode": "automatic",
-  "java.jdt.ls.vmargs": "-javaagent:/home/hanson/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.32/17d46b3e205515e1e8efd3ee4d57ce8018914163/lombok-1.18.32.jar",
+  "java.jdt.ls.lombokSupport.enabled": false,
+  "java.jdt.ls.vmargs": "-javaagent:/home/hanson/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.46/a5cfe99fdf320e84955ef653f2ce1bf789d11385/lombok-1.18.46.jar",
   "java.debug.settings.onBuildFailureProceed": true
 }

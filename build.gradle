@@ -107,8 +107,8 @@ dependencies {
     annotationProcessor "org.littletonrobotics.akit:akit-autolog:$akitJson.version"
 
     // Lombok — generates getters, setters, builders at compile time
-    compileOnly 'org.projectlombok:lombok:1.18.32'
-    annotationProcessor 'org.projectlombok:lombok:1.18.32'
+    compileOnly 'org.projectlombok:lombok:1.18.46'
+    annotationProcessor 'org.projectlombok:lombok:1.18.46'
    
     // JGraphT — graph algorithms used by DecisionTree command
     implementation 'org.jgrapht:jgrapht-core:1.5.1'

@@ -66,7 +66,7 @@ public class IntakerSubsystem extends SubsystemBase{
 
         pivot.setDefaultCommand(
             pivot.runMotionMagic(
-                    switch (currentMode){
+                    () -> switch (currentMode){
                         case INTAKING -> Degrees.of(
                             IntakerExtensionParamsNT.deployPosAngle.getValue()
                         );
