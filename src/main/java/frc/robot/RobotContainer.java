@@ -9,7 +9,6 @@ import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
 import frc.robot.subsystems.Intaker.*;
-import frc.robot.subsystems.Intaker.IntakerRollerParamsNT;
 import frc.robot.subsystems.Shooter.HoodSubsystem;
 import frc.robot.subsystems.Shooter.ShooterSubsystem;
 import lib.ironpulse.io.MotorIO;
@@ -21,6 +20,7 @@ import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
 import lib.ironpulse.subsystem.SubsystemConfig;
+import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
 import lib.ironpulse.subsystem.position.PositionParamSources;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 import lib.ironpulse.subsystem.velocity.VelocityParamSources;
@@ -33,15 +33,21 @@ import lib.ironpulse.swerve.sim.SwerveModuleIOSimpleSim;
 
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
+import static edu.wpi.first.units.Units.Degrees;
+
+
 
 import com.ctre.phoenix6.signals.InvertedValue;
 
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -52,8 +58,10 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 public class RobotContainer {
     private boolean isReal = RobotBase.isReal();
 
-  private final IntakerRollerSubsystem intakerRollerSubsystem = buildIntakerRoller();
-  private final IntakerExtensionSubsystem intakerExtensionSubsystem = buildIntakerExtension();
+  
+  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller = buildIntakerRoller();
+  private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> intakerPivot = buildIntakerPivot();
+  private final IntakerSubsystem intaker = new IntakerSubsystem(intakerRoller, intakerPivot);
   private final Swerve swerve = buildSwerve();
   private final FloorRollerSubsystem floorRollerSubsystem = buildFloorRoller();
   private final ShooterSubsystem shooterSubsystem = buildShooter();
@@ -62,14 +70,17 @@ public class RobotContainer {
   
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
-  private final CommandXboxController driverController = new CommandXboxController(OperatorConstants.kDriverControllerPort);
+  private final CommandXboxController driverController = new CommandXboxController(0);
 
   // Auto chooser
   private final SendableChooser<Command> autoChooser = new SendableChooser<>();
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
-    // Configure the trigger bindings
+
+    // intakerRoller = buildIntakerRoller();
+    // intakerPivot = buildIntakerPivot();
+    // TODO: fix initialization & PIVOT!!!
 
     configureBindings();
     autoChooser.setDefaultOption("Do nothing", Commands.none());
@@ -89,8 +100,10 @@ public class RobotContainer {
   private void configureBindings() {
 
     // Intake and outake
-//    driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensionSubsystem.extend(),intakerRollerSubsystem.runintake(), floorRollerSubsystem.feed()));
-    driverController.rightTrigger().onFalse(intakerExtensionSubsystem.retract());
+    // driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensioSubsystem.extend(),
+    //                                                             intakerRollerSubsystem.runIntake(), 
+    //                                                             floorRollerSubsystem.feed())); // TODO: Slow feed
+    // driverController.rightTrigger().onFalse(intakerExtensionSubsystem.retract());
     //driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
 
     // Swerve
@@ -134,29 +147,27 @@ public class RobotContainer {
 
 
 
-  private IntakerRollerSubsystem buildIntakerRoller() {
-      return new IntakerRollerSubsystem(new VelocityMotorSubsystem<>(
+  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildIntakerRoller() {
+      return new VelocityMotorSubsystem<>(
               IntakerConfig.INTAKER_ROLLER_CONFIG,
               new MotorInputsAutoLogged(),
               isReal
                       ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                       : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
-              IntakerRollerParamsNT.asVelocityParamSources()));
+              IntakerRollerParamsNT.asVelocityParamSources());
   }
 
-  private IntakerExtensionSubsystem buildIntakerExtension() {
-    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
-        "intaker_extension", 14, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.CounterClockwise_Positive);
-    return new IntakerExtensionSubsystem(
-        config,
-        new MotorInputsAutoLogged(),
-        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
-        new PositionParamSources() {
-          public double kP() { return 0.0; }
-          public double kI() { return 0.0; }
-          public double kD() { return 0.0; }
-        });
-  }
+    private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildIntakerPivot() {
+        return new PositionMotorSubsystem<>(
+                IntakerConfig.INTAKER_EXTENSION_CONFIG,
+                new MotorInputsAutoLogged(),
+                isReal
+                        ? new MotorIOTalonFX(IntakerConfig.INTAKER_EXTENSION_CONFIG)
+                        : new MotorIOSim(IntakerConfig.INTAKER_EXTENSION_CONFIG),
+                IntakerExtensionParamsNT.asPositionParamSources(),
+                Degrees.of(0),
+                IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
+    }
 
   private FloorRollerSubsystem buildFloorRoller() {
     SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
