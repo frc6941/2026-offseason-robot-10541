@@ -10,7 +10,7 @@ import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
 import frc.robot.subsystems.Intaker.*;
-import frc.robot.subsystems.Intaker.RollerParamsNT;
+import frc.robot.subsystems.Intaker.IntakerRollerParamsNT;
 import frc.robot.subsystems.Shooter.HoodSubsystem;
 import frc.robot.subsystems.Shooter.ShooterSubsystem;
 import lib.ironpulse.io.MotorIO;
@@ -143,7 +143,7 @@ public class RobotContainer {
               isReal
                       ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                       : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
-              RollerParamsNT.asVelocityParamSources());
+              IntakerRollerParamsNT.asVelocityParamSources());
   }
 
   private IntakerExtensionSubsystem buildIntakerExtension() {

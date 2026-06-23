@@ -15,8 +15,8 @@ public class IntakerConfig {
     private final static int INTAKER_ROLLER_ID = 10;
     private final static int INTAKER_EXTENSION_ID = 11;
 
-    public final static String INTAKER_ROLLER_NAME = "Intaker Roller";
-    public final static String INTAKER_EXTENSION_NAME = "Intaker Extension";
+    public final static String INTAKER_ROLLER_NAME = "IntakerRoller";
+    public final static String INTAKER_EXTENSION_NAME = "IntakerExtension";
 
     private final static double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0;
     private final static double INTAKER_EXTENSION_GEAR_RATIO = 48.0 / 5.0;
@@ -40,7 +40,7 @@ public class IntakerConfig {
 
 
     @NTParameter(tableName = "Params/"+INTAKER_ROLLER_NAME)
-    public final static class RollerParams{
+    public final static class IntakerRollerParams{
         public final static double kP = 0.0;
         public final static double kI = 0.0;
         public final static double kD = 0.0;
@@ -51,7 +51,7 @@ public class IntakerConfig {
     }
 
     @NTParameter(tableName = "Params/"+INTAKER_EXTENSION_NAME)
-    public final static class ExtensionParams{
+    public final static class IntakerExtensionParams{
         public final static double kP = 0.0;
         public final static double kI = 0.0;
         public final static double kD = 0.0;
