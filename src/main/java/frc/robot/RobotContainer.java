@@ -9,10 +9,11 @@ import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
-import frc.robot.subsystems.Intaker.IntakerExtensionSubsystem;
-import frc.robot.subsystems.Intaker.IntakerRollerSubsystem;
+import frc.robot.subsystems.Intaker.*;
+import frc.robot.subsystems.Intaker.RollerParamsNT;
 import frc.robot.subsystems.Shooter.HoodSubsystem;
 import frc.robot.subsystems.Shooter.ShooterSubsystem;
+import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
@@ -22,6 +23,7 @@ import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
 import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ironpulse.subsystem.position.PositionParamSources;
+import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 import lib.ironpulse.subsystem.velocity.VelocityParamSources;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveCommands;
@@ -49,6 +51,8 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
  * subsystems, commands, and trigger mappings) should be declared here.
  */
 public class RobotContainer {
+    private boolean isReal = RobotBase.isReal();
+
   private final IntakerRollerSubsystem intakerRollerSubsystem = buildIntakerRoller();
   private final IntakerExtensionSubsystem intakerExtensionSubsystem = buildIntakerExtension();
   private final Swerve swerve = buildSwerve();
@@ -87,9 +91,9 @@ public class RobotContainer {
   private void configureBindings() {
 
     // Intake and outake
-    driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensionSubsystem.extend(),intakerRollerSubsystem.runintake(), floorRollerSubsystem.feed()));
+//    driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensionSubsystem.extend(),intakerRollerSubsystem.runintake(), floorRollerSubsystem.feed()));
     driverController.rightTrigger().onFalse(intakerExtensionSubsystem.retract());
-    driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
+    //driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
 
     // Swerve
     swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, driverController::getLeftX, driverController::getLeftY, driverController::getRightX, swerve::getEstimatedPose, MetersPerSecond.of(0.1), DegreesPerSecond.of(5)));
@@ -133,12 +137,13 @@ public class RobotContainer {
 
 
   private IntakerRollerSubsystem buildIntakerRoller() {
-    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
-        "intaker_roller", 15, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.CounterClockwise_Positive);
-    return new IntakerRollerSubsystem(
-        config,
-        new MotorInputsAutoLogged(),
-        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config));
+      return new VelocityMotorSubsystem<>(
+              IntakerConfig.INTAKER_ROLLER_CONFIG,
+              new MotorInputsAutoLogged(),
+              isReal
+                      ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
+                      : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
+              RollerParamsNT.asVelocityParamSources());
   }
 
   private IntakerExtensionSubsystem buildIntakerExtension() {
