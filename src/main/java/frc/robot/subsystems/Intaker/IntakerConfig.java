@@ -18,8 +18,8 @@ public class IntakerConfig {
     public final static String INTAKER_ROLLER_NAME = "IntakerRoller";
     public final static String INTAKER_EXTENSION_NAME = "IntakerExtension";
 
-    private final static double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0;
-    private final static double INTAKER_EXTENSION_GEAR_RATIO = 48.0 / 5.0;
+    private final static double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0; // FIX
+    private final static double INTAKER_EXTENSION_GEAR_RATIO = 27 * 48.0 / 5.0;
 
     public final static SubsystemConfig INTAKER_ROLLER_CONFIG = SubsystemConfig.builder()
             .name(INTAKER_ROLLER_NAME)

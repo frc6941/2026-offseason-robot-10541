@@ -4,7 +4,6 @@
 
 package frc.robot;
 
-import frc.robot.Constants.OperatorConstants;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
@@ -63,8 +62,7 @@ public class RobotContainer {
   
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
-  private final CommandXboxController driverController =
-      new CommandXboxController(OperatorConstants.kDriverControllerPort);
+  private final CommandXboxController driverController = new CommandXboxController(OperatorConstants.kDriverControllerPort);
 
   // Auto chooser
   private final SendableChooser<Command> autoChooser = new SendableChooser<>();
