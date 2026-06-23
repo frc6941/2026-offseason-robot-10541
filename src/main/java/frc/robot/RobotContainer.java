@@ -137,13 +137,13 @@ public class RobotContainer {
 
 
   private IntakerRollerSubsystem buildIntakerRoller() {
-      return new VelocityMotorSubsystem<>(
+      return new IntakerRollerSubsystem(new VelocityMotorSubsystem<>(
               IntakerConfig.INTAKER_ROLLER_CONFIG,
               new MotorInputsAutoLogged(),
               isReal
                       ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                       : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
-              IntakerRollerParamsNT.asVelocityParamSources());
+              IntakerRollerParamsNT.asVelocityParamSources()));
   }
 
   private IntakerExtensionSubsystem buildIntakerExtension() {

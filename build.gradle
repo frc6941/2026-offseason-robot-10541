@@ -51,6 +51,27 @@ wpi.java.debugJni = false
 // Set this to true to enable desktop support.
 def includeDesktopSupport = true
 
+// Separate source set for annotation processors (ntext NTParameter codegen).
+// Compiled before main so the processor exists on main's processor path.
+sourceSets {
+    external {
+        java {
+            srcDir 'src/ext/java'
+        }
+        resources.srcDir 'src/ext/resources'
+    }
+}
+
+dependencies {
+    // ntext NTParameterWrapper/Registry need NetworkTables to compile
+    externalAnnotationProcessor wpi.java.deps.wpilibAnnotations()
+    externalImplementation wpi.java.deps.wpilib()
+    externalImplementation wpi.java.vendor.java()
+    // AutoService registers NTParameterProcessor as a javac processor
+    externalImplementation 'com.google.auto.service:auto-service:1.1.1'
+    externalAnnotationProcessor 'com.google.auto.service:auto-service:1.1.1'
+}
+
 // Setting up Advantagekit
 task(replayWatch, type: JavaExec) {
     mainClass = "org.littletonrobotics.junction.ReplayWatch"
@@ -95,9 +116,10 @@ dependencies {
     // JAMA — matrix math library used by math utilities
     implementation 'gov.nist.math:jama:1.0.3'
 
-    // AutoService — annotation processor used by ntext NTParameter registry
-    annotationProcessor 'com.google.auto.service:auto-service:1.1.1'
-    compileOnly 'com.google.auto.service:auto-service:1.1.1'
+    // ntext lives in the 'external' source set; consume its compiled output and
+    // run its NTParameterProcessor against main so @NTParameter classes generate ...NT.
+    implementation files(sourceSets.external.output.classesDirs)
+    annotationProcessor files(sourceSets.external.output.classesDirs)
 }
 
 test {
