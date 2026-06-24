@@ -60,7 +60,7 @@ public class IntakerSubsystem extends SubsystemBase{
                                 || currentMode == IntakeMode.FEEDING
                                 || currentMode == IntakeMode.EXTENDED_REVERSE
                                 || currentMode == IntakeMode.RETRACTED_FEEDING
-            )
+            ).repeatedly()
                             
         );
 
