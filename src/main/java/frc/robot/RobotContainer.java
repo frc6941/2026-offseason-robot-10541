@@ -7,8 +7,8 @@ package frc.robot;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
-import frc.robot.subsystems.FloorRoller.FloorRollerConfig;
-import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
+import frc.robot.subsystems.Hopper.HopperConfig;
+import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
 import frc.robot.subsystems.Shooter.HoodSubsystem;
 import frc.robot.subsystems.Shooter.ShooterSubsystem;
@@ -65,11 +65,11 @@ public class RobotContainer {
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> intakerPivot = buildIntakerPivot();
   private final IntakerSubsystem intaker = new IntakerSubsystem(intakerRoller, intakerPivot);
   private final Swerve swerve = buildSwerve();
-  private final FloorRollerSubsystem floorRollerSubsystem = buildFloorRoller();
+  private final HopperSubsystem hopperSubsystem = buildHopper();
   private final ShooterSubsystem shooterSubsystem = buildShooter();
   private final HoodSubsystem hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
-      new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, floorRollerSubsystem, swerve);
+      new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
   
 
@@ -87,7 +87,7 @@ public class RobotContainer {
     // TODO: fix initialization & PIVOT!!!
 
     intaker.setDefaultCommand();
-    floorRollerSubsystem.configureDefaultCommand();
+    hopperSubsystem.configureDefaultCommand();
     configureBindings();
     autoChooser.setDefaultOption("Do nothing", Commands.none());
     autoChooser.addOption("Drive Forward", Autos.driveForward(swerve));
@@ -120,7 +120,7 @@ public class RobotContainer {
         shooterSubsystem.spinUp(),
         hoodSubsystem.setMaxAngle(),
         Commands.waitUntil(shooterSubsystem::velocityAtGoal)
-            .andThen(floorRollerSubsystem.feed())
+            .andThen(hopperSubsystem.feed())
     ));
     driverController.rightBumper().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
 
@@ -168,14 +168,14 @@ public class RobotContainer {
                 IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
     }
 
-  private FloorRollerSubsystem buildFloorRoller() {
-    return new FloorRollerSubsystem(
+  private HopperSubsystem buildHopper() {
+    return new HopperSubsystem(
         intaker,
-        FloorRollerConfig.FLOOR_ROLLER_CONFIG,
+        HopperConfig.HOPPER_CONFIG,
         new MotorInputsAutoLogged(),
         RobotBase.isReal()
-            ? new MotorIOTalonFX(FloorRollerConfig.FLOOR_ROLLER_CONFIG)
-            : new MotorIOSim(FloorRollerConfig.FLOOR_ROLLER_CONFIG));
+            ? new MotorIOTalonFX(HopperConfig.HOPPER_CONFIG)
+            : new MotorIOSim(HopperConfig.HOPPER_CONFIG));
   }
 
   private ShooterSubsystem buildShooter() {

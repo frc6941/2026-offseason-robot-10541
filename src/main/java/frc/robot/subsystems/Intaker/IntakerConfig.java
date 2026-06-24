@@ -27,12 +27,12 @@ public class IntakerConfig {
     public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(1 / INTAKER_PIVOT_GEAR_RATIO * 360);
 
     public enum IntakeMode{
-        INTAKING,           // Roller: Intake, PIVOT: Extended
-        RETRACTED,          // Roller: Stop,   PIVOT: Retracted
-        FEEDING,            // Roller: Intake, PIVOT: Extended
-        EXTENDED_REVERSE,   // Roller: Outtake,PIVOT: Extended
-        RETRACTED_FEEDING,  // Roller: Intake, PIVOT: Swing
-        EXTENDED_IDLE       // Roller: Stop,   PIVOT: Extended
+        INTAKING,           // Roller: Intake, Pivot: Extended
+        RETRACTED,          // Roller: Stop,   Pivot: Retracted
+        FEEDING,            // Roller: Intake, Pivot: Extended
+        EXTENDED_REVERSE,   // Roller: Outtake,Pivot: Extended
+        RETRACTED_FEEDING,  // Roller: Intake, Pivot: Swing
+        EXTENDED_IDLE       // Roller: Stop,   Pivot: Extended
     }
 
     public final static SubsystemConfig INTAKER_ROLLER_CONFIG = SubsystemConfig.builder()

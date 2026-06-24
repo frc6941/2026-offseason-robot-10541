@@ -9,7 +9,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.commands.AutoAimCommand;
-import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
+import frc.robot.subsystems.Hopper.HopperSubsystem;
 import lib.ironpulse.swerve.Swerve;
 import org.littletonrobotics.junction.Logger;
 
@@ -25,18 +25,18 @@ import org.littletonrobotics.junction.Logger;
 public class ShootingSuperstructure extends SubsystemBase {
     private final ShooterSubsystem shooter;
     private final HoodSubsystem hood;
-    private final FloorRollerSubsystem floorRoller;
+    private final HopperSubsystem hopper;
     private final Swerve swerve;
     private final ShotCalculator calculator = new ShotCalculator();
 
     public ShootingSuperstructure(
             ShooterSubsystem shooter,
             HoodSubsystem hood,
-            FloorRollerSubsystem floorRoller,
+            HopperSubsystem hopper,
             Swerve swerve) {
         this.shooter = shooter;
         this.hood = hood;
-        this.floorRoller = floorRoller;
+        this.hopper = hopper;
         this.swerve = swerve;
     }
 
@@ -78,7 +78,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.parallel(
                 shooter.runVelVolt(() -> currentSolution().shooterSpeed()),
                 hood.runMotionMagic(() -> currentSolution().hoodAngle()),
-                Commands.waitUntil(this::readyToShoot).andThen(floorRoller.feed()));
+                Commands.waitUntil(this::readyToShoot).andThen(hopper.feed()));
     }
 
     /**
