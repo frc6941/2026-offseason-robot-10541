@@ -1,29 +1,54 @@
 package frc.robot.subsystems.FloorRoller;
 
+import static edu.wpi.first.units.Units.RotationsPerSecond;
+
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
+import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
-import lib.ironpulse.subsystem.MotorSubsystem;
 import lib.ironpulse.subsystem.SubsystemConfig;
+import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 
-public class FloorRollerSubsystem extends MotorSubsystem<MotorInputsAutoLogged, MotorIO>{
+public class FloorRollerSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> {
+    private final IntakerSubsystem intaker;
 
-    private static final double IDLE_SPEED = 0.2;
-    private static final double FEED_SPEED = 0.6;
-
-    public FloorRollerSubsystem(SubsystemConfig config, MotorInputsAutoLogged inputs, MotorIO io){
-        super(config, inputs, io);
+    public FloorRollerSubsystem(
+            IntakerSubsystem intaker,
+            SubsystemConfig config,
+            MotorInputsAutoLogged inputs,
+            MotorIO io) {
+        super(config, inputs, io, FloorRollerParamsNT.asVelocityParamSources());
+        this.intaker = intaker;
     }
 
     public Command idle() {
-        return runDutyCycle(IDLE_SPEED);
+        return runVelTC(RotationsPerSecond.of(FloorRollerParamsNT.idleRPS.getValue()));
     }
 
-    public Command feed(){
-        return runDutyCycle(FEED_SPEED);
+    public Command feed() {
+        return runVelTC(RotationsPerSecond.of(FloorRollerParamsNT.feedRPS.getValue()));
     }
 
-    public Command reverse(){
-        return runDutyCycle(-FEED_SPEED);
+    public Command shoot() {
+        return runVelTC(RotationsPerSecond.of(FloorRollerParamsNT.shootRPS.getValue()));
+    }
+
+    public Command reverse() {
+        return runVelTC(RotationsPerSecond.of(-FloorRollerParamsNT.feedRPS.getValue()));
+    }
+
+    public void configureDefaultCommand() {
+        setDefaultCommand(
+                Commands.select(
+                        java.util.Map.of(
+                                IntakeMode.INTAKING, feed(),
+                                IntakeMode.FEEDING, feed(),
+                                IntakeMode.RETRACTED_FEEDING, reverse(),
+                                IntakeMode.EXTENDED_REVERSE, reverse(),
+                                IntakeMode.EXTENDED_IDLE, idle(),
+                                IntakeMode.RETRACTED, idle()),
+                        intaker::getCurrentMode));
     }
 }

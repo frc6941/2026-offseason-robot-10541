@@ -7,6 +7,7 @@ package frc.robot;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
+import frc.robot.subsystems.FloorRoller.FloorRollerConfig;
 import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
 import frc.robot.subsystems.Intaker.*;
 import frc.robot.subsystems.Shooter.HoodSubsystem;
@@ -82,6 +83,8 @@ public class RobotContainer {
     // intakerPivot = buildIntakerPivot();
     // TODO: fix initialization & PIVOT!!!
 
+    intaker.setDefaultCommand();
+    floorRollerSubsystem.configureDefaultCommand();
     configureBindings();
     autoChooser.setDefaultOption("Do nothing", Commands.none());
     autoChooser.addOption("Drive Forward", Autos.driveForward(swerve));
@@ -108,9 +111,6 @@ public class RobotContainer {
 
     // Swerve
     swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, driverController::getLeftX, driverController::getLeftY, driverController::getRightX, swerve::getEstimatedPose, MetersPerSecond.of(0.1), DegreesPerSecond.of(5)));
-
-    // Roller Floor
-    floorRollerSubsystem.setDefaultCommand(floorRollerSubsystem.idle());
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
     driverController.rightBumper().whileTrue(Commands.parallel(
@@ -170,12 +170,13 @@ public class RobotContainer {
     }
 
   private FloorRollerSubsystem buildFloorRoller() {
-    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
-        "floor_roller", 20, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.Clockwise_Positive);
     return new FloorRollerSubsystem(
-        config,
+        intaker,
+        FloorRollerConfig.FLOOR_ROLLER_CONFIG,
         new MotorInputsAutoLogged(),
-        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config));
+        RobotBase.isReal()
+            ? new MotorIOTalonFX(FloorRollerConfig.FLOOR_ROLLER_CONFIG)
+            : new MotorIOSim(FloorRollerConfig.FLOOR_ROLLER_CONFIG));
   }
 
   private ShooterSubsystem buildShooter() {
