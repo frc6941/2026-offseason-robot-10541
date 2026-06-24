@@ -106,4 +106,50 @@ public class IntakerSubsystem extends SubsystemBase{
             }
         );
     }
+
+    public Command runRetract(){
+        return Commands.runOnce(
+            () -> {
+                fallbackMode = IntakeMode.RETRACTED;
+
+                if(currentMode != IntakeMode.FEEDING 
+                    && currentMode != IntakeMode.EXTENDED_REVERSE){
+                    currentMode = IntakeMode.RETRACTED;
+                }
+
+            }
+        );
+    }
+
+    public Command runExtendedIdle(){
+        return Commands.runOnce(
+            () -> {
+                fallbackMode = IntakeMode.EXTENDED_IDLE;
+
+                if(currentMode != IntakeMode.FEEDING 
+                    && currentMode != IntakeMode.EXTENDED_REVERSE){
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                }
+
+            }
+        );
+    }
+
+    public Command runFeed(){
+        return Commands.startEnd(
+            () -> currentMode = IntakeMode.EXTENDED_IDLE,
+            () -> currentMode = fallbackMode
+        );
+    }
+
+    public Command runExtendedReverse(){
+        return Commands.startEnd(
+            () -> currentMode = IntakeMode.EXTENDED_REVERSE,
+            () -> currentMode = fallbackMode
+        );
+    }
+
+    public Command zeroCommand(){
+        return pivot.zeroCommand();
+    }
 }
