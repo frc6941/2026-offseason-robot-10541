@@ -15,24 +15,24 @@ public class IntakerConfig {
     private final static CANBus CANBUS = CANIVORE_CAN_BUS;
 
     private final static int INTAKER_ROLLER_ID = 10;
-    private final static int INTAKER_EXTENSION_ID = 11;
+    private final static int INTAKER_PIVOT_ID = 11;
 
     public final static String INTAKER_ROLLER_NAME = "IntakerRoller";
-    public final static String INTAKER_EXTENSION_NAME = "IntakerExtension";
+    public final static String INTAKER_PIVOT_NAME = "IntakerPivot";
 
     private final static double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0; // FIX
-    private final static double INTAKER_EXTENSION_GEAR_RATIO = 27 * 48.0 / 5.0;
+    private final static double INTAKER_PIVOT_GEAR_RATIO = 27 * 48.0 / 5.0;
 
     // Accessible angle per mechansim rotation
-    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(1 / INTAKER_EXTENSION_GEAR_RATIO * 360);
+    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(1 / INTAKER_PIVOT_GEAR_RATIO * 360);
 
     public enum IntakeMode{
-        INTAKING,           // Roller: Intake, Extension: Extended
-        RETRACTED,          // Roller: Stop,   Extension: Retracted
-        FEEDING,            // Roller: Intake, Extension: Extended
-        EXTENDED_REVERSE,   // Roller: Outtake,Extension: Extended
-        RETRACTED_FEEDING,  // Roller: Intake, Extension: Swing
-        EXTENDED_IDLE       // Roller: Stop,   Extension: Extended
+        INTAKING,           // Roller: Intake, PIVOT: Extended
+        RETRACTED,          // Roller: Stop,   PIVOT: Retracted
+        FEEDING,            // Roller: Intake, PIVOT: Extended
+        EXTENDED_REVERSE,   // Roller: Outtake,PIVOT: Extended
+        RETRACTED_FEEDING,  // Roller: Intake, PIVOT: Swing
+        EXTENDED_IDLE       // Roller: Stop,   PIVOT: Extended
     }
 
     public final static SubsystemConfig INTAKER_ROLLER_CONFIG = SubsystemConfig.builder()
@@ -43,12 +43,12 @@ public class IntakerConfig {
             .SensorToMechanismRatio(INTAKER_ROLLER_GEAR_RATIO)
             .build();
 
-    public final static SubsystemConfig INTAKER_EXTENSION_CONFIG = SubsystemConfig.builder()
-            .name(INTAKER_EXTENSION_NAME)
+    public final static SubsystemConfig INTAKER_PIVOT_CONFIG = SubsystemConfig.builder()
+            .name(INTAKER_PIVOT_NAME)
             .mainBus(CANBUS)
-            .mainId(INTAKER_EXTENSION_ID)
+            .mainId(INTAKER_PIVOT_ID)
             .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
-            .SensorToMechanismRatio(INTAKER_EXTENSION_GEAR_RATIO)
+            .SensorToMechanismRatio(INTAKER_PIVOT_GEAR_RATIO)
             .build();
 
 
@@ -67,8 +67,8 @@ public class IntakerConfig {
         public final static int outtakeRPS = 0;
     }
 
-    @NTParameter(tableName = "Params/"+INTAKER_EXTENSION_NAME)
-    public final static class IntakerExtensionParams{
+    @NTParameter(tableName = "Params/"+INTAKER_PIVOT_NAME)
+    public final static class IntakerPivotParams{
         public final static double kP = 0.0;
         public final static double kI = 0.0;
         public final static double kD = 0.0;

@@ -12,6 +12,7 @@ import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
 import frc.robot.subsystems.Intaker.*;
 import frc.robot.subsystems.Shooter.HoodSubsystem;
 import frc.robot.subsystems.Shooter.ShooterSubsystem;
+import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
@@ -67,6 +68,8 @@ public class RobotContainer {
   private final FloorRollerSubsystem floorRollerSubsystem = buildFloorRoller();
   private final ShooterSubsystem shooterSubsystem = buildShooter();
   private final HoodSubsystem hoodSubsystem = buildHood();
+  private final ShootingSuperstructure shootingSuperstructure =
+      new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, floorRollerSubsystem, swerve);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
   
 
@@ -106,7 +109,7 @@ public class RobotContainer {
     // driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensioSubsystem.extend(),
     //                                                             intakerRollerSubsystem.runIntake(), 
     //                                                             floorRollerSubsystem.feed())); // TODO: Slow feed
-    // driverController.rightTrigger().onFalse(intakerExtensionSubsystem.retract());
+    // driverController.rightTrigger().onFalse(intakerPivotSubsystem.retract());
     //driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
 
     // Swerve
@@ -121,17 +124,13 @@ public class RobotContainer {
     ));
     driverController.rightBumper().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
 
-    // Auto-aim: swerve rotates to face hub, hood adjusts angle by distance, feed when at speed
+    // Auto-aim: drivetrain rotates to face the hub (yaw), while the shooting superstructure tracks
+    // distance to set hood angle + flywheel speed and feeds once chassis/hood/flywheel are all ready.
     driverController.a().whileTrue(Commands.parallel(
         new AutoAimCommand(swerve, driverController::getLeftX, driverController::getLeftY),
-        shooterSubsystem.spinUp(),
-        hoodSubsystem.runMotionMagic(() -> HoodSubsystem.getAngleForDistance(
-            AutoAimCommand.getDistanceToTarget(
-                swerve.getEstimatedPose().toPose2d().getTranslation()))),
-        Commands.waitUntil(shooterSubsystem::velocityAtGoal)
-            .andThen(floorRollerSubsystem.feed())
+        shootingSuperstructure.aimAndShoot()
     ));
-    driverController.a().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
+    driverController.a().onFalse(shootingSuperstructure.idle());
   }
 
   /**
@@ -159,12 +158,12 @@ public class RobotContainer {
 
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildIntakerPivot() {
         return new PositionMotorSubsystem<>(
-                IntakerConfig.INTAKER_EXTENSION_CONFIG,
+                IntakerConfig.INTAKER_PIVOT_CONFIG,
                 new MotorInputsAutoLogged(),
                 isReal
-                        ? new MotorIOTalonFX(IntakerConfig.INTAKER_EXTENSION_CONFIG)
-                        : new MotorIOSim(IntakerConfig.INTAKER_EXTENSION_CONFIG),
-                IntakerExtensionParamsNT.asPositionParamSources(),
+                        ? new MotorIOTalonFX(IntakerConfig.INTAKER_PIVOT_CONFIG)
+                        : new MotorIOSim(IntakerConfig.INTAKER_PIVOT_CONFIG),
+                IntakerPivotParamsNT.asPositionParamSources(),
                 Degrees.of(0),
                 IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
     }
