@@ -1,0 +1,20 @@
+{
+  "name": "Offseason2026",
+  "rotations": [{ "axis": "x", "degrees": 90 }],
+  "position": [0.0, 0.0, 0.0],
+  "components": [
+    {
+      "zeroedRotations": [
+        { "axis": "z", "degrees": -90 }
+      ],
+      "zeroedPosition": [0.2579, 0.0, 0.47525]
+    },
+    {
+      "zeroedRotations": [
+        { "axis": "x", "degrees": -90 },
+        { "axis": "z", "degrees": -90 }
+      ],
+      "zeroedPosition": [0.2829, 0.0, 0.20125]
+    }
+  ]
+}

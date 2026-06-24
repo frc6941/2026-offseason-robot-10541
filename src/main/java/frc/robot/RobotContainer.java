@@ -71,7 +71,8 @@ public class RobotContainer {
   private final ShootingSuperstructure shootingSuperstructure =
       new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
-  
+  private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
+
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
   private final CommandXboxController driverController = new CommandXboxController(0);
@@ -105,12 +106,11 @@ public class RobotContainer {
    */
   private void configureBindings() {
 
-    // Intake and outake
-    // driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensioSubsystem.extend(),
-    //                                                             intakerRollerSubsystem.runIntake(), 
-    //                                                             floorRollerSubsystem.feed())); // TODO: Slow feed
-    // driverController.rightTrigger().onFalse(intakerPivotSubsystem.retract());
-    //driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
+    // Intake: right trigger deploys + intakes while held, retracts on release.
+    // (Hopper feeds automatically off the intake state machine via its default command.)
+    driverController.rightTrigger().onTrue(intaker.runIntake());
+    driverController.rightTrigger().onFalse(intaker.runRetract());
+    // TODO: bind outtake/reverse (e.g. left trigger -> intaker.runExtendedReverse())
 
     // Swerve
     swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, driverController::getLeftX, driverController::getLeftY, driverController::getRightX, swerve::getEstimatedPose, MetersPerSecond.of(0.1), DegreesPerSecond.of(5)));

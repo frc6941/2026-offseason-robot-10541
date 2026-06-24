@@ -152,4 +152,9 @@ public class IntakerSubsystem extends SubsystemBase{
     public Command zeroCommand(){
         return pivot.zeroCommand();
     }
+
+    /** Live pivot angle, for 3D mechanism visualization / logging. */
+    public Angle getPivotAngle() {
+        return pivot.getCurrPos();
+    }
 }

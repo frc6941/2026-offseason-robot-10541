@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.MetersPerSecond;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -40,6 +41,13 @@ public class AutoAimCommand extends Command {
         addRequirements(swerve); // occupies swerve during command
     }
 
+    // Drum shooter mounting relative to robot center, robot frame (+X fwd/intake, +Y left).
+    // The rotation is the firing yaw: Math.PI = fires opposite the intake (out the back).
+    // The translation's Y (lateral offset) drives the off-center aim correction.
+    // TODO: set from CAD — drum position + firing yaw; tune live until the shooter faces the hub.
+    public static final Transform2d ROBOT_TO_SHOOTER =
+            new Transform2d(-0.15, 0.0, Rotation2d.fromRadians(Math.PI));
+
     public static Translation2d getTarget() {
         return AllianceFlipUtil.apply(FieldConstants.Hub.getTarget2d());
     }
@@ -48,13 +56,27 @@ public class AutoAimCommand extends Command {
         return getTarget().getDistance(robotPos);
     }
 
+    /**
+     * Chassis heading that points the SHOOTER (not robot-forward/intake) at the hub, à la 6328:
+     * bearingToHub + asin(shooterLateralY / distance) + shooterFiringYaw.
+     */
+    public static Rotation2d getShooterAimHeading(Pose2d robotPose) {
+        Translation2d target = getTarget();
+        Rotation2d bearing = target.minus(robotPose.getTranslation()).getAngle();
+        double distance = target.getDistance(robotPose.getTranslation());
+        Rotation2d lateralCorrection = new Rotation2d(MathUtil.clamp(
+                Math.asin(MathUtil.clamp(ROBOT_TO_SHOOTER.getY() / distance, -1.0, 1.0)),
+                -Math.PI, Math.PI));
+        return bearing.plus(lateralCorrection).plus(ROBOT_TO_SHOOTER.getRotation());
+    }
+
     @Override
     public void execute() {
         var robotPose = swerve.getEstimatedPose().toPose2d();
         Translation2d toTarget = getTarget().minus(robotPose.getTranslation()); // get aiming vector
 
-        // Heading from robot to hub
-        Rotation2d targetHeading = toTarget.getAngle(); // heading angle
+        // Heading that aims the SHOOTER (not robot-forward/intake) at the hub
+        Rotation2d targetHeading = getShooterAimHeading(robotPose);
         double omega = rotController.calculate(
                 robotPose.getRotation().getRadians(),
                 targetHeading.getRadians());

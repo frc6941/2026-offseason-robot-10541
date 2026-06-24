@@ -4,7 +4,7 @@ import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -54,11 +54,12 @@ public class ShootingSuperstructure extends SubsystemBase {
         return calculator.solve(distanceToTarget());
     }
 
-    /** True when the chassis is pointed at the hub within the (NT-tunable) heading tolerance. */
+    /** True when the SHOOTER is pointed at the hub within the (NT-tunable) heading tolerance. */
     public boolean headingAtGoal() {
         Pose2d pose = robotPose();
-        Translation2d toTarget = AutoAimCommand.getTarget().minus(pose.getTranslation());
-        double errorDeg = Math.abs(pose.getRotation().minus(toTarget.getAngle()).getDegrees());
+        // Uses the shooter-corrected aim heading (off-axis firing + edge-mount offset), not robot-forward.
+        Rotation2d aimHeading = AutoAimCommand.getShooterAimHeading(pose);
+        double errorDeg = Math.abs(pose.getRotation().minus(aimHeading).getDegrees());
         return errorDeg <= ShootingParamsNT.headingToleranceDeg.getValue();
     }
 

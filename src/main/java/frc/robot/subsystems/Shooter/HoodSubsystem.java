@@ -17,7 +17,7 @@ public class HoodSubsystem extends PositionMotorSubsystem<MotorInputsAutoLogged,
     private final static Angle MAX_ANGLE = Degrees.of(30);
     private final static Angle DEGREES_PER_ROTATION = Degrees.of(360);
 
-    // Distance (meters) → hood angle (degrees) — tune with real robot testing
+    // TODO: tune distance→hood-angle map on the real robot (note: ShotCalculator is now the source of truth for aiming)
     private static final InterpolatingDoubleTreeMap ANGLE_MAP = new InterpolatingDoubleTreeMap();
     static {
         ANGLE_MAP.put(2.0, 10.0);

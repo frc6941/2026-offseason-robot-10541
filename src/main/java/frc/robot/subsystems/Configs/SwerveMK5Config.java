@@ -16,10 +16,10 @@ import lib.ironpulse.swerve.sim.SwerveSimConfig;
 public final class SwerveMK5Config {
 
     // Half-dimensions from robot center to module (meters)
-    public static final double kSwerveHalfLength = 0.30468;
-    public static final double kSwerveHalfWidth  = 0.24218;
+    public static final double kSwerveHalfLength = 0.3429;
+    public static final double kSwerveHalfWidth  = 0.3429;
 
-    // Pigeon IMU mounting angles — copy from competition robot, tune later
+    // TODO: tune Pigeon IMU mounting angles for this robot (currently copied from competition robot)
     public static final ImuPigeonConfig pigeonConfig =
             ImuPigeonConfig.builder()
                     .mountPoseYaw(88.95365142822266)
