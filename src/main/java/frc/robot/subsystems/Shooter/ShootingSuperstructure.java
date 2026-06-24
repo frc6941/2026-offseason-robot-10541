@@ -4,7 +4,6 @@ import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -24,9 +23,6 @@ import org.littletonrobotics.junction.Logger;
  * drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
-    // TODO: TUNE — chassis heading error allowed before we consider ourselves aimed at the hub.
-    private static final Rotation2d HEADING_TOLERANCE = Rotation2d.fromDegrees(2.0);
-
     private final ShooterSubsystem shooter;
     private final HoodSubsystem hood;
     private final FloorRollerSubsystem floorRoller;
@@ -58,12 +54,12 @@ public class ShootingSuperstructure extends SubsystemBase {
         return calculator.solve(distanceToTarget());
     }
 
-    /** True when the chassis is pointed at the hub within {@link #HEADING_TOLERANCE}. */
+    /** True when the chassis is pointed at the hub within the (NT-tunable) heading tolerance. */
     public boolean headingAtGoal() {
         Pose2d pose = robotPose();
         Translation2d toTarget = AutoAimCommand.getTarget().minus(pose.getTranslation());
         double errorDeg = Math.abs(pose.getRotation().minus(toTarget.getAngle()).getDegrees());
-        return errorDeg <= HEADING_TOLERANCE.getDegrees();
+        return errorDeg <= ShootingParamsNT.headingToleranceDeg.getValue();
     }
 
     /** All three shot DOFs satisfied: chassis aimed, hood at angle, flywheel up to speed. */
