@@ -11,6 +11,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakerRollerParams;
+import frc.robot.subsystems.Intaker.IntakerConfig.IntakerPivotParams;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -68,22 +69,22 @@ public class IntakerSubsystem extends SubsystemBase{
             pivot.runMotionMagic(
                     () -> switch (currentMode){
                         case INTAKING -> Degrees.of(
-                            IntakerExtensionParamsNT.deployPosAngle.getValue()
+                            IntakerPivotParamsNT.deployPosAngle.getValue()
                         );
                         case EXTENDED_IDLE, EXTENDED_REVERSE -> Degrees.of(
-                            IntakerExtensionParamsNT.deployPosAngle.getValue()
+                            IntakerPivotParamsNT.deployPosAngle.getValue()
                         );
                         case RETRACTED -> Degrees.of(
-                            IntakerExtensionParamsNT.retractPosAngle.getValue()
+                            IntakerPivotParamsNT.retractPosAngle.getValue()
                         );
                         case FEEDING -> Degrees.of(
-                            IntakerExtensionParamsNT.feedPosAngle.getValue()
+                            IntakerPivotParamsNT.feedPosAngle.getValue()
                         );
                         case RETRACTED_FEEDING -> Degrees.of(
-                            IntakerExtensionParamsNT.retractedfeedPosAngle.getValue()
+                            IntakerPivotParamsNT.retractedfeedPosAngle.getValue()
                         );
                         default -> Degrees.of(
-                            IntakerExtensionParamsNT.retractPosAngle.getValue()
+                            IntakerPivotParamsNT.retractPosAngle.getValue()
                         );
                     }
             )

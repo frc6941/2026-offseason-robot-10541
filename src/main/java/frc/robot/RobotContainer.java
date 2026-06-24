@@ -106,7 +106,7 @@ public class RobotContainer {
     // driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensioSubsystem.extend(),
     //                                                             intakerRollerSubsystem.runIntake(), 
     //                                                             floorRollerSubsystem.feed())); // TODO: Slow feed
-    // driverController.rightTrigger().onFalse(intakerExtensionSubsystem.retract());
+    // driverController.rightTrigger().onFalse(intakerPivotSubsystem.retract());
     //driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
 
     // Swerve
@@ -158,12 +158,12 @@ public class RobotContainer {
 
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildIntakerPivot() {
         return new PositionMotorSubsystem<>(
-                IntakerConfig.INTAKER_EXTENSION_CONFIG,
+                IntakerConfig.INTAKER_PIVOT_CONFIG,
                 new MotorInputsAutoLogged(),
                 isReal
-                        ? new MotorIOTalonFX(IntakerConfig.INTAKER_EXTENSION_CONFIG)
-                        : new MotorIOSim(IntakerConfig.INTAKER_EXTENSION_CONFIG),
-                IntakerExtensionParamsNT.asPositionParamSources(),
+                        ? new MotorIOTalonFX(IntakerConfig.INTAKER_PIVOT_CONFIG)
+                        : new MotorIOSim(IntakerConfig.INTAKER_PIVOT_CONFIG),
+                IntakerPivotParamsNT.asPositionParamSources(),
                 Degrees.of(0),
                 IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
     }
