@@ -105,7 +105,6 @@ Temporary Items
 
 ### VisualStudioCode ###
 .vscode/*
-!.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
@@ -144,6 +143,9 @@ gradle-app.setting
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
+
+# Local-only project overrides
+build.gradle
 
 # Cache of project
 .gradletasknamecache

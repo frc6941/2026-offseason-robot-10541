@@ -99,7 +99,7 @@ public class IntakerSubsystem extends SubsystemBase{
 
                 if(currentMode != IntakeMode.FEEDING 
                     && currentMode != IntakeMode.EXTENDED_REVERSE){
-                    
+                    currentMode = IntakeMode.INTAKING;
                 }
 
             }
