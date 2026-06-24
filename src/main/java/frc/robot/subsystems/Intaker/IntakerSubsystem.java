@@ -137,7 +137,7 @@ public class IntakerSubsystem extends SubsystemBase{
 
     public Command runFeed(){
         return Commands.startEnd(
-            () -> currentMode = IntakeMode.EXTENDED_IDLE,
+            () -> currentMode = IntakeMode.FEEDING,
             () -> currentMode = fallbackMode
         );
     }
