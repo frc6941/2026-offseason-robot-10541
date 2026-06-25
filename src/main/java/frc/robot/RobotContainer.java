@@ -7,11 +7,13 @@ package frc.robot;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
+import frc.robot.subsystems.Shooter.HoodConfig;
 import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
-import frc.robot.subsystems.Shooter.HoodSubsystem;
-import frc.robot.subsystems.Shooter.ShooterSubsystem;
+import frc.robot.subsystems.Shooter.HoodParamsNT;
+import frc.robot.subsystems.Shooter.ShooterConfig;
+import frc.robot.subsystems.Shooter.ShooterParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
@@ -21,11 +23,8 @@ import lib.ironpulse.limelight.DeviationParamSources;
 import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
-import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
-import lib.ironpulse.subsystem.position.PositionParamSources;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
-import lib.ironpulse.subsystem.velocity.VelocityParamSources;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveCommands;
 import lib.ironpulse.swerve.mk5n.ImuIOPigeon;
@@ -36,11 +35,6 @@ import lib.ironpulse.swerve.sim.SwerveModuleIOSimpleSim;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Degrees;
-
-
-
-import com.ctre.phoenix6.signals.InvertedValue;
-
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
@@ -66,8 +60,8 @@ public class RobotContainer {
   private final IntakerSubsystem intaker = new IntakerSubsystem(intakerRoller, intakerPivot);
   private final Swerve swerve = buildSwerve();
   private final HopperSubsystem hopperSubsystem = buildHopper();
-  private final ShooterSubsystem shooterSubsystem = buildShooter();
-  private final HoodSubsystem hoodSubsystem = buildHood();
+  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterSubsystem = buildShooter();
+  private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
       new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
@@ -117,12 +111,14 @@ public class RobotContainer {
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
     driverController.rightBumper().whileTrue(Commands.parallel(
-        shooterSubsystem.spinUp(),
-        hoodSubsystem.setMaxAngle(),
+        shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.shootRPS.getValue())),
+        hoodSubsystem.runMotionMagic(HoodConfig.HOOD_MAX_ANGLE),
         Commands.waitUntil(shooterSubsystem::velocityAtGoal)
             .andThen(hopperSubsystem.feed())
     ));
-    driverController.rightBumper().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
+    driverController.rightBumper().onFalse(Commands.parallel(
+        shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
+        hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)));
 
     // Auto-aim: drivetrain rotates to face the hub (yaw), while the shooting superstructure tracks
     // distance to set hood angle + flywheel speed and feeds once chassis/hood/flywheel are all ready.
@@ -178,29 +174,14 @@ public class RobotContainer {
             : new MotorIOSim(HopperConfig.HOPPER_CONFIG));
   }
 
-  private ShooterSubsystem buildShooter() {
-    SubsystemConfig config = SubsystemConfig.builder()
-      .name("shooter")
-      .mainId(19)
-      .mainBus(RobotConstants.CANIVORE_CAN_BUS)
-      .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
-      .followers(new SubsystemConfig.FollowerConfig[]{
-        SubsystemConfig.FollowerConfig.builder()
-            .id(20)
-            .bus(RobotConstants.CANIVORE_CAN_BUS)
-            .build()
-        }
-      )
-    .build();
-    return new ShooterSubsystem(
-        config,
+  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooter() {
+    return new VelocityMotorSubsystem<>(
+        ShooterConfig.SHOOTER_CONFIG,
         new MotorInputsAutoLogged(),
-        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
-        new VelocityParamSources() {
-          public double kP() { return 0.0; }
-          public double kI() { return 0.0; }
-          public double kD() { return 0.0; }
-        });
+        RobotBase.isReal()
+            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_CONFIG)
+            : new MotorIOSim(ShooterConfig.SHOOTER_CONFIG),
+        ShooterParamsNT.asVelocityParamSources());
   }
 
   private LimelightSubsystem buildLimelight() {
@@ -224,18 +205,16 @@ public class RobotContainer {
     return new LimelightSubsystem(swerve, io);
   }
 
-  private HoodSubsystem buildHood() {
-    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
-        "hood", 10, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.CounterClockwise_Positive);
-    return new HoodSubsystem(
-        config,
+  private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildHood() {
+    return new PositionMotorSubsystem<>(
+        HoodConfig.HOOD_CONFIG,
         new MotorInputsAutoLogged(),
-        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
-        new PositionParamSources() {
-          public double kP() { return 0.0; }
-          public double kI() { return 0.0; }
-          public double kD() { return 0.0; }
-        });
+        RobotBase.isReal()
+            ? new MotorIOTalonFX(HoodConfig.HOOD_CONFIG)
+            : new MotorIOSim(HoodConfig.HOOD_CONFIG),
+        HoodParamsNT.asPositionParamSources(),
+        HoodConfig.HOOD_MIN_ANGLE,
+        HoodConfig.HOOD_ANGLE_PER_ROTATION);
   }
 
   private Swerve buildSwerve() {

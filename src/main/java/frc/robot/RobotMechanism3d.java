@@ -5,9 +5,12 @@ import static edu.wpi.first.units.Units.Radians;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
-import frc.robot.subsystems.Shooter.HoodSubsystem;
+import lib.ironpulse.io.MotorIO;
+import lib.ironpulse.io.MotorInputsAutoLogged;
+import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -36,10 +39,12 @@ public class RobotMechanism3d extends SubsystemBase {
   private static final Translation3d HOOD_PIVOT = new Translation3d(-0.2579, 0.0, 0.47525);
   private static final Translation3d INTAKE_PIVOT = new Translation3d(0.2829, 0.0, 0.20125);
 
-  private final HoodSubsystem hood;
+  private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
   private final IntakerSubsystem intaker;
 
-  public RobotMechanism3d(HoodSubsystem hood, IntakerSubsystem intaker) {
+  public RobotMechanism3d(
+      PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood,
+      IntakerSubsystem intaker) {
     this.hood = hood;
     this.intaker = intaker;
   }

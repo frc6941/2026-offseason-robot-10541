@@ -5,11 +5,16 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
+import lib.ironpulse.io.MotorIO;
+import lib.ironpulse.io.MotorInputsAutoLogged;
+import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
+import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 import lib.ironpulse.swerve.Swerve;
 import org.littletonrobotics.junction.Logger;
 
@@ -23,15 +28,15 @@ import org.littletonrobotics.junction.Logger;
  * drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
-    private final ShooterSubsystem shooter;
-    private final HoodSubsystem hood;
+    private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooter;
+    private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
     private final HopperSubsystem hopper;
     private final Swerve swerve;
     private final ShotCalculator calculator = new ShotCalculator();
 
     public ShootingSuperstructure(
-            ShooterSubsystem shooter,
-            HoodSubsystem hood,
+            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooter,
+            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood,
             HopperSubsystem hopper,
             Swerve swerve) {
         this.shooter = shooter;
@@ -87,7 +92,9 @@ public class ShootingSuperstructure extends SubsystemBase {
      * its own default command. Bind to {@code onFalse} of the aim trigger.
      */
     public Command idle() {
-        return Commands.parallel(shooter.stop(), hood.setFlat());
+        return Commands.parallel(
+                shooter.runVelVolt(() -> RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
+                hood.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE));
     }
 
     @Override
