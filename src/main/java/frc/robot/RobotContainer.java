@@ -7,6 +7,9 @@ package frc.robot;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
+import frc.robot.commands.auto.AutoPoints;
+import frc.robot.commands.auto.AutoBuilder;
+import frc.robot.commands.auto.AutoCommands;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Shooter.HoodConfig;
 import frc.robot.subsystems.Hopper.HopperConfig;
@@ -65,6 +68,7 @@ public class RobotContainer {
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
       new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
+  private final AutoBuilder autoBuilder = new AutoBuilder(intaker);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
   private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
 
@@ -84,9 +88,15 @@ public class RobotContainer {
 
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
+    AutoBuilder.configure(swerve);
     configureBindings();
     autoChooser.setDefaultOption("Do nothing", Commands.none());
     autoChooser.addOption("Drive Forward", Autos.driveForward(swerve));
+    autoChooser.addOption("Depot X Collect", autoBuilder.buildDepotXAuto());
+    autoChooser.addOption("Depot Y Collect", autoBuilder.buildDepotYAuto());
+    autoChooser.addOption("Go To Outpost", autoBuilder.buildOutpostAuto());
+    autoChooser.addOption("Mid Sweep L->R", autoBuilder.buildMidSweepLeftToRightAuto());
+    autoChooser.addOption("Mid Sweep R->L", autoBuilder.buildMidSweepRightToLeftAuto());
     SmartDashboard.putData("Auto Chooser", autoChooser);
   }
 
@@ -126,6 +136,13 @@ public class RobotContainer {
     driverController.rightBumper().onFalse(Commands.parallel(
         shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
         hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)));
+
+    // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
+    driverController.b().onTrue(
+        AutoCommands.pathfindToBluePose(
+            AutoPoints.OUTPOST,
+            AutoCommands.TRANSIT_CONSTRAINTS,
+            0.0));
 
     // Auto-aim: drivetrain rotates to face the hub (yaw), while the shooting superstructure tracks
     // distance to set hood angle + flywheel speed and feeds once chassis/hood/flywheel are all ready.
