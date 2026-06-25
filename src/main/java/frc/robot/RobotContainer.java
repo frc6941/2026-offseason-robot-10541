@@ -113,7 +113,7 @@ public class RobotContainer {
     // TODO: bind outtake/reverse (e.g. left trigger -> intaker.runExtendedReverse())
 
     // Swerve
-    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, driverController::getLeftX, driverController::getLeftY, driverController::getRightX, swerve::getEstimatedPose, MetersPerSecond.of(0.1), DegreesPerSecond.of(5)));
+    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX(), () -> -driverController.getRightX(), swerve::getEstimatedPose, MetersPerSecond.of(0.025), DegreesPerSecond.of(10)));
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
     driverController.rightBumper().whileTrue(Commands.parallel(
@@ -127,7 +127,7 @@ public class RobotContainer {
     // Auto-aim: drivetrain rotates to face the hub (yaw), while the shooting superstructure tracks
     // distance to set hood angle + flywheel speed and feeds once chassis/hood/flywheel are all ready.
     driverController.a().whileTrue(Commands.parallel(
-        new AutoAimCommand(swerve, driverController::getLeftX, driverController::getLeftY),
+        new AutoAimCommand(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX()),
         shootingSuperstructure.aimAndShoot()
     ));
     driverController.a().onFalse(shootingSuperstructure.idle());

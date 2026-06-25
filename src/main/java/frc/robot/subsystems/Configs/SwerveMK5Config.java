@@ -12,6 +12,7 @@ import lib.ironpulse.swerve.SwerveLimit;
 import lib.ironpulse.swerve.SwerveModuleLimit;
 import lib.ironpulse.swerve.mk5n.SwerveMK5NConfig;
 import lib.ironpulse.swerve.sim.SwerveSimConfig;
+import lib.ntext.NTParameter;
 
 public final class SwerveMK5Config {
 
@@ -41,7 +42,7 @@ public final class SwerveMK5Config {
     // Chassis-level limits
     public static final SwerveLimit kDefaultSwerveLimit =
             SwerveLimit.builder()
-                    .maxLinearVelocity(MetersPerSecond.of(4))
+                    .maxLinearVelocity(MetersPerSecond.of(4.5))
                     .maxSkidAcceleration(MetersPerSecondPerSecond.of(200))
                     .maxAngularVelocity(DegreesPerSecond.of(1000))
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000))
@@ -137,4 +138,26 @@ public final class SwerveMK5Config {
                     .canivoreCanBus(CANIVORE_CAN_BUS)
                     .pigeonId(RobotConstants.PIGEON_ID)
                     .build();
+
+    // NT-tunable swerve module PID/FF. Generates SwerveModuleParamsNT (nested Drive/Steer with
+    // per-group isAnyChanged()), consumed by SwerveModule.
+    // TODO: tune drive + steer gains on the real robot.
+    @NTParameter(tableName = "Params/SwerveModule")
+    public static final class SwerveModuleParams {
+        public static final class Drive {
+            public static final double kP = 15.0;
+            public static final double kI = 0.0;
+            public static final double kD = 0.0;
+            public static final double kS = 0.0;
+            public static final double kV = 0.136;
+            public static final double kA = 0.05;
+        }
+
+        public static final class Steer {
+            public static final double kP = 60.0;
+            public static final double kI = 0.0;
+            public static final double kD = 0.1;
+            public static final double kS = 0.0;
+        }
+    }
 }
