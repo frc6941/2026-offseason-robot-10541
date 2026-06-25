@@ -4,6 +4,7 @@
 
 package frc.robot;
 
+import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
@@ -99,6 +100,12 @@ public class RobotContainer {
    * joysticks}.
    */
   private void configureBindings() {
+    // Competition-style hood homing: zero on teleop enable so position control starts from a known reference.
+    new Trigger(DriverStation::isTeleopEnabled).onTrue(shootingSuperstructure.zeroHood());
+
+    // Driver-triggered intake pivot homing. Keep manual until the team confirms the mechanism can always
+    // safely drive into its hard stop on enable.
+    driverController.povLeft().onTrue(intaker.zeroCommand());
 
     // Intake: right trigger deploys + intakes while held, retracts on release.
     // (Hopper feeds automatically off the intake state machine via its default command.)

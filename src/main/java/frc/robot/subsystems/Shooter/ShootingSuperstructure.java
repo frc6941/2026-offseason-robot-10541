@@ -3,6 +3,7 @@ package frc.robot.subsystems.Shooter;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.units.measure.Angle;
@@ -59,6 +60,14 @@ public class ShootingSuperstructure extends SubsystemBase {
         return calculator.solve(distanceToTarget());
     }
 
+    private Angle clampHoodAngle(Angle angle) {
+        return Degrees.of(
+                MathUtil.clamp(
+                        angle.in(Degrees),
+                        HoodConfig.HOOD_MIN_ANGLE.in(Degrees),
+                        HoodConfig.HOOD_MAX_ANGLE.in(Degrees)));
+    }
+
     /** True when the SHOOTER is pointed at the hub within the (NT-tunable) heading tolerance. */
     public boolean headingAtGoal() {
         Pose2d pose = robotPose();
@@ -83,7 +92,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     public Command aimAndShoot() {
         return Commands.parallel(
                 shooter.runVelVolt(() -> currentSolution().shooterSpeed()),
-                hood.runMotionMagic(() -> currentSolution().hoodAngle()),
+                hood.runMotionMagic(() -> clampHoodAngle(currentSolution().hoodAngle())),
                 Commands.waitUntil(this::readyToShoot).andThen(hopper.feed()));
     }
 
@@ -95,6 +104,11 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.parallel(
                 shooter.runVelVolt(() -> RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
                 hood.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE));
+    }
+
+    /** Zero only the hood mechanism. */
+    public Command zeroHood() {
+        return hood.zeroCommand();
     }
 
     @Override
