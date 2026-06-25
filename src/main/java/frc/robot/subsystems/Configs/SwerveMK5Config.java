@@ -42,9 +42,9 @@ public final class SwerveMK5Config {
     // Chassis-level limits
     public static final SwerveLimit kDefaultSwerveLimit =
             SwerveLimit.builder()
-                    .maxLinearVelocity(MetersPerSecond.of(4.5))
+                    .maxLinearVelocity(MetersPerSecond.of(4.0))
                     .maxSkidAcceleration(MetersPerSecondPerSecond.of(200))
-                    .maxAngularVelocity(DegreesPerSecond.of(1000))
+                    .maxAngularVelocity(DegreesPerSecond.of(450))
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000))
                     .build();
 
