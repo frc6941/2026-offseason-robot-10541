@@ -82,10 +82,6 @@ public class RobotContainer {
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
 
-    // intakerRoller = buildIntakerRoller();
-    // intakerPivot = buildIntakerPivot();
-    // TODO: fix initialization & PIVOT!!!
-
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
     AutoBuilder.configure(swerve);
@@ -121,7 +117,9 @@ public class RobotContainer {
     // (Hopper feeds automatically off the intake state machine via its default command.)
     driverController.rightTrigger().onTrue(intaker.runIntake());
     driverController.rightTrigger().onFalse(intaker.runRetract());
-    // TODO: bind outtake/reverse (e.g. left trigger -> intaker.runExtendedReverse())
+    // Outtake/reverse: left trigger deploys + outtakes while held, retracts on release
+    driverController.leftTrigger().onTrue(intaker.runExtendedReverse());
+    driverController.leftTrigger().onFalse(intaker.runRetract());
 
     // Swerve
     swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX(), () -> -driverController.getRightX(), swerve::getEstimatedPose, MetersPerSecond.of(0.025), DegreesPerSecond.of(10)));

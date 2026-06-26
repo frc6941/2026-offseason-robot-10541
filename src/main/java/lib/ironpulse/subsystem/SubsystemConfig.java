@@ -56,6 +56,7 @@ public class SubsystemConfig {
     /** Optional supply current limit in amps, set to NaN to disable. */
     @Default public final double supplyCurrentLimitAmps = Double.NaN;
 
+    /** Optional voltage closed-loop ramp period in seconds, set to NaN to disable. */
     @Default public final double ramp = Double.NaN;
 
     // other close loop configs
@@ -141,7 +142,7 @@ public class SubsystemConfig {
         @Default public final double statorCurrentLimitAmps = Double.NaN;
         @Default public final double supplyCurrentLimitAmps = Double.NaN;
 
-        // TODO: FIX ME
+        /** Optional voltage closed-loop ramp period in seconds, set to NaN to disable. */
         @Default public final double ramp = Double.NaN;
     }
 
