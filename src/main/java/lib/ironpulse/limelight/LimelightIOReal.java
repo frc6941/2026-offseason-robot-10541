@@ -299,11 +299,6 @@ public class LimelightIOReal implements LimelightIO {
     }
 
     @Override
-    public double getIMUYawInternal() {
-        return LimelightHelpers.getIMUData(config.getName()).Yaw;
-    }
-
-    @Override
     public double getIMUYawRobot() {
         return LimelightHelpers.getIMUData(config.getName()).robotYaw;
     }

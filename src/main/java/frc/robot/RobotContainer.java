@@ -100,7 +100,9 @@ public class RobotContainer {
     // Use Suppliers so each scheduling step gets a fresh Command — WPILib 2026
     // forbids re-composing or re-scheduling an already-used composed command.
     Supplier<Command> shootSupplier = () -> Commands.parallel(
-            new AutoAimCommand(swerve, () -> 0.0, () -> 0.0),
+            new AutoAimCommand(swerve, () -> 0.0, () -> 0.0,
+                    () -> AutoAimCommand.getShooterAimHeading(swerve.getEstimatedPose().toPose2d()),
+                    () -> 0.0),
             shootingSuperstructure.aimAndShoot())
             .withTimeout(3.0);
     Supplier<Command> intakeSupplier = () -> Commands.parallel(

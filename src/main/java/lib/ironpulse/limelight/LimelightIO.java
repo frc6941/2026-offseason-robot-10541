@@ -46,10 +46,6 @@ public interface LimelightIO {
 
     default void requestInternalIMUReseed() {}
 
-    // FIXME: leave only one function for yaw. This was to see that whether robotYaw equals to
-    // internal yaw.
-    double getIMUYawInternal();
-
     double getIMUYawRobot();
 
     boolean canUseInternalIMU();

@@ -166,8 +166,10 @@ public class MotorIOTalonFX implements MotorIO {
     }
 
     private void configureCANcoder(SubsystemConfig.RemoteCANcoder rc) {
+        // Create a temporary CANcoder handle to push configuration to the device.
+        // Configuration is persisted in CANcoder hardware — the handle is discarded
+        // because no runtime interaction with the CANcoder is needed after config.
         CANcoder coder = new CANcoder(rc.id, rc.bus);
-        // Build a CANcoderConfiguration from rc fields
         CANcoderConfiguration c = new CANcoderConfiguration();
         c.MagnetSensor.MagnetOffset = rc.magnetOffset;
         c.MagnetSensor.SensorDirection = rc.sensorDirection;

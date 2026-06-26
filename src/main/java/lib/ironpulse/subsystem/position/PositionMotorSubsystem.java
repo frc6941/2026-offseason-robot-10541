@@ -137,11 +137,10 @@ public class PositionMotorSubsystem<
     }
 
     public boolean positionAtGoal() {
-        try {
+        if (mechanismUnitPerRotation instanceof Angle) {
             return positionAtGoal((M) Degrees.of(params.positionAtGoalToleranceDegrees()));
-        } catch (ClassCastException e) {
-            return positionAtGoal((M) Meters.of(params.positionAtGoalToleranceMeters()));
         }
+        return positionAtGoal((M) Meters.of(params.positionAtGoalToleranceMeters()));
     }
 
     public Command waitUntilAtGoal(M tolerance) {

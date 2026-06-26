@@ -72,8 +72,7 @@ public class LimelightSubsystem extends SubsystemBase {
                 continue;
             }
 
-            Logger.recordOutput("Limelight/IMU/" + io.getName() + "_INT", io.getIMUYawInternal());
-            Logger.recordOutput("Limelight/IMU/" + io.getName() + "_ROBOT", io.getIMUYawRobot());
+            Logger.recordOutput("Limelight/IMU/" + io.getName(), io.getIMUYawRobot());
 
             SmartDashboard.putBoolean(
                     "Limelight/" + io.getName() + "alive",
