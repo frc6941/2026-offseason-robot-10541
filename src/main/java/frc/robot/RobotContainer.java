@@ -42,8 +42,9 @@ import static edu.wpi.first.units.Units.Degrees;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
+import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
+import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -93,7 +94,9 @@ public class RobotContainer {
     autoChooser.addOption("Go To Outpost", autoBuilder.buildOutpostAuto());
     autoChooser.addOption("Mid Sweep L->R", autoBuilder.buildMidSweepLeftToRightAuto());
     autoChooser.addOption("Mid Sweep R->L", autoBuilder.buildMidSweepRightToLeftAuto());
-    SmartDashboard.putData("Auto Chooser", autoChooser);
+    Shuffleboard.getTab("Autonomous")
+        .add("Auto Chooser", autoChooser)
+        .withWidget(BuiltInWidgets.kComboBoxChooser);
   }
 
   /**
