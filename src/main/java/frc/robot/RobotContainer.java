@@ -168,7 +168,9 @@ public class RobotContainer {
     // Auto-aim: drivetrain rotates to face the hub (yaw), while the shooting superstructure tracks
     // distance to set hood angle + flywheel speed and feeds once chassis/hood/flywheel are all ready.
     driverController.a().whileTrue(Commands.parallel(
-        new AutoAimCommand(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX()),
+        new AutoAimCommand(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX(),
+                          shootingSuperstructure::aimHeading,
+                          shootingSuperstructure::aimHeadingRateRadPerSec),
         shootingSuperstructure.aimAndShoot()
     ));
     driverController.a().onFalse(shootingSuperstructure.idle());
