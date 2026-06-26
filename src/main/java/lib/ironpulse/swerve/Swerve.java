@@ -8,6 +8,7 @@ import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -318,6 +319,10 @@ public class Swerve extends SubsystemBase implements Localizable {
 
     public SwerveModuleLimit getSwerveModuleLimit() {
         return setpointGenerator.getModuleLimit();
+    }
+
+    public Translation2d[] getModuleLocations() {
+        return config.moduleLocations();
     }
 
     public void setSwerveModuleLimit(SwerveModuleLimit limit) {

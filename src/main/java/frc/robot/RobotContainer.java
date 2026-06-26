@@ -6,6 +6,7 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
+import java.util.function.Supplier;
 import frc.robot.commands.Autos;
 import frc.robot.commands.auto.AutoPoints;
 import frc.robot.commands.auto.AutoBuilder;
@@ -94,6 +95,25 @@ public class RobotContainer {
     autoChooser.addOption("Go To Outpost", autoBuilder.buildOutpostAuto());
     autoChooser.addOption("Mid Sweep L->R", autoBuilder.buildMidSweepLeftToRightAuto());
     autoChooser.addOption("Mid Sweep R->L", autoBuilder.buildMidSweepRightToLeftAuto());
+
+    // Shooting-integrated auto routines (6328-inspired)
+    // Use Suppliers so each scheduling step gets a fresh Command — WPILib 2026
+    // forbids re-composing or re-scheduling an already-used composed command.
+    Supplier<Command> shootSupplier = () -> Commands.parallel(
+            new AutoAimCommand(swerve, () -> 0.0, () -> 0.0),
+            shootingSuperstructure.aimAndShoot())
+            .withTimeout(3.0);
+    Supplier<Command> intakeSupplier = () -> Commands.parallel(
+            intaker.runIntake(),
+            hopperSubsystem.feed())
+            .withTimeout(2.1);
+    autoChooser.addOption("1 Note (Shoot)", Autos.oneNote(swerve, shootSupplier));
+    autoChooser.addOption("2 Note (Shoot+Intake+Shoot)", Autos.twoNote(swerve, shootSupplier, intakeSupplier));
+
+    // Example path-following autos (programmatic S-curve, no .path file needed)
+    var robotConfig = AutoBuilder.createRobotConfig();
+    autoChooser.addOption("Example Path", Autos.examplePathAuto(swerve, robotConfig));
+    autoChooser.addOption("Example Path+Shoot", Autos.examplePathAndShoot(swerve, robotConfig, shootSupplier));
     Shuffleboard.getTab("Autonomous")
         .add("Auto Chooser", autoChooser)
         .withWidget(BuiltInWidgets.kComboBoxChooser);

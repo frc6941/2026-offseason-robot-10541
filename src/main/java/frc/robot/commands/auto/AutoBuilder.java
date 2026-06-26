@@ -52,7 +52,7 @@ public final class AutoBuilder {
         configured = true;
     }
 
-    private static RobotConfig createRobotConfig() {
+    public static RobotConfig createRobotConfig() {
         Translation2d[] moduleLocations = {
             new Translation2d(SwerveMK5Config.kSwerveHalfLength, SwerveMK5Config.kSwerveHalfWidth),
             new Translation2d(SwerveMK5Config.kSwerveHalfLength, -SwerveMK5Config.kSwerveHalfWidth),
