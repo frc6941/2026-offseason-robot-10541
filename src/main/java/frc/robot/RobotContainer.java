@@ -20,6 +20,10 @@ import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import lib.ironpulse.indicator.IndicatorIO;
+import lib.ironpulse.indicator.IndicatorIOARGB;
+import lib.ironpulse.indicator.IndicatorIOSim;
+import lib.ironpulse.indicator.IndicatorSubsystem;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
@@ -72,6 +76,7 @@ public class RobotContainer {
       new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
   private final AutoBuilder autoBuilder = new AutoBuilder(intaker, swerve);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
+  private final IndicatorSubsystem indicator = buildIndicator();
   private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
 
 
@@ -88,6 +93,8 @@ public class RobotContainer {
     hopperSubsystem.configureDefaultCommand();
     AutoBuilder.configure(swerve);
     configureBindings();
+    // Continuously evaluate robot state → LED pattern (runs every scheduler tick).
+    new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
     autoChooser.setDefaultOption("Do nothing", Commands.none());
     autoChooser.addOption("Drive Forward", Autos.driveForward(swerve));
     autoChooser.addOption("Depot X Collect", autoBuilder.buildDepotXAuto());
@@ -156,9 +163,11 @@ public class RobotContainer {
         Commands.waitUntil(shooterSubsystem::velocityAtGoal)
             .andThen(hopperSubsystem.feed())
     ));
-    driverController.rightBumper().onFalse(Commands.parallel(
-        shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
-        hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)));
+    driverController.rightBumper().onFalse(Commands.sequence(
+        Commands.parallel(
+            shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
+            hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)),
+        indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
 
     // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
     driverController.b().onTrue(
@@ -175,7 +184,9 @@ public class RobotContainer {
                           shootingSuperstructure::aimHeadingRateRadPerSec),
         shootingSuperstructure.aimAndShoot()
     ));
-    driverController.a().onFalse(shootingSuperstructure.idle());
+    driverController.a().onFalse(Commands.sequence(
+        shootingSuperstructure.idle(),
+        indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
   }
 
   /**
@@ -185,6 +196,73 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     return autoChooser.getSelected();
+  }
+
+  /**
+   * Evaluates subsystem states each cycle and sets the indicator pattern accordingly.
+   *
+   * <p>Priority order (higher wins when multiple states overlap):
+   * <ol>
+   *   <li>{@link IndicatorIO.Patterns#AUTO Auto} — robot is in autonomous mode</li>
+   *   <li>{@link IndicatorIO.Patterns#SHOOTING Shooting} — flywheel spinning up, not at speed yet</li>
+   *   <li>{@link IndicatorIO.Patterns#HOLD_SHOOTING HoldShooting} — flywheel + hood ready, waiting for feed</li>
+   *   <li>{@link IndicatorIO.Patterns#INTAKE Intake} — intaker is intaking, feeding, or reversing</li>
+   *   <li>{@link IndicatorIO.Patterns#RED_ALLIANCE Red} / {@link IndicatorIO.Patterns#BLUE_ALLIANCE Blue} — disabled, show alliance</li>
+   *   <li>{@link IndicatorIO.Patterns#NORMAL Normal} — fallback (teleop driving)</li>
+   * </ol>
+   */
+  public void updateIndicator() {
+    // Don't clobber a command-driven transient pattern (e.g. AFTER_SHOOTING flash).
+    // Commands set outsideDefault = true while they own the pattern.
+    if (indicator.isOutsideDefault()) {
+      return;
+    }
+
+    // --- 1. Autonomous ---
+    if (DriverStation.isAutonomousEnabled()) {
+      indicator.setPattern(IndicatorIO.Patterns.AUTO);
+      return;
+    }
+
+    // --- 2 & 3. Shooting pipeline ---
+    // Detect whether the shooter is actively being commanded above idle.
+    double shooterSetpointRPS =
+        shooterSubsystem.getCurrSetpoint().in(edu.wpi.first.units.Units.RotationsPerSecond);
+    boolean shooterActive = shooterSetpointRPS > ShooterParamsNT.idleRPS.getValue() + 1.0;
+
+    if (shooterActive) {
+      if (shooterSubsystem.velocityAtGoal() && hoodSubsystem.positionAtGoal()) {
+        // Flywheel at speed + hood on target → ready to feed
+        indicator.setPattern(IndicatorIO.Patterns.HOLD_SHOOTING);
+      } else {
+        // Still spinning up
+        indicator.setPattern(IndicatorIO.Patterns.SHOOTING);
+      }
+      return;
+    }
+
+    // --- 4. Intaker-deployed states ---
+    var intakeMode = intaker.getCurrentMode();
+    if (intakeMode == IntakerConfig.IntakeMode.INTAKING
+        || intakeMode == IntakerConfig.IntakeMode.FEEDING
+        || intakeMode == IntakerConfig.IntakeMode.EXTENDED_REVERSE
+        || intakeMode == IntakerConfig.IntakeMode.RETRACTED_FEEDING) {
+      indicator.setPattern(IndicatorIO.Patterns.INTAKE);
+      return;
+    }
+
+    // --- 5. Disabled → alliance colour ---
+    if (DriverStation.isDisabled()) {
+      var alliance = DriverStation.getAlliance();
+      indicator.setPattern(
+          alliance.isPresent() && alliance.get() == DriverStation.Alliance.Red
+              ? IndicatorIO.Patterns.RED_ALLIANCE
+              : IndicatorIO.Patterns.BLUE_ALLIANCE);
+      return;
+    }
+
+    // --- 6. Fallback ---
+    indicator.setPattern(IndicatorIO.Patterns.NORMAL);
   }
 
  
@@ -252,6 +330,13 @@ public class RobotContainer {
           public double imuCorrectionReliabilityThreshold() { return 0.9; }
         });
     return new LimelightSubsystem(swerve, io);
+  }
+
+  private IndicatorSubsystem buildIndicator() {
+    return new IndicatorSubsystem(
+        RobotBase.isReal()
+            ? new IndicatorIOARGB(/* PWM port */ 9, /* LED count */ 60)
+            : new IndicatorIOSim());
   }
 
   private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildHood() {
