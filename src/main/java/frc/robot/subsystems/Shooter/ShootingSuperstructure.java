@@ -1,15 +1,20 @@
 package frc.robot.subsystems.Shooter;
 
 import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Rotation;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.RobotConstants;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import lib.ironpulse.io.MotorIO;
@@ -44,6 +49,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         this.hood = hood;
         this.hopper = hopper;
         this.swerve = swerve;
+        cachedAimHeading = AutoAimCommand.getShooterAimHeading(robotPose());
     }
 
     private Pose2d robotPose() {
@@ -55,9 +61,46 @@ public class ShootingSuperstructure extends SubsystemBase {
         return AutoAimCommand.getDistanceToTarget(robotPose().getTranslation());
     }
 
-    /** The shot solution (hood angle + flywheel speed) for the current distance. */
+    /**
+     * Distance the shot must actually cover given chassis motion (shoot-on-move lookahead): the ball
+     * inherits the chassis field velocity for its time of flight. Equals {@link #distanceToTarget()}
+     * when stationary. Uses the commanded (setpoint) velocity for smoothness, à la 6328.
+     */
+    public double effectiveDistanceToTarget() {
+        ChassisSpeeds fieldVel =
+                ChassisSpeeds.fromRobotRelativeSpeeds(
+                        swerve.getChassisSpeedsCmd(), robotPose().getRotation());
+        return calculator.effectiveDistance(
+                robotPose().getTranslation(),
+                AutoAimCommand.getTarget(),
+                fieldVel.vxMetersPerSecond,
+                fieldVel.vyMetersPerSecond);
+    }
+
+    /** The shot solution (hood angle + flywheel speed), shoot-on-move compensated. */
     public ShotSolution currentSolution() {
-        return calculator.solve(distanceToTarget());
+        return calculator.solve(effectiveDistanceToTarget());
+    }
+
+    private Rotation2d computeAimHeading() {
+        ChassisSpeeds fv = ChassisSpeeds.fromRobotRelativeSpeeds(swerve.getChassisSpeedsCmd(), robotPose().getRotation());
+        double tof = calculator.timeOfFlightFor(distanceToTarget());
+        Translation2d lookahead = robotPose().getTranslation().plus(new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof));
+        return AutoAimCommand.getShooterAimHeading(new Pose2d(lookahead, robotPose().getRotation()));
+    }
+
+
+    private Rotation2d cachedAimHeading;
+    private Rotation2d lastAimHeading;
+    private double aimRate;
+    private LinearFilter aimRateFilter = LinearFilter.movingAverage((int)(0.1 / RobotConstants.LOOPER_DT));
+
+    public Rotation2d aimHeading() {
+        return cachedAimHeading;
+    }
+
+    public double aimHeadingRateRadPerSec() {
+        return aimRate;
     }
 
     private Angle clampHoodAngle(Angle angle) {
@@ -113,9 +156,25 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     @Override
     public void periodic() {
-        double distance = distanceToTarget();
-        ShotSolution solution = calculator.solve(distance);
-        Logger.recordOutput("Shooting/distanceMeters", distance);
+        double geometric = distanceToTarget();
+        double effective = effectiveDistanceToTarget();
+        ShotSolution solution = calculator.solve(effective);
+        Rotation2d heading = computeAimHeading();
+        double raw = (lastAimHeading == null)
+                        ? 0.0
+                        : heading.minus(lastAimHeading).getRadians() / RobotConstants.LOOPER_DT;
+        aimRate = aimRateFilter.calculate(raw);
+        lastAimHeading = heading;
+        cachedAimHeading = heading;
+
+
+
+
+
+
+        Logger.recordOutput("Shooting/distanceMeters", geometric);
+        Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
+        Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
         Logger.recordOutput("Shooting/shooterTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
         Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal());
