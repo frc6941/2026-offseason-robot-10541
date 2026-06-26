@@ -34,6 +34,12 @@ public class LimelightSubsystem extends SubsystemBase {
         return VecBuilder.fill(stdDev[0], stdDev[1], stdDev[2], stdDev[3]);
     }
 
+    /**
+     * Reliability threshold above which vision pose is trusted enough for a direct odometry reset
+     * instead of a gradual Kalman-filter correction. Set to 0 to disable auto-reset.
+     */
+    private static final double AUTO_RESET_RELIABILITY_THRESHOLD = 0.95;
+
     private void addVisionMeasurement() {
         if (suppressVisionFrames > 0) {
             suppressVisionFrames--;
@@ -46,8 +52,18 @@ public class LimelightSubsystem extends SubsystemBase {
             if (MathTools.epsilonEquals(input.reliability, 0)) {
                 continue;
             }
-            localizationProvider.addVisionMeasurement(
-                    input.pose, input.timestampSeconds, getVisionStdDev(io, input.reliability));
+
+            // When vision is near-certain (multiple well-spaced tags, close range, large area),
+            // directly reset odometry for instant correction instead of waiting for the Kalman
+            // filter to converge. This behaves like an automatic "resetPoseFromVision".
+            if (input.reliability >= AUTO_RESET_RELIABILITY_THRESHOLD && input.tv) {
+                localizationProvider.resetEstimatedPose(input.pose);
+                Logger.recordOutput("Limelight/" + io.getName() + "/autoReset", true);
+            } else {
+                localizationProvider.addVisionMeasurement(
+                        input.pose, input.timestampSeconds, getVisionStdDev(io, input.reliability));
+                Logger.recordOutput("Limelight/" + io.getName() + "/autoReset", false);
+            }
         }
     }
 
@@ -120,5 +136,27 @@ public class LimelightSubsystem extends SubsystemBase {
     public Pose2d getPose(String id) {
         LimelightIOInputsAutoLogged inputs = ios.get(getIoById(id));
         return inputs.pose == null ? new Pose2d() : inputs.pose.toPose2d();
+    }
+
+    /** Returns the auto-logged inputs for the named limelight. Useful for commands that need
+     *  raw targeting data (tx, ty, tid, targetPoseRobotSpace, etc.) without reaching into IO. */
+    public LimelightIOInputsAutoLogged getInputs(String id) {
+        return ios.get(getIoById(id));
+    }
+
+    /**
+     * Explicitly resets the swerve odometry to what this limelight currently sees.
+     * Only applies if the vision estimate is reliable and a valid target exists.
+     *
+     * @param id the limelight name (e.g. "limelight")
+     * @return true if the reset was performed, false if rejected
+     */
+    public boolean resetPoseFromVision(String id) {
+        LimelightIOInputsAutoLogged inputs = ios.get(getIoById(id));
+        if (inputs.pose == null || inputs.reliability < 0.7 || !inputs.tv) {
+            return false;
+        }
+        localizationProvider.resetEstimatedPose(inputs.pose);
+        return true;
     }
 }

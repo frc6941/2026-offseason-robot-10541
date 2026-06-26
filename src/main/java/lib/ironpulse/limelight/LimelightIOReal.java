@@ -281,6 +281,14 @@ public class LimelightIOReal implements LimelightIO {
         inputs.lastHeartbeat = lastHeartbeat;
         inputs.lastSeenTime = lastSeenTime;
         inputs.temperature = LimelightHelpers.getTemperature(config.getName());
+
+        // Raw targeting data — fast NT reads, independent of MegaTag2 pipeline
+        inputs.tv = LimelightHelpers.getTV(config.getName());
+        inputs.tx = LimelightHelpers.getTX(config.getName());
+        inputs.ty = LimelightHelpers.getTY(config.getName());
+        inputs.ta = LimelightHelpers.getTA(config.getName());
+        inputs.tid = LimelightHelpers.getFiducialID(config.getName());
+        inputs.targetPoseRobotSpace = LimelightHelpers.getTargetPose3d_RobotSpace(config.getName());
     }
 
     @Override

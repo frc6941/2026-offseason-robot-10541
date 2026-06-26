@@ -96,5 +96,12 @@ public interface LimelightIO {
         public double lastTsBootMs;
         public double lastSeenTime;
         public double temperature;
+        // Raw targeting data — updated every cycle directly from NT
+        public boolean tv;                   // has valid target
+        public double tx;                    // horizontal offset from crosshair (degrees)
+        public double ty;                    // vertical offset from crosshair (degrees)
+        public double ta;                    // target area (% of image)
+        public double tid;                   // primary target AprilTag ID
+        public Pose3d targetPoseRobotSpace;  // target pose in robot-frame (6DOF)
     }
 }

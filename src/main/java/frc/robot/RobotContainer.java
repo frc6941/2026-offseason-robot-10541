@@ -4,6 +4,8 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
 import java.util.function.Supplier;
@@ -32,6 +34,7 @@ import lib.ironpulse.limelight.DeviationParamSources;
 import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
+import lib.ironpulse.limelight.commands.LimelightAlignToTag;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 import lib.ironpulse.swerve.Swerve;
@@ -168,6 +171,19 @@ public class RobotContainer {
             shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
             hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)),
         indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
+
+    // Reset odometry to vision → one-shot correction when the driver notices drift.
+    // Also fires once at the start of autonomous.
+    new Trigger(DriverStation::isAutonomousEnabled)
+        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision("limelight")));
+    driverController.x()
+        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision("limelight")));
+
+    // Precision align to whatever AprilTag the Limelight sees — hold Y, release to stop.
+    // Desired offset: 0.5 m in front of the tag, facing it (kPi = look at the tag).
+    driverController.y().whileTrue(new LimelightAlignToTag(
+        swerve, limelightSubsystem, "limelight", -1,
+        new Transform2d(0.5, 0.0, Rotation2d.kPi)));
 
     // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
     driverController.b().onTrue(
