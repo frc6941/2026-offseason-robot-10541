@@ -25,9 +25,11 @@ public final class AutoBuilder {
     private static boolean configured = false;
 
     private final IntakerSubsystem intaker;
+    private final Swerve swerve;
 
-    public AutoBuilder(IntakerSubsystem intaker) {
+    public AutoBuilder(IntakerSubsystem intaker, Swerve swerve) {
         this.intaker = intaker;
+        this.swerve = swerve;
     }
 
     public static void configure(Swerve swerve) {
@@ -75,22 +77,22 @@ public final class AutoBuilder {
     }
 
     public Command buildDepotXAuto() {
-        return AutoCommands.depotXCollect(intaker);
+        return AutoCommands.depotXCollect(swerve, intaker);
     }
 
     public Command buildDepotYAuto() {
-        return AutoCommands.depotYCollect(intaker);
+        return AutoCommands.depotYCollect(swerve, intaker);
     }
 
     public Command buildOutpostAuto() {
-        return AutoCommands.goToOutpost();
+        return AutoCommands.goToOutpost(swerve);
     }
 
     public Command buildMidSweepLeftToRightAuto() {
-        return AutoCommands.sweepMidLeftToRight(intaker);
+        return AutoCommands.sweepMidLeftToRight(swerve, intaker);
     }
 
     public Command buildMidSweepRightToLeftAuto() {
-        return AutoCommands.sweepMidRightToLeft(intaker);
+        return AutoCommands.sweepMidRightToLeft(swerve, intaker);
     }
 }

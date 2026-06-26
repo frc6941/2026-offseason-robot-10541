@@ -68,7 +68,7 @@ public class RobotContainer {
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
       new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
-  private final AutoBuilder autoBuilder = new AutoBuilder(intaker);
+  private final AutoBuilder autoBuilder = new AutoBuilder(intaker, swerve);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
   private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
 
