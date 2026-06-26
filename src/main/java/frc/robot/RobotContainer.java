@@ -13,6 +13,7 @@ import frc.robot.commands.Autos;
 import frc.robot.commands.auto.AutoPoints;
 import frc.robot.commands.auto.AutoBuilder;
 import frc.robot.commands.auto.AutoCommands;
+import frc.robot.commands.auto.AutoSelector;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Shooter.HoodConfig;
 import frc.robot.subsystems.Hopper.HopperConfig;
@@ -50,9 +51,6 @@ import static edu.wpi.first.units.Units.Degrees;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
-import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
-import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -77,7 +75,7 @@ public class RobotContainer {
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
       new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
-  private final AutoBuilder autoBuilder = new AutoBuilder(intaker, swerve);
+  private final AutoBuilder autoBuilder = new AutoBuilder(intaker, swerve, shootingSuperstructure);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
   private final IndicatorSubsystem indicator = buildIndicator();
   private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
@@ -86,8 +84,7 @@ public class RobotContainer {
   // Replace with CommandPS4Controller or CommandJoystick if needed
   private final CommandXboxController driverController = new CommandXboxController(0);
 
-  // Auto chooser
-  private final SendableChooser<Command> autoChooser = new SendableChooser<>();
+  private final AutoSelector autoSelector;
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -96,39 +93,8 @@ public class RobotContainer {
     hopperSubsystem.configureDefaultCommand();
     AutoBuilder.configure(swerve);
     configureBindings();
-    // Continuously evaluate robot state → LED pattern (runs every scheduler tick).
+    autoSelector = new AutoSelector(autoBuilder, Autos.driveForward(swerve));
     new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
-    autoChooser.setDefaultOption("Do nothing", Commands.none());
-    autoChooser.addOption("Drive Forward", Autos.driveForward(swerve));
-    autoChooser.addOption("Depot X Collect", autoBuilder.buildDepotXAuto());
-    autoChooser.addOption("Depot Y Collect", autoBuilder.buildDepotYAuto());
-    autoChooser.addOption("Go To Outpost", autoBuilder.buildOutpostAuto());
-    autoChooser.addOption("Mid Sweep L->R", autoBuilder.buildMidSweepLeftToRightAuto());
-    autoChooser.addOption("Mid Sweep R->L", autoBuilder.buildMidSweepRightToLeftAuto());
-
-    // Shooting-integrated auto routines (6328-inspired)
-    // Use Suppliers so each scheduling step gets a fresh Command — WPILib 2026
-    // forbids re-composing or re-scheduling an already-used composed command.
-    Supplier<Command> shootSupplier = () -> Commands.parallel(
-            new AutoAimCommand(swerve, () -> 0.0, () -> 0.0,
-                    () -> AutoAimCommand.getShooterAimHeading(swerve.getEstimatedPose().toPose2d()),
-                    () -> 0.0),
-            shootingSuperstructure.aimAndShoot())
-            .withTimeout(3.0);
-    Supplier<Command> intakeSupplier = () -> Commands.parallel(
-            intaker.runIntake(),
-            hopperSubsystem.feed())
-            .withTimeout(2.1);
-    autoChooser.addOption("1 Note (Shoot)", Autos.oneNote(swerve, shootSupplier));
-    autoChooser.addOption("2 Note (Shoot+Intake+Shoot)", Autos.twoNote(swerve, shootSupplier, intakeSupplier));
-
-    // Example path-following autos (programmatic S-curve, no .path file needed)
-    var robotConfig = AutoBuilder.createRobotConfig();
-    autoChooser.addOption("Example Path", Autos.examplePathAuto(swerve, robotConfig));
-    autoChooser.addOption("Example Path+Shoot", Autos.examplePathAndShoot(swerve, robotConfig, shootSupplier));
-    Shuffleboard.getTab("Autonomous")
-        .add("Auto Chooser", autoChooser)
-        .withWidget(BuiltInWidgets.kComboBoxChooser);
   }
 
   /**
@@ -211,7 +177,15 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    return autoChooser.getSelected();
+    return autoSelector.getCommand();
+  }
+
+  public void updateDashboard() {
+    autoSelector.updateDashboard();
+  }
+
+  public String getAutoSelectionSummary() {
+    return autoSelector.getSelectionSummary();
   }
 
   /**

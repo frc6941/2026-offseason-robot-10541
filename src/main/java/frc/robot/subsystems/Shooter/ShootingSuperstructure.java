@@ -114,8 +114,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     /** True when the SHOOTER is pointed at the hub within the (NT-tunable) heading tolerance. */
     public boolean headingAtGoal() {
         Pose2d pose = robotPose();
-        // Uses the shooter-corrected aim heading (off-axis firing + edge-mount offset), not robot-forward.
-        Rotation2d aimHeading = AutoAimCommand.getShooterAimHeading(pose);
+        Rotation2d aimHeading = aimHeading();
         double errorDeg = Math.abs(pose.getRotation().minus(aimHeading).getDegrees());
         return errorDeg <= ShootingParamsNT.headingToleranceDeg.getValue();
     }
@@ -137,6 +136,14 @@ public class ShootingSuperstructure extends SubsystemBase {
                 shooter.runVelVolt(() -> currentSolution().shooterSpeed()),
                 hood.runMotionMagic(() -> clampHoodAngle(currentSolution().hoodAngle())),
                 Commands.waitUntil(this::readyToShoot).andThen(hopper.feed()));
+    }
+
+    public Command feedShotForSeconds(double seconds) {
+        return Commands.deadline(
+                Commands.waitSeconds(seconds),
+                shooter.runVelVolt(() -> currentSolution().shooterSpeed()),
+                hood.runMotionMagic(() -> clampHoodAngle(currentSolution().hoodAngle())),
+                hopper.feed());
     }
 
     /**

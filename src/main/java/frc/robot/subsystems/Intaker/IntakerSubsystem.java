@@ -91,33 +91,34 @@ public class IntakerSubsystem extends SubsystemBase{
         );
             
     }
+
+    private void setIntakeMode(IntakeMode mode) {
+        fallbackMode = mode;
+
+        if(currentMode != IntakeMode.FEEDING
+            && currentMode != IntakeMode.EXTENDED_REVERSE){
+            currentMode = mode;
+        }
+    }
     
 
     public Command runIntake(){
         return Commands.runOnce(
-            () -> {
-                fallbackMode = IntakeMode.INTAKING;
+            () -> setIntakeMode(IntakeMode.INTAKING)
+        );
+    }
 
-                if(currentMode != IntakeMode.FEEDING 
-                    && currentMode != IntakeMode.EXTENDED_REVERSE){
-                    currentMode = IntakeMode.INTAKING;
-                }
-
-            }
+    public Command runIntakeContinuous(){
+        return Commands.startEnd(
+            () -> setIntakeMode(IntakeMode.INTAKING),
+            () -> setIntakeMode(IntakeMode.RETRACTED),
+            this
         );
     }
 
     public Command runRetract(){
         return Commands.runOnce(
-            () -> {
-                fallbackMode = IntakeMode.RETRACTED;
-
-                if(currentMode != IntakeMode.FEEDING 
-                    && currentMode != IntakeMode.EXTENDED_REVERSE){
-                    currentMode = IntakeMode.RETRACTED;
-                }
-
-            }
+            () -> setIntakeMode(IntakeMode.RETRACTED)
         );
     }
 
