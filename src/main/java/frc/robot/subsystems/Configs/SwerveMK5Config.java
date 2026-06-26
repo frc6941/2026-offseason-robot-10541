@@ -55,7 +55,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(kSwerveHalfLength, kSwerveHalfWidth))
                     .driveMotorId(9).steerMotorId(8).encoderId(7)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.0))
+                    .steerMotorEncoderOffset(Rotations.of(-0.016113))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -65,7 +65,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(kSwerveHalfLength, -kSwerveHalfWidth))
                     .driveMotorId(12).steerMotorId(11).encoderId(10)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.0))
+                    .steerMotorEncoderOffset(Rotations.of(0.172119))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -75,7 +75,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(-kSwerveHalfLength, kSwerveHalfWidth))
                     .driveMotorId(6).steerMotorId(5).encoderId(4)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.0))
+                    .steerMotorEncoderOffset(Rotations.of(0.238281))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -85,7 +85,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(-kSwerveHalfLength, -kSwerveHalfWidth))
                     .driveMotorId(3).steerMotorId(2).encoderId(1)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.0))
+                    .steerMotorEncoderOffset(Rotations.of(0.494141))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
