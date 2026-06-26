@@ -10,7 +10,7 @@ public final class RobotConstants {
 
 
     // CAN_ID
-    public static final int PIGEON_ID = 14;
+    public static final int PIGEON_ID = 0;
 
     
     // Alliance flip

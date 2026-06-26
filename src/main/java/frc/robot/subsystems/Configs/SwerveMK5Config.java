@@ -53,9 +53,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("LF")
                     .location(new Translation2d(kSwerveHalfLength, kSwerveHalfWidth))
-                    .driveMotorId(1).steerMotorId(2).encoderId(9)
+                    .driveMotorId(9).steerMotorId(8).encoderId(7)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.008544921875))
+                    .steerMotorEncoderOffset(Rotations.of(0.0))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -63,9 +63,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("RF")
                     .location(new Translation2d(kSwerveHalfLength, -kSwerveHalfWidth))
-                    .driveMotorId(3).steerMotorId(4).encoderId(10)
+                    .driveMotorId(12).steerMotorId(11).encoderId(10)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.26318359375))
+                    .steerMotorEncoderOffset(Rotations.of(0.0))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -73,9 +73,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("LB")
                     .location(new Translation2d(-kSwerveHalfLength, kSwerveHalfWidth))
-                    .driveMotorId(5).steerMotorId(6).encoderId(11)
+                    .driveMotorId(6).steerMotorId(5).encoderId(4)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.165771484375))
+                    .steerMotorEncoderOffset(Rotations.of(0.0))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -83,9 +83,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("RB")
                     .location(new Translation2d(-kSwerveHalfLength, -kSwerveHalfWidth))
-                    .driveMotorId(7).steerMotorId(8).encoderId(12)
+                    .driveMotorId(3).steerMotorId(2).encoderId(1)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.220947265625))
+                    .steerMotorEncoderOffset(Rotations.of(0.0))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
