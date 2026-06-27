@@ -62,6 +62,10 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 public class RobotContainer {
     private boolean isReal = RobotBase.isReal();
 
+    // Limelight device id — must exactly match the limelight's hostname (web UI -> Settings ->
+    // Hostname). Single source of truth so the IO registration and every lookup can't drift apart.
+    private static final String LIMELIGHT_NAME = "limelight-a";
+
   
   private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller = buildIntakerRoller();
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> intakerPivot = buildIntakerPivot();
@@ -144,14 +148,14 @@ public class RobotContainer {
     // Reset odometry to vision → one-shot correction when the driver notices drift.
     // Also fires once at the start of autonomous.
     new Trigger(DriverStation::isAutonomousEnabled)
-        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision("limelight")));
+        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision(LIMELIGHT_NAME)));
     driverController.x()
-        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision("limelight")));
+        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision(LIMELIGHT_NAME)));
 
     // Precision align to whatever AprilTag the Limelight sees — hold Y, release to stop.
     // Desired offset: 0.5 m in front of the tag, facing it (kPi = look at the tag).
     driverController.y().whileTrue(new LimelightAlignToTag(
-        swerve, limelightSubsystem, "limelight", -1,
+        swerve, limelightSubsystem, LIMELIGHT_NAME, -1,
         new Transform2d(0.5, 0.0, Rotation2d.kPi)));
 
     // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
@@ -306,9 +310,7 @@ public class RobotContainer {
 
   private LimelightSubsystem buildLimelight() {
     LimelightIOConfig config = LimelightIOConfig.builder()
-        // Must exactly match the limelight's hostname (web UI -> Settings -> Hostname).
-        // Using the comp-bot's convention; rename the device to "limelight-a" to match.
-        .name("limelight-a")
+        .name(LIMELIGHT_NAME)
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
         .defaultXStdDev(0.7)
