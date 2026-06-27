@@ -39,12 +39,6 @@ public class NTDeviationSources implements DeviationParamSources {
         this.defaultZStdDev = defaultZStdDev;
         this.defaultAngleStdDev = defaultAngleStdDev;
         this.defaultImuThreshold = defaultImuThreshold;
-        // Publish defaults so the entries appear in Shuffleboard / Glass for live tuning.
-        SmartDashboard.putNumber(key("xStdDev"), defaultXStdDev);
-        SmartDashboard.putNumber(key("yStdDev"), defaultYStdDev);
-        SmartDashboard.putNumber(key("zStdDev"), defaultZStdDev);
-        SmartDashboard.putNumber(key("angleStdDev"), defaultAngleStdDev);
-        SmartDashboard.putNumber(key("imuCorrectionReliabilityThreshold"), defaultImuThreshold);
     }
 
     private String key(String param) {
@@ -53,26 +47,36 @@ public class NTDeviationSources implements DeviationParamSources {
 
     @Override
     public double xStdDev() {
-        return SmartDashboard.getNumber(key("xStdDev"), defaultXStdDev);
+        double value = SmartDashboard.getNumber(key("xStdDev"), defaultXStdDev);
+        SmartDashboard.putNumber(key("xStdDev"), value);
+        return value;
     }
 
     @Override
     public double yStdDev() {
-        return SmartDashboard.getNumber(key("yStdDev"), defaultYStdDev);
+        double value = SmartDashboard.getNumber(key("yStdDev"), defaultYStdDev);
+        SmartDashboard.putNumber(key("yStdDev"), value);
+        return value;
     }
 
     @Override
     public double zStdDev() {
-        return SmartDashboard.getNumber(key("zStdDev"), defaultZStdDev);
+        double value = SmartDashboard.getNumber(key("zStdDev"), defaultZStdDev);
+        SmartDashboard.putNumber(key("zStdDev"), value);
+        return value;
     }
 
     @Override
     public double angleStdDev() {
-        return SmartDashboard.getNumber(key("angleStdDev"), defaultAngleStdDev);
+        double value = SmartDashboard.getNumber(key("angleStdDev"), defaultAngleStdDev);
+        SmartDashboard.putNumber(key("angleStdDev"), value);
+        return value;
     }
 
     @Override
     public double imuCorrectionReliabilityThreshold() {
-        return SmartDashboard.getNumber(key("imuCorrectionReliabilityThreshold"), defaultImuThreshold);
+        double value = SmartDashboard.getNumber(key("imuCorrectionReliabilityThreshold"), defaultImuThreshold);
+        SmartDashboard.putNumber(key("imuCorrectionReliabilityThreshold"), value);
+        return value;
     }
 }
