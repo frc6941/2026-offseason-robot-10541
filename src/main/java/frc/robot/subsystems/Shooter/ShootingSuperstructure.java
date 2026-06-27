@@ -8,6 +8,9 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
@@ -17,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotConstants;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
+import lib.ironpulse.command.VisualizeProjectileShot;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -39,6 +43,10 @@ public class ShootingSuperstructure extends SubsystemBase {
     private final HopperSubsystem hopper;
     private final Swerve swerve;
     private final ShotCalculator calculator = new ShotCalculator();
+
+    // TODO: tune kRpsToMuzzleMps until the visualized arc lands in the hub at a known, stationary
+    // distance. Visualization only — does NOT affect aim (that comes from the ToF table).
+    private static final double kRpsToMuzzleMps = 0.11;
 
     public ShootingSuperstructure(
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooter,
@@ -186,5 +194,40 @@ public class ShootingSuperstructure extends SubsystemBase {
         Logger.recordOutput("Shooting/shooterTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
         Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal());
         Logger.recordOutput("Shooting/readyToShoot", readyToShoot());
+
+        // --- Shoot-on-move visualization (drag these onto a 2D/3D Field in AdvantageScope) ---
+        Pose2d pose = robotPose();
+        Translation2d hub = AutoAimCommand.getTarget();
+        ChassisSpeeds fv =
+                ChassisSpeeds.fromRobotRelativeSpeeds(
+                        swerve.getChassisSpeedsCmd(), pose.getRotation());
+        double tof = calculator.timeOfFlightFor(geometric);
+        // How far the ball drifts downrange from inheriting chassis velocity over its flight.
+        Translation2d leadOffset =
+                new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
+        // The point the chassis actually aims at: the hub pulled back against our motion.
+        Translation2d virtualTarget = hub.minus(leadOffset);
+        // The internal dual the aim math uses: pretend the shooter is here, aim at the real hub.
+        Translation2d virtualShooter = pose.getTranslation().plus(leadOffset);
+
+        Logger.recordOutput("Shooting/Viz/Hub", new Pose2d(hub, new Rotation2d()));
+        Logger.recordOutput("Shooting/Viz/VirtualTarget", new Pose2d(virtualTarget, new Rotation2d()));
+        Logger.recordOutput("Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
+        Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
+
+        // --- Ballistic arc overlay (3D Field: Commands/VisualizeProjectileShot/pathWorld) ---
+        // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
+        Pose3d muzzle =
+                new Pose3d(pose).plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
+        VisualizeProjectileShot.logPath(
+                muzzle,
+                // TODO: verify the shooter fires off the back (-X); drop the +180 if it points forward.
+                pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
+                // TODO: verify hood angle sign/zero maps to up-positive launch pitch vs CAD.
+                Rotation2d.fromDegrees(hood.getCurrPos().in(Degrees)),
+                solution.shooterSpeed().in(RotationsPerSecond) * kRpsToMuzzleMps,
+                new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond),
+                true,
+                "");
     }
 }

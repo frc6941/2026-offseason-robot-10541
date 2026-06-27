@@ -3,11 +3,14 @@ package lib.ironpulse.limelight;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N4;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lib.ironpulse.math.MathTools;
@@ -76,6 +79,11 @@ public class LimelightSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
+        // Tag-derived robot poses for this loop — drawn as a translucent "ghost" in AdvantageScope
+        // alongside the solid Swerve/SwerveEstimatorPose model. Each camera contributes a pose only
+        // while it has a trusted target, so the ghost vanishes when no tags are visible.
+        List<Pose3d> visionGhosts = new ArrayList<>();
+
         for (Map.Entry<LimelightIO, LimelightIOInputsAutoLogged> entry : ios.entrySet()) {
             LimelightIO io = entry.getKey();
             io.setRobotOrientation();
@@ -83,6 +91,15 @@ public class LimelightSubsystem extends SubsystemBase {
 
             io.updateInputs(inputs);
             Logger.processInputs("Limelight/" + io.getName(), inputs);
+
+            // Per-camera ghost: empty array (hidden) unless this camera trusts its target.
+            if (inputs.tv && inputs.reliability > 0 && inputs.pose != null) {
+                Logger.recordOutput(
+                        "Limelight/" + io.getName() + "/VisionPose", new Pose3d[] {inputs.pose});
+                visionGhosts.add(inputs.pose);
+            } else {
+                Logger.recordOutput("Limelight/" + io.getName() + "/VisionPose", new Pose3d[0]);
+            }
 
             if (!io.canUseInternalIMU()) {
                 continue;
@@ -94,6 +111,9 @@ public class LimelightSubsystem extends SubsystemBase {
                     "Limelight/" + io.getName() + "alive",
                     Objects.equals(inputs.status, "Connected"));
         }
+
+        // Combined ghost across all cameras — bind one translucent robot to this in AdvantageScope.
+        Logger.recordOutput("Limelight/VisionPose", visionGhosts.toArray(new Pose3d[0]));
 
         addVisionMeasurement();
         LoggedTracer.record("Limelight");

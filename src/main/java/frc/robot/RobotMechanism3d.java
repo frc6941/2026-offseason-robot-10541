@@ -36,7 +36,8 @@ public class RobotMechanism3d extends SubsystemBase {
 
   // TODO: tune joint origins (meters, relative to robot center) from CAD
   // ---- Joint origins relative to robot center (meters) ----
-  private static final Translation3d HOOD_PIVOT = new Translation3d(-0.2579, 0.0, 0.47525);
+  // HOOD_PIVOT is shared with the shooter muzzle viz — see RobotConstants.HOOD_PIVOT.
+  private static final Translation3d HOOD_PIVOT = RobotConstants.HOOD_PIVOT;
   private static final Translation3d INTAKE_PIVOT = new Translation3d(0.2829, 0.0, 0.20125);
 
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
