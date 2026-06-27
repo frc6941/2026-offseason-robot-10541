@@ -1,16 +1,22 @@
 package frc.robot;
 
 import com.ctre.phoenix6.CANBus;
+import edu.wpi.first.math.geometry.Translation3d;
 
 public final class RobotConstants {
+    // Mechanism geometry (robot frame: +X forward, +Y left, +Z up)
+    // TODO: match HOOD_PIVOT to CAD. Single source of truth for the hood joint origin
+    // (RobotMechanism3d 3D model) and the shooter muzzle release point (projectile viz).
+    public static final Translation3d HOOD_PIVOT = new Translation3d(-0.2579, 0.0, 0.47525);
+
     // CAN
     public static final String ROBORIO_CAN_BUS_NAME = "rio";
-    public static final String CANIVORE_CAN_BUS_NAME = "6941Canivore0";
+    public static final String CANIVORE_CAN_BUS_NAME = "10541Canivore0";
     public static final CANBus CANIVORE_CAN_BUS = new CANBus(CANIVORE_CAN_BUS_NAME);
 
 
     // CAN_ID
-    public static final int PIGEON_ID = 14;
+    public static final int PIGEON_ID = 0;
 
     
     // Alliance flip

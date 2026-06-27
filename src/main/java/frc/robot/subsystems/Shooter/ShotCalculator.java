@@ -62,22 +62,22 @@ public class ShotCalculator {
      * <p>When stationary ({@code vx == vy == 0}) this returns the plain geometric distance, so it is
      * always safe to route the normal (non-moving) case through here too.
      *
-     * @param launcher field-relative launcher position (≈ robot center for a near-centered launcher)
+     * @param shooter field-relative shooter position (≈ robot center for a near-centered shooter)
      * @param target field-relative hub target
      * @param vxField field-relative chassis x velocity (m/s)
      * @param vyField field-relative chassis y velocity (m/s)
      * @return effective distance (m) to feed {@link #solve}
      */
     public double effectiveDistance(
-            Translation2d launcher, Translation2d target, double vxField, double vyField) {
+            Translation2d shooter, Translation2d target, double vxField, double vyField) {
         rebuildIfNeeded();
         // TODO: add 6328-style linear-drag model to the offset (v*effectiveTOF) once stationary aim is dialed in
-        double distance = target.getDistance(launcher);
+        double distance = target.getDistance(shooter);
         for (int i = 0; i < LOOKAHEAD_ITERATIONS; i++) {
             double tof = timeOfFlightSec.get(distance);
-            Translation2d virtualLauncher =
-                    launcher.plus(new Translation2d(vxField * tof, vyField * tof));
-            distance = target.getDistance(virtualLauncher);
+            Translation2d virtualShooter =
+                    shooter.plus(new Translation2d(vxField * tof, vyField * tof));
+            distance = target.getDistance(virtualShooter);
         }
         return distance;
     }
