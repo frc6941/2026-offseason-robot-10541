@@ -3,9 +3,7 @@ package lib.ironpulse.swerve;
 import static edu.wpi.first.units.Units.*;
 import static lib.ironpulse.math.MathTools.epsilonEquals;
 
-import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.events.Event;
-import com.pathplanner.lib.path.PathPlannerPath;
 import com.pathplanner.lib.trajectory.PathPlannerTrajectory;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
@@ -21,7 +19,6 @@ import java.util.function.DoubleSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import lib.ironpulse.swerve.commands.SwerveDriveToPose;
-import lib.ironpulse.swerve.commands.SwerveFollowPath;
 import lib.ironpulse.swerve.commands.SwerveFollowPathPlannerTrajectory;
 import org.littletonrobotics.junction.Logger;
 
@@ -196,28 +193,6 @@ public class SwerveCommands {
                 translationTolerance,
                 rotationTolerance,
                 eventConsumer);
-    }
-
-    /**
-     * Follow a {@link PathPlannerPath} using on-the-fly trajectory generation. A {@link RobotConfig}
-     * must be provided — it describes the robot's mass, MOI, module config, and module locations so
-     * PathPlanner can generate a dynamically feasible trajectory.
-     */
-    public static Command followPath(
-            Swerve swerve,
-            PathPlannerPath path,
-            Supplier<Pose3d> poseWorldRobotSupplier,
-            RobotConfig robotConfig,
-            PIDController translationController,
-            PIDController rotationController,
-            Distance translationTolerance,
-            Angle rotationTolerance) {
-        var cmd = new SwerveFollowPath(swerve, path, translationController, rotationController);
-        cmd.setPoseWorldRobotSupplier(poseWorldRobotSupplier);
-        cmd.setRobotConfig(robotConfig);
-        cmd.setTranslationTolerance(translationTolerance);
-        cmd.setRotationTolerance(rotationTolerance);
-        return cmd;
     }
 
     public static SysIdRoutine sysid(

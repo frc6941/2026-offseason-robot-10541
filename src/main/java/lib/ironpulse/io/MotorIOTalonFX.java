@@ -20,7 +20,6 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Voltage;
-import frc.robot.RobotConstants;
 import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ironpulse.utils.PhoenixUtils;
 
@@ -130,14 +129,14 @@ public class MotorIOTalonFX implements MotorIO {
                     followerCurrentLimits.SupplyCurrentLimitEnable = true;
                     followerCurrentLimits.SupplyCurrentLimit = f.supplyCurrentLimitAmps;
                 }
+                if (!Double.isNaN(f.ramp)) {
+                    followers[i]
+                            .getConfigurator()
+                            .apply(
+                                    new ClosedLoopRampsConfigs()
+                                            .withVoltageClosedLoopRampPeriod(f.ramp));
+                }
                 followers[i].getConfigurator().apply(followerCurrentLimits);
-            }
-            if (!Double.isNaN(f.ramp)) {
-                followers[i]
-                        .getConfigurator()
-                        .apply(
-                                new ClosedLoopRampsConfigs()
-                                        .withVoltageClosedLoopRampPeriod(f.ramp));
             }
         }
 
@@ -160,21 +159,17 @@ public class MotorIOTalonFX implements MotorIO {
         supplyVoltSig.setUpdateFrequency(30.0);
         statorSig.setUpdateFrequency(100.0);
         supplySig.setUpdateFrequency(100.0);
-        boolean isCanivoreBus = cfg.mainBus == RobotConstants.CANIVORE_CAN_BUS;
-        PhoenixUtils.registerSignals(isCanivoreBus, signals);
+        PhoenixUtils.registerSignals(cfg.mainBus, signals);
         main.optimizeBusUtilization();
     }
 
     private void configureCANcoder(SubsystemConfig.RemoteCANcoder rc) {
-        // Create a temporary CANcoder handle to push configuration to the device.
-        // Configuration is persisted in CANcoder hardware — the handle is discarded
-        // because no runtime interaction with the CANcoder is needed after config.
-        try (CANcoder coder = new CANcoder(rc.id, rc.bus)) {
-            CANcoderConfiguration c = new CANcoderConfiguration();
-            c.MagnetSensor.MagnetOffset = rc.magnetOffset;
-            c.MagnetSensor.SensorDirection = rc.sensorDirection;
-            coder.getConfigurator().apply(c);
-        }
+        CANcoder coder = new CANcoder(rc.id, rc.bus);
+        // Build a CANcoderConfiguration from rc fields
+        CANcoderConfiguration c = new CANcoderConfiguration();
+        c.MagnetSensor.MagnetOffset = rc.magnetOffset;
+        c.MagnetSensor.SensorDirection = rc.sensorDirection;
+        coder.getConfigurator().apply(c);
     }
 
     @Override

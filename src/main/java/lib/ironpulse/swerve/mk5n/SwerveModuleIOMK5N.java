@@ -78,7 +78,7 @@ public class SwerveModuleIOMK5N implements SwerveModuleIO {
 
         // register signals, refresh in robotPeriodic
         PhoenixUtils.registerSignals(
-                true,
+                config.canivoreCanBus,
                 drivePosition,
                 driveVelocity,
                 driveVoltage,

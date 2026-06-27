@@ -7,6 +7,7 @@ import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.path.GoalEndState;
 import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.path.PathPlannerPath;
+import com.pathplanner.lib.trajectory.PathPlannerTrajectory;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
@@ -82,16 +83,23 @@ public final class Autos {
         // Reset odometry before following the path.
         // .beforeStarting runs the Runnable in initialize() BEFORE generating
         // the trajectory, so the generator sees the correct starting pose.
+        // New lib takes a pre-generated trajectory; generate from the path's starting heading
+        // (we reset to that same pose in beforeStarting).
+        PathPlannerTrajectory traj =
+                path.generateTrajectory(
+                        new ChassisSpeeds(),
+                        path.getStartingDifferentialPose().getRotation(),
+                        robotConfig);
         return SwerveCommands
-                .followPath(
+                .followPathPlannerTrajectory(
                         swerve,
-                        path,
+                        traj,
                         swerve::getEstimatedPose,
-                        robotConfig,
                         transPID,
                         rotPID,
                         Meters.of(0.05),
-                        Radians.of(0.05))
+                        Radians.of(0.05),
+                        event -> {})
                 .beforeStarting(
                         () -> swerve.resetEstimatedPose(
                                 new Pose3d(path.getStartingDifferentialPose())));
@@ -111,11 +119,17 @@ public final class Autos {
 
         // Using .beforeStarting() on the path command itself for the pose reset,
         // then composing with shoot commands via Commands.sequence().
+        PathPlannerTrajectory traj =
+                path.generateTrajectory(
+                        new ChassisSpeeds(),
+                        path.getStartingDifferentialPose().getRotation(),
+                        robotConfig);
         Command followPathWithReset = SwerveCommands
-                .followPath(
-                        swerve, path, swerve::getEstimatedPose, robotConfig,
+                .followPathPlannerTrajectory(
+                        swerve, traj, swerve::getEstimatedPose,
                         transPID, rotPID,
-                        Meters.of(0.05), Radians.of(0.05))
+                        Meters.of(0.05), Radians.of(0.05),
+                        event -> {})
                 .beforeStarting(
                         () -> swerve.resetEstimatedPose(
                                 new Pose3d(path.getStartingDifferentialPose())));

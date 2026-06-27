@@ -9,7 +9,6 @@ import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 import edu.wpi.first.units.measure.Angle;
-import frc.robot.RobotConstants;
 import lib.ironpulse.utils.PhoenixUtils;
 
 public class CANCoderIOCANCoder implements CANCoderIO {
@@ -29,8 +28,7 @@ public class CANCoderIOCANCoder implements CANCoderIO {
         PhoenixUtils.tryUntilOk(5, () -> encoder.getConfigurator().apply(cancoderConfigs));
         positionSig = encoder.getAbsolutePosition();
         positionSig.setUpdateFrequency(1000.0);
-        boolean isCanivoreBus = mBus.equals(RobotConstants.CANIVORE_CAN_BUS);
-        PhoenixUtils.registerSignals(isCanivoreBus, new BaseStatusSignal[] {positionSig});
+        PhoenixUtils.registerSignals(mBus, new BaseStatusSignal[] {positionSig});
         encoder.optimizeBusUtilization();
     }
 

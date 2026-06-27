@@ -139,25 +139,6 @@ public final class SwerveMK5Config {
                     .pigeonId(RobotConstants.PIGEON_ID)
                     .build();
 
-    // NT-tunable swerve module PID/FF. Generates SwerveModuleParamsNT (nested Drive/Steer with
-    // per-group isAnyChanged()), consumed by SwerveModule.
-    // TODO: tune drive + steer gains on the real robot.
-    @NTParameter(tableName = "Params/SwerveModule")
-    public static final class SwerveModuleParams {
-        public static final class Drive {
-            public static final double kP = 10.0;
-            public static final double kI = 0.0;
-            public static final double kD = 0.0;
-            public static final double kS = 0.0;
-            public static final double kV = 0.136;
-            public static final double kA = 0.05;
-        }
-
-        public static final class Steer {
-            public static final double kP = 10.0;
-            public static final double kI = 0.0;
-            public static final double kD = 0.1;
-            public static final double kS = 0.0;
-        }
-    }
+    // Swerve module PID/FF gains moved to frc.robot.SwerveModuleParams (package frc.robot) — the
+    // vendored lib imports frc.robot.SwerveModuleParamsNT directly.
 }

@@ -4,6 +4,7 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -33,7 +34,7 @@ import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
-import lib.ironpulse.limelight.commands.LimelightAlignToTag;
+import lib.ironpulse.limelight.DeviationParamSources;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 import lib.ironpulse.swerve.Swerve;
@@ -53,6 +54,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import org.littletonrobotics.junction.Logger;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -154,18 +156,11 @@ public class RobotContainer {
             hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)),
         indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
 
-    // Reset odometry to vision → one-shot correction when the driver notices drift.
-    // Also fires once at the start of autonomous.
-    new Trigger(DriverStation::isAutonomousEnabled)
-        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision(LIMELIGHT_NAME)));
-    driverController.x()
-        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision(LIMELIGHT_NAME)));
-
-    // Precision align to whatever AprilTag the Limelight sees — hold Y, release to stop.
-    // Desired offset: 0.5 m in front of the tag, facing it (kPi = look at the tag).
-    driverController.y().whileTrue(new LimelightAlignToTag(
-        swerve, limelightSubsystem, LIMELIGHT_NAME, -1,
-        new Transform2d(0.5, 0.0, Rotation2d.kPi)));
+    // Vision pose correction is now continuous via MegaTag2 (seeded by the Start-button heading
+    // zero), so the old one-shot resetPoseFromVision bindings (auto-start + driver X) were removed
+    // with the lib-IP-2026 adoption.
+    // TODO: re-wire precision tag-align to the new lib's SwerveDriveToAllign (the old
+    // LimelightAlignToTag was dropped). Driver Y is free until then.
 
     // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
     driverController.b().onTrue(
@@ -198,6 +193,14 @@ public class RobotContainer {
 
   public void updateDashboard() {
     autoSelector.updateDashboard();
+
+    // Vision ghost — re-homed out of the vendored lib so future lib copies stay drop-in. Logs the
+    // tag-derived robot pose as a Pose2d[], hidden (empty array) when there's no target so it
+    // doesn't snap to the field origin. Bind a translucent robot to Vision/Ghost in AdvantageScope.
+    Pose2d visionPose = limelightSubsystem.getPose(LIMELIGHT_NAME);
+    Logger.recordOutput(
+        "Vision/Ghost",
+        visionPose.equals(new Pose2d()) ? new Pose2d[0] : new Pose2d[] {visionPose});
   }
 
   public String getAutoSelectionSummary() {
@@ -322,11 +325,6 @@ public class RobotContainer {
         .name(LIMELIGHT_NAME)
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
-        .defaultXStdDev(0.7)
-        .defaultYStdDev(0.7)
-        .defaultZStdDev(9999.0)
-        .defaultAngleStdDev(1.0)
-        .defaultImuCorrectionReliabilityThreshold(0.9)
         .build();
 
     LimelightIOReal io = new LimelightIOReal(
@@ -334,7 +332,14 @@ public class RobotContainer {
         swerve::getIMUYaw,
         swerve::getYawVelocityRadPerSec,
         () -> false,
-        config.createDeviationSources());
+        // TODO: tune vision std-devs on the real robot (x/y trusted; z & heading distrusted for MT2).
+        new DeviationParamSources() {
+          public double xStdDev() { return 0.7; }
+          public double yStdDev() { return 0.7; }
+          public double zStdDev() { return 9999.0; }
+          public double angleStdDev() { return 1.0; }
+          public double imuCorrectionReliabilityThreshold() { return 0.9; }
+        });
     return new LimelightSubsystem(swerve, io);
   }
 
