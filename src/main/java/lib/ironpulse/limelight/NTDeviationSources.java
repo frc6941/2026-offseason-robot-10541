@@ -12,25 +12,39 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 public class NTDeviationSources implements DeviationParamSources {
 
     private final String name;
-
-    // Hard-coded fallback defaults that also seed the NT entries on construction.
-    private static final double DEFAULT_X_STD_DEV = 0.7;
-    private static final double DEFAULT_Y_STD_DEV = 0.7;
-    private static final double DEFAULT_Z_STD_DEV = 9999.0;
-    private static final double DEFAULT_ANGLE_STD_DEV = 1.0;
-    private static final double DEFAULT_IMU_THRESHOLD = 0.9;
+    private final double defaultXStdDev;
+    private final double defaultYStdDev;
+    private final double defaultZStdDev;
+    private final double defaultAngleStdDev;
+    private final double defaultImuThreshold;
 
     /**
-     * @param name the limelight name (e.g. "limelight"), used for the NT key prefix
+     * @param name              the limelight name (e.g. "limelight"), used for the NT key prefix
+     * @param defaultXStdDev    default x standard deviation
+     * @param defaultYStdDev    default y standard deviation
+     * @param defaultZStdDev    default z standard deviation
+     * @param defaultAngleStdDev default angle standard deviation
+     * @param defaultImuThreshold default IMU correction reliability threshold
      */
-    public NTDeviationSources(String name) {
+    public NTDeviationSources(
+            String name,
+            double defaultXStdDev,
+            double defaultYStdDev,
+            double defaultZStdDev,
+            double defaultAngleStdDev,
+            double defaultImuThreshold) {
         this.name = name;
+        this.defaultXStdDev = defaultXStdDev;
+        this.defaultYStdDev = defaultYStdDev;
+        this.defaultZStdDev = defaultZStdDev;
+        this.defaultAngleStdDev = defaultAngleStdDev;
+        this.defaultImuThreshold = defaultImuThreshold;
         // Publish defaults so the entries appear in Shuffleboard / Glass for live tuning.
-        SmartDashboard.putNumber(key("xStdDev"), DEFAULT_X_STD_DEV);
-        SmartDashboard.putNumber(key("yStdDev"), DEFAULT_Y_STD_DEV);
-        SmartDashboard.putNumber(key("zStdDev"), DEFAULT_Z_STD_DEV);
-        SmartDashboard.putNumber(key("angleStdDev"), DEFAULT_ANGLE_STD_DEV);
-        SmartDashboard.putNumber(key("imuCorrectionReliabilityThreshold"), DEFAULT_IMU_THRESHOLD);
+        SmartDashboard.putNumber(key("xStdDev"), defaultXStdDev);
+        SmartDashboard.putNumber(key("yStdDev"), defaultYStdDev);
+        SmartDashboard.putNumber(key("zStdDev"), defaultZStdDev);
+        SmartDashboard.putNumber(key("angleStdDev"), defaultAngleStdDev);
+        SmartDashboard.putNumber(key("imuCorrectionReliabilityThreshold"), defaultImuThreshold);
     }
 
     private String key(String param) {
@@ -39,26 +53,26 @@ public class NTDeviationSources implements DeviationParamSources {
 
     @Override
     public double xStdDev() {
-        return SmartDashboard.getNumber(key("xStdDev"), DEFAULT_X_STD_DEV);
+        return SmartDashboard.getNumber(key("xStdDev"), defaultXStdDev);
     }
 
     @Override
     public double yStdDev() {
-        return SmartDashboard.getNumber(key("yStdDev"), DEFAULT_Y_STD_DEV);
+        return SmartDashboard.getNumber(key("yStdDev"), defaultYStdDev);
     }
 
     @Override
     public double zStdDev() {
-        return SmartDashboard.getNumber(key("zStdDev"), DEFAULT_Z_STD_DEV);
+        return SmartDashboard.getNumber(key("zStdDev"), defaultZStdDev);
     }
 
     @Override
     public double angleStdDev() {
-        return SmartDashboard.getNumber(key("angleStdDev"), DEFAULT_ANGLE_STD_DEV);
+        return SmartDashboard.getNumber(key("angleStdDev"), defaultAngleStdDev);
     }
 
     @Override
     public double imuCorrectionReliabilityThreshold() {
-        return SmartDashboard.getNumber(key("imuCorrectionReliabilityThreshold"), DEFAULT_IMU_THRESHOLD);
+        return SmartDashboard.getNumber(key("imuCorrectionReliabilityThreshold"), defaultImuThreshold);
     }
 }

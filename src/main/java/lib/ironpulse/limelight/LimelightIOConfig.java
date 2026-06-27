@@ -19,32 +19,37 @@ public class LimelightIOConfig {
     @Builder.Default private final int portToForwardStream = 0;
     @Builder.Default private final int portToForwardPipeline = 0;
 
-    /**
-     * When enabled, standard-deviation parameters (xStdDev, yStdDev, zStdDev, angleStdDev,
-     * imuCorrectionReliabilityThreshold) are read from NetworkTables at runtime so they can be
-     * tuned live via Shuffleboard / Glass without re-deploying code.
-     *
-     * @see #createDeviationSources()
-     */
-    @Builder.Default private final boolean debug = false;
+    // --- vision standard-deviation defaults ---
+    // These seed the NT entries and also act as fallback values when a Shuffleboard slider has
+    // not been touched yet. They can be set directly in the builder or tuned live via NT.
+    @Builder.Default private final double defaultXStdDev = 0.7;
+    @Builder.Default private final double defaultYStdDev = 0.7;
+    @Builder.Default private final double defaultZStdDev = 9999.0;
+    @Builder.Default private final double defaultAngleStdDev = 1.0;
+    @Builder.Default private final double defaultImuCorrectionReliabilityThreshold = 0.9;
 
     private final MountPosition mountPosition;
 
     private final Limelight4Config limeLight4Config;
 
     /**
-     * Creates a {@link DeviationParamSources} instance. When {@link #debug} is true, returns an
-     * NT-tunable implementation that reads/writes values via SmartDashboard so they can be adjusted
-     * live. When {@link #debug} is false, returns {@code null} — the caller should fall back to
-     * hard-coded defaults.
+     * Creates a {@link DeviationParamSources} backed by NetworkTables so standard-deviation
+     * parameters can be tuned live through Shuffleboard / Glass without re-deploying code. The
+     * default values set in this config seed the NT entries and act as fallbacks when a slider
+     * has not been touched yet.
      *
-     * @return a tunable {@code DeviationParamSources} if debug is enabled, or {@code null}
+     * <p>NT keys: {@code Limelight/<name>/debug/<param>}
+     *
+     * @return a tunable {@code DeviationParamSources} (never null)
      */
     public DeviationParamSources createDeviationSources() {
-        if (debug) {
-            return new NTDeviationSources(name);
-        }
-        return null;
+        return new NTDeviationSources(
+                name,
+                defaultXStdDev,
+                defaultYStdDev,
+                defaultZStdDev,
+                defaultAngleStdDev,
+                defaultImuCorrectionReliabilityThreshold);
     }
 
     public enum MountPosition {

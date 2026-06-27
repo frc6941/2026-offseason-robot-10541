@@ -30,7 +30,6 @@ import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
-import lib.ironpulse.limelight.DeviationParamSources;
 import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
@@ -310,27 +309,14 @@ public class RobotContainer {
         .name("limelight")
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
-        .debug(true)
         .build();
-
-    DeviationParamSources deviationParams = config.createDeviationSources();
-    if (deviationParams == null) {
-      // fallback to hard-coded defaults when debug is off
-      deviationParams = new DeviationParamSources() {
-        public double xStdDev() { return 0.7; }
-        public double yStdDev() { return 0.7; }
-        public double zStdDev() { return 9999.0; }
-        public double angleStdDev() { return 1.0; }
-        public double imuCorrectionReliabilityThreshold() { return 0.9; }
-      };
-    }
 
     LimelightIOReal io = new LimelightIOReal(
         config,
         swerve::getIMUYaw,
         swerve::getYawVelocityRadPerSec,
         () -> false,
-        deviationParams);
+        config.createDeviationSources());
     return new LimelightSubsystem(swerve, io);
   }
 
