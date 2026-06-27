@@ -13,6 +13,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.FieldConstants;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
+import lib.ntext.NTParameter;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
@@ -24,10 +25,7 @@ import org.littletonrobotics.junction.Logger;
  * to also adjust the hood angle simultaneously.
  */
 public class AutoAimCommand extends Command {
-    // Following 6328's constant
-    private static final double DRIVE_LAUNCH_KP = 8.0;
-    private static final double DRIVE_LAUNCH_KD = 0.0;
-    private static final double MAX_ANGULAR_VEL_RAD_PER_SEC = 7.0;
+    // Heading-control gains are NT-tunable (Params/AutoAim) — see AutoAimParams at the bottom.
 
     private final Swerve swerve;
     private final DoubleSupplier xSupplier;
@@ -84,8 +82,13 @@ public class AutoAimCommand extends Command {
         double error = target.minus(robotPose.getRotation()).getRadians();
         double ffVel = targetHeadingRate.getAsDouble();
         double measureOmega = swerve.getYawVelocityRadPerSec();
-        double omega = ffVel + DRIVE_LAUNCH_KP * error + DRIVE_LAUNCH_KD * (ffVel - measureOmega);
-        omega = MathUtil.clamp(omega, -MAX_ANGULAR_VEL_RAD_PER_SEC, MAX_ANGULAR_VEL_RAD_PER_SEC);
+        // NT-tunable gains (Params/AutoAim). The "kD" term is angular-velocity feedback (commanded
+        // ffVel vs measured omega), not a derivative-of-error — preserved from the original law.
+        double kP = AutoAimParamsNT.kP.getValue();
+        double kD = AutoAimParamsNT.kD.getValue();
+        double maxOmega = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
+        double omega = ffVel + kP * error + kD * (ffVel - measureOmega);
+        omega = MathUtil.clamp(omega, -maxOmega, maxOmega);
 
 
         // Joystick translation — same convention as driveWithJoystick
@@ -100,6 +103,11 @@ public class AutoAimCommand extends Command {
 
         Logger.recordOutput("AutoAim/TargetHeading", target.getDegrees());
         Logger.recordOutput("AutoAim/Distance", toTarget.getNorm());
+        // Tuning observability — plot these over time to spot oscillation / steady-state error / sign.
+        Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
+        Logger.recordOutput("AutoAim/omegaCmd", omega);
+        Logger.recordOutput("AutoAim/omegaMeas", measureOmega);
+        Logger.recordOutput("AutoAim/ffVel", ffVel);
     }
 
     @Override
@@ -110,5 +118,19 @@ public class AutoAimCommand extends Command {
     @Override
     public boolean isFinished() {
         return false;
+    }
+
+    /**
+     * NT-tunable heading-control gains for live tuning (sim or real) without recompiling. Generates
+     * AutoAimParamsNT; adjust under Params/AutoAim in AdvantageScope while holding aim.
+     *
+     * <p>TODO: sim gives only a ballpark (idealized SimpleSim rotational dynamics) — retune kP/kD on
+     * the real robot.
+     */
+    @NTParameter(tableName = "Params/AutoAim")
+    public static final class AutoAimParams {
+        public static final double kP = 8.0;
+        public static final double kD = 0.0;
+        public static final double maxAngularVelRadPerSec = 7.0;
     }
 }
