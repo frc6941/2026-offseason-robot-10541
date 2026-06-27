@@ -309,6 +309,11 @@ public class RobotContainer {
         .name("limelight")
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
+        .defaultXStdDev(0.7)
+        .defaultYStdDev(0.7)
+        .defaultZStdDev(9999.0)
+        .defaultAngleStdDev(1.0)
+        .defaultImuCorrectionReliabilityThreshold(0.9)
         .build();
 
     LimelightIOReal io = new LimelightIOReal(
