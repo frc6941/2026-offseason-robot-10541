@@ -9,6 +9,7 @@ import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
@@ -63,6 +64,7 @@ public class Robot extends LoggedRobot {
     // Pull the latest @NTParameter values from NetworkTables and fire onChange hooks so all
     // tunables (shooting, swerve PID, intaker, hood, ...) update live from the dashboard.
     NTParameterRegistry.refresh();
+    robotContainer.updateDashboard();
   }
 
   /** This function is called once each time the robot enters Disabled mode. */
@@ -76,6 +78,7 @@ public class Robot extends LoggedRobot {
   @Override
   public void autonomousInit() {
     autonomousCommand = robotContainer.getAutonomousCommand();
+    DriverStation.reportWarning("Selected auto: " + robotContainer.getAutoSelectionSummary(), false);
 
     // schedule the autonomous command (example)
     if (autonomousCommand != null) {

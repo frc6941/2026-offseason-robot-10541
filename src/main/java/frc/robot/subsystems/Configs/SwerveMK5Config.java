@@ -12,19 +12,20 @@ import lib.ironpulse.swerve.SwerveLimit;
 import lib.ironpulse.swerve.SwerveModuleLimit;
 import lib.ironpulse.swerve.mk5n.SwerveMK5NConfig;
 import lib.ironpulse.swerve.sim.SwerveSimConfig;
+import lib.ntext.NTParameter;
 
 public final class SwerveMK5Config {
 
     // Half-dimensions from robot center to module (meters)
-    public static final double kSwerveHalfLength = 0.30468;
-    public static final double kSwerveHalfWidth  = 0.24218;
+    public static final double kSwerveHalfLength = 0.3429;
+    public static final double kSwerveHalfWidth  = 0.3429;
 
-    // Pigeon IMU mounting angles — copy from competition robot, tune later
+    // TODO: tune Pigeon IMU mounting angles for this robot (currently copied from competition robot)
     public static final ImuPigeonConfig pigeonConfig =
             ImuPigeonConfig.builder()
-                    .mountPoseYaw(88.95365142822266)
-                    .mountPosePitch(0.85715872049331667)
-                    .mountPoseRoll(-0.731235146522522)
+                    .mountPoseYaw(-0.52185)
+                    .mountPosePitch(-4.042969)
+                    .mountPoseRoll(0.263672)
                     .gyroScalarZ(-3.5)
                     .build();
 
@@ -41,9 +42,9 @@ public final class SwerveMK5Config {
     // Chassis-level limits
     public static final SwerveLimit kDefaultSwerveLimit =
             SwerveLimit.builder()
-                    .maxLinearVelocity(MetersPerSecond.of(4))
+                    .maxLinearVelocity(MetersPerSecond.of(4.0))
                     .maxSkidAcceleration(MetersPerSecondPerSecond.of(200))
-                    .maxAngularVelocity(DegreesPerSecond.of(1000))
+                    .maxAngularVelocity(DegreesPerSecond.of(450))
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000))
                     .build();
 
@@ -52,9 +53,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("LF")
                     .location(new Translation2d(kSwerveHalfLength, kSwerveHalfWidth))
-                    .driveMotorId(1).steerMotorId(2).encoderId(9)
+                    .driveMotorId(9).steerMotorId(8).encoderId(7)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.008544921875))
+                    .steerMotorEncoderOffset(Rotations.of(0.481689))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -62,9 +63,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("RF")
                     .location(new Translation2d(kSwerveHalfLength, -kSwerveHalfWidth))
-                    .driveMotorId(3).steerMotorId(4).encoderId(10)
+                    .driveMotorId(12).steerMotorId(11).encoderId(10)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.26318359375))
+                    .steerMotorEncoderOffset(Rotations.of(-0.328613))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -72,9 +73,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("LB")
                     .location(new Translation2d(-kSwerveHalfLength, kSwerveHalfWidth))
-                    .driveMotorId(5).steerMotorId(6).encoderId(11)
+                    .driveMotorId(6).steerMotorId(5).encoderId(4)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.165771484375))
+                    .steerMotorEncoderOffset(Rotations.of(0.243164))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -82,9 +83,9 @@ public final class SwerveMK5Config {
             SwerveConfig.SwerveModuleConfig.builder()
                     .name("RB")
                     .location(new Translation2d(-kSwerveHalfLength, -kSwerveHalfWidth))
-                    .driveMotorId(7).steerMotorId(8).encoderId(12)
+                    .driveMotorId(3).steerMotorId(2).encoderId(1)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.220947265625))
+                    .steerMotorEncoderOffset(Rotations.of(0.493164))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -137,4 +138,26 @@ public final class SwerveMK5Config {
                     .canivoreCanBus(CANIVORE_CAN_BUS)
                     .pigeonId(RobotConstants.PIGEON_ID)
                     .build();
+
+    // NT-tunable swerve module PID/FF. Generates SwerveModuleParamsNT (nested Drive/Steer with
+    // per-group isAnyChanged()), consumed by SwerveModule.
+    // TODO: tune drive + steer gains on the real robot.
+    @NTParameter(tableName = "Params/SwerveModule")
+    public static final class SwerveModuleParams {
+        public static final class Drive {
+            public static final double kP = 10.0;
+            public static final double kI = 0.0;
+            public static final double kD = 0.0;
+            public static final double kS = 0.0;
+            public static final double kV = 0.136;
+            public static final double kA = 0.05;
+        }
+
+        public static final class Steer {
+            public static final double kP = 10.0;
+            public static final double kI = 0.0;
+            public static final double kD = 0.1;
+            public static final double kS = 0.0;
+        }
+    }
 }

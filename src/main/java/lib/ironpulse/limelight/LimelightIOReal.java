@@ -21,7 +21,6 @@ public class LimelightIOReal implements LimelightIO {
     private final DeviationParamSources deviationParams;
     private boolean isPrevDisabled = true;
     private double lastHeartbeat = -1;
-    private double lastTsBootMs = -1;
     private double lastSeenTime = 0.0;
     private int reseedFramesRemaining = 0;
 
@@ -86,34 +85,33 @@ public class LimelightIOReal implements LimelightIO {
     }
 
     private String updateStatus() {
-        // TODO: fix me, ERR reason not accurate
-        String status = "Connected";
         double now = edu.wpi.first.wpilibj.Timer.getFPGATimestamp();
         double hb = LimelightHelpers.getHeartbeat(config.getName());
 
-        if (now - lastSeenTime > 0.5) {
-            status = "Disconnected";
-        }
-
-        if (hb != lastHeartbeat) {
-            double tsBootMs =
-                    LimelightHelpers.getLatestResults(config.getName()).timestamp_LIMELIGHT_publish;
-
-            if (lastSeenTime > 0 && now - lastSeenTime > 0.5) {
-                if (lastTsBootMs >= 0 && tsBootMs < lastTsBootMs) {
-                    status = "Reconnected, previously likely power ERR";
-                } else {
-                    status = "Reconnected, previously likely network ERR";
-                }
-            } else {
-                status = "Connected";
+        if (hb == lastHeartbeat) {
+            // No new heartbeat since last check
+            if (now - lastSeenTime > 0.5) {
+                return "Disconnected";
             }
-
-            lastHeartbeat = hb;
-            lastTsBootMs = tsBootMs;
-            lastSeenTime = now;
+            return "Connected";
         }
 
+        // New heartbeat received
+        String status;
+        if (lastSeenTime > 0 && now - lastSeenTime > 0.5) {
+            // Was previously disconnected — determine likely cause
+            // A decreasing heartbeat value indicates the Limelight rebooted (power cycle)
+            if (hb < lastHeartbeat) {
+                status = "Reconnected (likely power cycle)";
+            } else {
+                status = "Reconnected (likely network)";
+            }
+        } else {
+            status = "Connected";
+        }
+
+        lastHeartbeat = hb;
+        lastSeenTime = now;
         return status;
     }
 
@@ -281,9 +279,16 @@ public class LimelightIOReal implements LimelightIO {
         inputs.avgTagDist = estimate.avgTagDist;
         inputs.status = updateStatus();
         inputs.lastHeartbeat = lastHeartbeat;
-        inputs.lastTsBootMs = lastTsBootMs;
         inputs.lastSeenTime = lastSeenTime;
         inputs.temperature = LimelightHelpers.getTemperature(config.getName());
+
+        // Raw targeting data — fast NT reads, independent of MegaTag2 pipeline
+        inputs.tv = LimelightHelpers.getTV(config.getName());
+        inputs.tx = LimelightHelpers.getTX(config.getName());
+        inputs.ty = LimelightHelpers.getTY(config.getName());
+        inputs.ta = LimelightHelpers.getTA(config.getName());
+        inputs.tid = LimelightHelpers.getFiducialID(config.getName());
+        inputs.targetPoseRobotSpace = LimelightHelpers.getTargetPose3d_RobotSpace(config.getName());
     }
 
     @Override
@@ -299,11 +304,6 @@ public class LimelightIOReal implements LimelightIO {
     @Override
     public double getImuCorrectionReliabilityThreshold() {
         return deviationParams.imuCorrectionReliabilityThreshold();
-    }
-
-    @Override
-    public double getIMUYawInternal() {
-        return LimelightHelpers.getIMUData(config.getName()).Yaw;
     }
 
     @Override

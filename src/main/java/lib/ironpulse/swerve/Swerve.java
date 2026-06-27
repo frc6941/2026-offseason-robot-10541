@@ -8,6 +8,7 @@ import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -17,7 +18,6 @@ import edu.wpi.first.math.numbers.N4;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.units.measure.Voltage;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,14 +103,11 @@ public class Swerve extends SubsystemBase implements Localizable {
         // odom
         var swerveModulePositionsWithTime = getSampledModulePositions();
         var rotations = imuIOInputs.odometryRotations;
-        var now = Timer.getTimestamp();
         for (int i = 0; i < swerveModulePositionsWithTime.size(); i++) {
             var positionWithTime = swerveModulePositionsWithTime.get(i);
             poseEstimator.updateWithTime(
-                    now,
-                    rotations[i], // FIXME: there's a discrepancy between Phoenix time and rio time.
-                    // need to find
-                    // the offset. this fix is temporary
+                    positionWithTime.getFirst(), // FPGA-adjusted sample timestamp
+                    rotations[i], // IMU yaw at sample time
                     positionWithTime.getSecond());
         }
         odometryLock.unlock();
@@ -318,6 +315,10 @@ public class Swerve extends SubsystemBase implements Localizable {
 
     public SwerveModuleLimit getSwerveModuleLimit() {
         return setpointGenerator.getModuleLimit();
+    }
+
+    public Translation2d[] getModuleLocations() {
+        return config.moduleLocations();
     }
 
     public void setSwerveModuleLimit(SwerveModuleLimit limit) {

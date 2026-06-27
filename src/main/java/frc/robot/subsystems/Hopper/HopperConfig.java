@@ -1,4 +1,4 @@
-package frc.robot.subsystems.FloorRoller;
+package frc.robot.subsystems.Hopper;
 
 import static frc.robot.RobotConstants.CANIVORE_CAN_BUS;
 
@@ -8,25 +8,25 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ntext.NTParameter;
 
-public class FloorRollerConfig {
+public class HopperConfig {
     private static final CANBus CANBUS = CANIVORE_CAN_BUS;
 
-    private static final int FLOOR_ROLLER_ID = 20;
+    private static final int HOPPER_ID = 20;
 
-    public static final String FLOOR_ROLLER_NAME = "FloorRoller";
+    public static final String HOPPER_NAME = "Hopper";
 
-    private static final double FLOOR_ROLLER_GEAR_RATIO = 35.0 / 20.0;
+    private static final double HOPPER_GEAR_RATIO = 35.0 / 20.0;
 
-    public static final SubsystemConfig FLOOR_ROLLER_CONFIG = SubsystemConfig.builder()
-            .name(FLOOR_ROLLER_NAME)
+    public static final SubsystemConfig HOPPER_CONFIG = SubsystemConfig.builder()
+            .name(HOPPER_NAME)
             .mainBus(CANBUS)
-            .mainId(FLOOR_ROLLER_ID)
+            .mainId(HOPPER_ID)
             .motorInvertedValue(InvertedValue.Clockwise_Positive)
-            .SensorToMechanismRatio(FLOOR_ROLLER_GEAR_RATIO)
+            .SensorToMechanismRatio(HOPPER_GEAR_RATIO)
             .build();
 
-    @NTParameter(tableName = "Params/" + FLOOR_ROLLER_NAME)
-    public static final class FloorRollerParams {
+    @NTParameter(tableName = "Params/" + HOPPER_NAME)
+    public static final class HopperParams {
         public static final double kP = 0.0;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
@@ -39,8 +39,8 @@ public class FloorRollerConfig {
         public static final double shootRPS = 1.0;
         public static final double idleRPS = 0.2;
 
-        private FloorRollerParams() {}
+        private HopperParams() {}
     }
 
-    private FloorRollerConfig() {}
+    private HopperConfig() {}
 }

@@ -25,14 +25,25 @@ public class IntakerConfig {
 
     // Accessible angle per mechansim rotation
     public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(1 / INTAKER_PIVOT_GEAR_RATIO * 360);
+    public final static Angle INTAKER_PIVOT_MIN_ANGLE = Degrees.of(0.0);
+    public final static Angle INTAKER_PIVOT_MAX_ANGLE = Degrees.of(135.0);
+    // The real intake-pivot angle when the mechanism is resting against its zero hard stop.
+    // Measure on the robot and update this value so getCurrPos() reports the true mechanism angle after homing.
+    public final static Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
+    // Placeholder template values for homing. These MUST be verified on the real robot.
+    // Sign must drive the intake pivot toward the zero hard stop.
+    public final static double INTAKER_PIVOT_ZEROING_VOLTAGE = -1.0;
+    // Must be above free-run current and below breaker / unsafe stall current.
+    public final static double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 20.0;
+    public final static int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 5;
 
     public enum IntakeMode{
-        INTAKING,           // Roller: Intake, PIVOT: Extended
-        RETRACTED,          // Roller: Stop,   PIVOT: Retracted
-        FEEDING,            // Roller: Intake, PIVOT: Extended
-        EXTENDED_REVERSE,   // Roller: Outtake,PIVOT: Extended
-        RETRACTED_FEEDING,  // Roller: Intake, PIVOT: Swing
-        EXTENDED_IDLE       // Roller: Stop,   PIVOT: Extended
+        INTAKING,           // Roller: Intake, Pivot: Extended
+        RETRACTED,          // Roller: Stop,   Pivot: Retracted
+        FEEDING,            // Roller: Intake, Pivot: Extended
+        EXTENDED_REVERSE,   // Roller: Outtake,Pivot: Extended
+        RETRACTED_FEEDING,  // Roller: Intake, Pivot: Swing
+        EXTENDED_IDLE       // Roller: Stop,   Pivot: Extended
     }
 
     public final static SubsystemConfig INTAKER_ROLLER_CONFIG = SubsystemConfig.builder()
@@ -49,6 +60,15 @@ public class IntakerConfig {
             .mainId(INTAKER_PIVOT_ID)
             .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
             .SensorToMechanismRatio(INTAKER_PIVOT_GEAR_RATIO)
+            // Normal-operation protection range. zeroCommand() disables these temporarily during homing.
+            .reverseSoftLimitDegrees(INTAKER_PIVOT_MIN_ANGLE)
+            .forwardSoftLimitDegrees(INTAKER_PIVOT_MAX_ANGLE)
+            .zeroOffset(INTAKER_PIVOT_ZERO_OFFSET)
+            .zeroingConfig(SubsystemConfig.ZeroingConfig.builder()
+                    .zeroingVoltage(INTAKER_PIVOT_ZEROING_VOLTAGE)
+                    .zeroingCurrentLimit(INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS)
+                    .zeroingFilterSize(INTAKER_PIVOT_ZEROING_FILTER_SIZE)
+                    .build())
             .build();
 
 
@@ -63,8 +83,10 @@ public class IntakerConfig {
         public final static double kA = 0.0;
         public final static double kS = 0.0;
 
-        public final static int intakeRPS = 0;
-        public final static int outtakeRPS = 0;
+        // NT integers come back from NetworkTables as Long, which breaks the generated
+        // Integer wrapper on refresh() — keep all tunable NT numerics as double.
+        public final static double intakeRPS = 0.0;
+        public final static double outtakeRPS = 0.0;
     }
 
     @NTParameter(tableName = "Params/"+INTAKER_PIVOT_NAME)

@@ -1,4 +1,4 @@
-package frc.robot.subsystems.FloorRoller;
+package frc.robot.subsystems.Hopper;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
@@ -11,32 +11,32 @@ import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 
-public class FloorRollerSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> {
+public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> {
     private final IntakerSubsystem intaker;
 
-    public FloorRollerSubsystem(
+    public HopperSubsystem(
             IntakerSubsystem intaker,
             SubsystemConfig config,
             MotorInputsAutoLogged inputs,
             MotorIO io) {
-        super(config, inputs, io, FloorRollerParamsNT.asVelocityParamSources());
+        super(config, inputs, io, HopperParamsNT.asVelocityParamSources());
         this.intaker = intaker;
     }
 
     public Command idle() {
-        return runVelTC(RotationsPerSecond.of(FloorRollerParamsNT.idleRPS.getValue()));
+        return runVelTC(RotationsPerSecond.of(HopperParamsNT.idleRPS.getValue()));
     }
 
     public Command feed() {
-        return runVelTC(RotationsPerSecond.of(FloorRollerParamsNT.feedRPS.getValue()));
+        return runVelTC(RotationsPerSecond.of(HopperParamsNT.feedRPS.getValue()));
     }
 
     public Command shoot() {
-        return runVelTC(RotationsPerSecond.of(FloorRollerParamsNT.shootRPS.getValue()));
+        return runVelTC(RotationsPerSecond.of(HopperParamsNT.shootRPS.getValue()));
     }
 
     public Command reverse() {
-        return runVelTC(RotationsPerSecond.of(-FloorRollerParamsNT.feedRPS.getValue()));
+        return runVelTC(RotationsPerSecond.of(-HopperParamsNT.feedRPS.getValue()));
     }
 
     public void configureDefaultCommand() {

@@ -4,48 +4,51 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
+import frc.robot.commands.auto.AutoPoints;
+import frc.robot.commands.auto.AutoBuilder;
+import frc.robot.commands.auto.AutoCommands;
+import frc.robot.commands.auto.AutoSelector;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
-import frc.robot.subsystems.FloorRoller.FloorRollerConfig;
-import frc.robot.subsystems.FloorRoller.FloorRollerSubsystem;
+import frc.robot.subsystems.Shooter.HoodConfig;
+import frc.robot.subsystems.Hopper.HopperConfig;
+import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
-import frc.robot.subsystems.Shooter.HoodSubsystem;
-import frc.robot.subsystems.Shooter.ShooterSubsystem;
+import frc.robot.subsystems.Shooter.HoodParamsNT;
+import frc.robot.subsystems.Shooter.ShooterConfig;
+import frc.robot.subsystems.Shooter.ShooterParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import lib.ironpulse.indicator.IndicatorIO;
+import lib.ironpulse.indicator.IndicatorIOARGB;
+import lib.ironpulse.indicator.IndicatorIOSim;
+import lib.ironpulse.indicator.IndicatorSubsystem;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
-import lib.ironpulse.limelight.DeviationParamSources;
 import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
-import lib.ironpulse.subsystem.SubsystemConfig;
+import lib.ironpulse.limelight.commands.LimelightAlignToTag;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
-import lib.ironpulse.subsystem.position.PositionParamSources;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
-import lib.ironpulse.subsystem.velocity.VelocityParamSources;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveCommands;
 import lib.ironpulse.swerve.mk5n.ImuIOPigeon;
 import lib.ironpulse.swerve.mk5n.SwerveModuleIOMK5N;
 import lib.ironpulse.swerve.sim.ImuIOSim;
 import lib.ironpulse.swerve.sim.SwerveModuleIOSimpleSim;
+import lib.ironpulse.utils.AllianceFlipUtil;
 
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Degrees;
-
-
-
-import com.ctre.phoenix6.signals.InvertedValue;
-
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.units.measure.Distance;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -60,38 +63,40 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 public class RobotContainer {
     private boolean isReal = RobotBase.isReal();
 
+    // Limelight device id — must exactly match the limelight's hostname (web UI -> Settings ->
+    // Hostname). Single source of truth so the IO registration and every lookup can't drift apart.
+    private static final String LIMELIGHT_NAME = "limelight-a";
+
   
   private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller = buildIntakerRoller();
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> intakerPivot = buildIntakerPivot();
   private final IntakerSubsystem intaker = new IntakerSubsystem(intakerRoller, intakerPivot);
   private final Swerve swerve = buildSwerve();
-  private final FloorRollerSubsystem floorRollerSubsystem = buildFloorRoller();
-  private final ShooterSubsystem shooterSubsystem = buildShooter();
-  private final HoodSubsystem hoodSubsystem = buildHood();
+  private final HopperSubsystem hopperSubsystem = buildHopper();
+  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterSubsystem = buildShooter();
+  private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
-      new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, floorRollerSubsystem, swerve);
+      new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
+  private final AutoBuilder autoBuilder = new AutoBuilder(intaker, swerve, shootingSuperstructure);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
-  
+  private final IndicatorSubsystem indicator = buildIndicator();
+  private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
+
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
   private final CommandXboxController driverController = new CommandXboxController(0);
 
-  // Auto chooser
-  private final SendableChooser<Command> autoChooser = new SendableChooser<>();
+  private final AutoSelector autoSelector;
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
 
-    // intakerRoller = buildIntakerRoller();
-    // intakerPivot = buildIntakerPivot();
-    // TODO: fix initialization & PIVOT!!!
-
     intaker.setDefaultCommand();
-    floorRollerSubsystem.configureDefaultCommand();
+    hopperSubsystem.configureDefaultCommand();
+    AutoBuilder.configure(swerve);
     configureBindings();
-    autoChooser.setDefaultOption("Do nothing", Commands.none());
-    autoChooser.addOption("Drive Forward", Autos.driveForward(swerve));
-    SmartDashboard.putData("Auto Chooser", autoChooser);
+    autoSelector = new AutoSelector(autoBuilder, Autos.driveForward(swerve));
+    new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
   }
 
   /**
@@ -104,33 +109,82 @@ public class RobotContainer {
    * joysticks}.
    */
   private void configureBindings() {
+    // Competition-style hood homing: zero on teleop enable so position control starts from a known reference.
+    new Trigger(DriverStation::isTeleopEnabled).onTrue(shootingSuperstructure.zeroHood());
 
-    // Intake and outake
-    // driverController.rightTrigger().whileTrue(Commands.parallel(intakerExtensioSubsystem.extend(),
-    //                                                             intakerRollerSubsystem.runIntake(), 
-    //                                                             floorRollerSubsystem.feed())); // TODO: Slow feed
-    // driverController.rightTrigger().onFalse(intakerPivotSubsystem.retract());
-    //driverController.leftTrigger().whileTrue(intakerRollerSubsystem.outtake());
+    // Driver-triggered intake pivot homing. Keep manual until the team confirms the mechanism can always
+    // safely drive into its hard stop on enable.
+    driverController.povLeft().onTrue(intaker.zeroCommand());
+
+    // Intake: right trigger deploys + intakes while held, retracts on release.
+    // (Hopper feeds automatically off the intake state machine via its default command.)
+    driverController.rightTrigger().onTrue(intaker.runIntake());
+    driverController.rightTrigger().onFalse(intaker.runRetract());
+    // Outtake/reverse: left trigger deploys + outtakes while held, retracts on release
+    driverController.leftTrigger().onTrue(intaker.runExtendedReverse());
+    driverController.leftTrigger().onFalse(intaker.runRetract());
 
     // Swerve
-    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, driverController::getLeftX, driverController::getLeftY, driverController::getRightX, swerve::getEstimatedPose, MetersPerSecond.of(0.1), DegreesPerSecond.of(5)));
+    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, 
+    () -> -driverController.getLeftY(), 
+    () -> -driverController.getLeftX(), 
+    () -> -driverController.getRightX(), 
+    swerve::getEstimatedPose, 
+    MetersPerSecond.of(0.03), 
+    DegreesPerSecond.of(12)));
+
+    // Field-relative heading zero: place the robot on the field facing the correct direction and
+    // press Start. Seeds the Pigeon to field yaw (0, or 180 on the flipped alliance) so MegaTag2 —
+    // which only solves X/Y from the gyro heading — corrects position correctly from then on.
+    driverController.start()
+        .onTrue(SwerveCommands.resetAngle(
+            swerve,
+            () -> AllianceFlipUtil.shouldFlip() ? Rotation2d.k180deg : Rotation2d.kZero));
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
     driverController.rightBumper().whileTrue(Commands.parallel(
-        shooterSubsystem.spinUp(),
-        hoodSubsystem.setMaxAngle(),
+        shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.shootRPS.getValue())),
+        hoodSubsystem.runMotionMagic(HoodConfig.HOOD_MAX_ANGLE),
         Commands.waitUntil(shooterSubsystem::velocityAtGoal)
-            .andThen(floorRollerSubsystem.feed())
+            .andThen(hopperSubsystem.feed())
     ));
-    driverController.rightBumper().onFalse(Commands.parallel(shooterSubsystem.stop(), hoodSubsystem.setFlat()));
+    driverController.rightBumper().onFalse(Commands.sequence(
+        Commands.parallel(
+            shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
+            hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)),
+        indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
+
+    // Reset odometry to vision → one-shot correction when the driver notices drift.
+    // Also fires once at the start of autonomous.
+    new Trigger(DriverStation::isAutonomousEnabled)
+        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision(LIMELIGHT_NAME)));
+    driverController.x()
+        .onTrue(Commands.runOnce(() -> limelightSubsystem.resetPoseFromVision(LIMELIGHT_NAME)));
+
+    // Precision align to whatever AprilTag the Limelight sees — hold Y, release to stop.
+    // Desired offset: 0.5 m in front of the tag, facing it (kPi = look at the tag).
+    driverController.y().whileTrue(new LimelightAlignToTag(
+        swerve, limelightSubsystem, LIMELIGHT_NAME, -1,
+        new Transform2d(0.5, 0.0, Rotation2d.kPi)));
+
+    // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
+    driverController.b().onTrue(
+        AutoCommands.pathfindToBluePose(
+            AutoPoints.OUTPOST,
+            AutoCommands.TRANSIT_CONSTRAINTS,
+            0.0));
 
     // Auto-aim: drivetrain rotates to face the hub (yaw), while the shooting superstructure tracks
     // distance to set hood angle + flywheel speed and feeds once chassis/hood/flywheel are all ready.
     driverController.a().whileTrue(Commands.parallel(
-        new AutoAimCommand(swerve, driverController::getLeftX, driverController::getLeftY),
+        new AutoAimCommand(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX(),
+                          shootingSuperstructure::aimHeading,
+                          shootingSuperstructure::aimHeadingRateRadPerSec),
         shootingSuperstructure.aimAndShoot()
     ));
-    driverController.a().onFalse(shootingSuperstructure.idle());
+    driverController.a().onFalse(Commands.sequence(
+        shootingSuperstructure.idle(),
+        indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
   }
 
   /**
@@ -139,7 +193,82 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    return autoChooser.getSelected();
+    return autoSelector.getCommand();
+  }
+
+  public void updateDashboard() {
+    autoSelector.updateDashboard();
+  }
+
+  public String getAutoSelectionSummary() {
+    return autoSelector.getSelectionSummary();
+  }
+
+  /**
+   * Evaluates subsystem states each cycle and sets the indicator pattern accordingly.
+   *
+   * <p>Priority order (higher wins when multiple states overlap):
+   * <ol>
+   *   <li>{@link IndicatorIO.Patterns#AUTO Auto} — robot is in autonomous mode</li>
+   *   <li>{@link IndicatorIO.Patterns#SHOOTING Shooting} — flywheel spinning up, not at speed yet</li>
+   *   <li>{@link IndicatorIO.Patterns#HOLD_SHOOTING HoldShooting} — flywheel + hood ready, waiting for feed</li>
+   *   <li>{@link IndicatorIO.Patterns#INTAKE Intake} — intaker is intaking, feeding, or reversing</li>
+   *   <li>{@link IndicatorIO.Patterns#RED_ALLIANCE Red} / {@link IndicatorIO.Patterns#BLUE_ALLIANCE Blue} — disabled, show alliance</li>
+   *   <li>{@link IndicatorIO.Patterns#NORMAL Normal} — fallback (teleop driving)</li>
+   * </ol>
+   */
+  public void updateIndicator() {
+    // Don't clobber a command-driven transient pattern (e.g. AFTER_SHOOTING flash).
+    // Commands set outsideDefault = true while they own the pattern.
+    if (indicator.isOutsideDefault()) {
+      return;
+    }
+
+    // --- 1. Autonomous ---
+    if (DriverStation.isAutonomousEnabled()) {
+      indicator.setPattern(IndicatorIO.Patterns.AUTO);
+      return;
+    }
+
+    // --- 2 & 3. Shooting pipeline ---
+    // Detect whether the shooter is actively being commanded above idle.
+    double shooterSetpointRPS =
+        shooterSubsystem.getCurrSetpoint().in(edu.wpi.first.units.Units.RotationsPerSecond);
+    boolean shooterActive = shooterSetpointRPS > ShooterParamsNT.idleRPS.getValue() + 1.0;
+
+    if (shooterActive) {
+      if (shooterSubsystem.velocityAtGoal() && hoodSubsystem.positionAtGoal()) {
+        // Flywheel at speed + hood on target → ready to feed
+        indicator.setPattern(IndicatorIO.Patterns.HOLD_SHOOTING);
+      } else {
+        // Still spinning up
+        indicator.setPattern(IndicatorIO.Patterns.SHOOTING);
+      }
+      return;
+    }
+
+    // --- 4. Intaker-deployed states ---
+    var intakeMode = intaker.getCurrentMode();
+    if (intakeMode == IntakerConfig.IntakeMode.INTAKING
+        || intakeMode == IntakerConfig.IntakeMode.FEEDING
+        || intakeMode == IntakerConfig.IntakeMode.EXTENDED_REVERSE
+        || intakeMode == IntakerConfig.IntakeMode.RETRACTED_FEEDING) {
+      indicator.setPattern(IndicatorIO.Patterns.INTAKE);
+      return;
+    }
+
+    // --- 5. Disabled → alliance colour ---
+    if (DriverStation.isDisabled()) {
+      var alliance = DriverStation.getAlliance();
+      indicator.setPattern(
+          alliance.isPresent() && alliance.get() == DriverStation.Alliance.Red
+              ? IndicatorIO.Patterns.RED_ALLIANCE
+              : IndicatorIO.Patterns.BLUE_ALLIANCE);
+      return;
+    }
+
+    // --- 6. Fallback ---
+    indicator.setPattern(IndicatorIO.Patterns.NORMAL);
   }
 
  
@@ -168,74 +297,64 @@ public class RobotContainer {
                 IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
     }
 
-  private FloorRollerSubsystem buildFloorRoller() {
-    return new FloorRollerSubsystem(
+  private HopperSubsystem buildHopper() {
+    return new HopperSubsystem(
         intaker,
-        FloorRollerConfig.FLOOR_ROLLER_CONFIG,
+        HopperConfig.HOPPER_CONFIG,
         new MotorInputsAutoLogged(),
         RobotBase.isReal()
-            ? new MotorIOTalonFX(FloorRollerConfig.FLOOR_ROLLER_CONFIG)
-            : new MotorIOSim(FloorRollerConfig.FLOOR_ROLLER_CONFIG));
+            ? new MotorIOTalonFX(HopperConfig.HOPPER_CONFIG)
+            : new MotorIOSim(HopperConfig.HOPPER_CONFIG));
   }
 
-  private ShooterSubsystem buildShooter() {
-    SubsystemConfig config = SubsystemConfig.builder()
-      .name("shooter")
-      .mainId(19)
-      .mainBus(RobotConstants.CANIVORE_CAN_BUS)
-      .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
-      .followers(new SubsystemConfig.FollowerConfig[]{
-        SubsystemConfig.FollowerConfig.builder()
-            .id(20)
-            .bus(RobotConstants.CANIVORE_CAN_BUS)
-            .build()
-        }
-      )
-    .build();
-    return new ShooterSubsystem(
-        config,
+  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooter() {
+    return new VelocityMotorSubsystem<>(
+        ShooterConfig.SHOOTER_CONFIG,
         new MotorInputsAutoLogged(),
-        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
-        new VelocityParamSources() {
-          public double kP() { return 0.0; }
-          public double kI() { return 0.0; }
-          public double kD() { return 0.0; }
-        });
+        RobotBase.isReal()
+            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_CONFIG)
+            : new MotorIOSim(ShooterConfig.SHOOTER_CONFIG),
+        ShooterParamsNT.asVelocityParamSources());
   }
 
   private LimelightSubsystem buildLimelight() {
     LimelightIOConfig config = LimelightIOConfig.builder()
-        .name("limelight")
+        .name(LIMELIGHT_NAME)
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
+        .defaultXStdDev(0.7)
+        .defaultYStdDev(0.7)
+        .defaultZStdDev(9999.0)
+        .defaultAngleStdDev(1.0)
+        .defaultImuCorrectionReliabilityThreshold(0.9)
         .build();
+
     LimelightIOReal io = new LimelightIOReal(
         config,
         swerve::getIMUYaw,
         swerve::getYawVelocityRadPerSec,
         () -> false,
-        new DeviationParamSources() {
-          public double xStdDev() { return 0.7; }
-          public double yStdDev() { return 0.7; }
-          public double zStdDev() { return 9999.0; }
-          public double angleStdDev() { return 1.0; }
-          public double imuCorrectionReliabilityThreshold() { return 0.9; }
-        });
+        config.createDeviationSources());
     return new LimelightSubsystem(swerve, io);
   }
 
-  private HoodSubsystem buildHood() {
-    SubsystemConfig config = SubsystemConfig.simpleMotorCfg(
-        "hood", 10, RobotConstants.CANIVORE_CAN_BUS, InvertedValue.CounterClockwise_Positive);
-    return new HoodSubsystem(
-        config,
+  private IndicatorSubsystem buildIndicator() {
+    return new IndicatorSubsystem(
+        RobotBase.isReal()
+            ? new IndicatorIOARGB(/* PWM port */ 9, /* LED count */ 60)
+            : new IndicatorIOSim());
+  }
+
+  private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildHood() {
+    return new PositionMotorSubsystem<>(
+        HoodConfig.HOOD_CONFIG,
         new MotorInputsAutoLogged(),
-        RobotBase.isReal() ? new MotorIOTalonFX(config) : new MotorIOSim(config),
-        new PositionParamSources() {
-          public double kP() { return 0.0; }
-          public double kI() { return 0.0; }
-          public double kD() { return 0.0; }
-        });
+        RobotBase.isReal()
+            ? new MotorIOTalonFX(HoodConfig.HOOD_CONFIG)
+            : new MotorIOSim(HoodConfig.HOOD_CONFIG),
+        HoodParamsNT.asPositionParamSources(),
+        HoodConfig.HOOD_MIN_ANGLE,
+        HoodConfig.HOOD_ANGLE_PER_ROTATION);
   }
 
   private Swerve buildSwerve() {

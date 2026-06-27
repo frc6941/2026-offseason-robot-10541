@@ -130,14 +130,14 @@ public class MotorIOTalonFX implements MotorIO {
                     followerCurrentLimits.SupplyCurrentLimitEnable = true;
                     followerCurrentLimits.SupplyCurrentLimit = f.supplyCurrentLimitAmps;
                 }
-                if (!Double.isNaN(f.ramp)) {
-                    followers[i]
-                            .getConfigurator()
-                            .apply(
-                                    new ClosedLoopRampsConfigs()
-                                            .withVoltageClosedLoopRampPeriod(f.ramp));
-                }
                 followers[i].getConfigurator().apply(followerCurrentLimits);
+            }
+            if (!Double.isNaN(f.ramp)) {
+                followers[i]
+                        .getConfigurator()
+                        .apply(
+                                new ClosedLoopRampsConfigs()
+                                        .withVoltageClosedLoopRampPeriod(f.ramp));
             }
         }
 
@@ -166,12 +166,15 @@ public class MotorIOTalonFX implements MotorIO {
     }
 
     private void configureCANcoder(SubsystemConfig.RemoteCANcoder rc) {
-        CANcoder coder = new CANcoder(rc.id, rc.bus);
-        // Build a CANcoderConfiguration from rc fields
-        CANcoderConfiguration c = new CANcoderConfiguration();
-        c.MagnetSensor.MagnetOffset = rc.magnetOffset;
-        c.MagnetSensor.SensorDirection = rc.sensorDirection;
-        coder.getConfigurator().apply(c);
+        // Create a temporary CANcoder handle to push configuration to the device.
+        // Configuration is persisted in CANcoder hardware — the handle is discarded
+        // because no runtime interaction with the CANcoder is needed after config.
+        try (CANcoder coder = new CANcoder(rc.id, rc.bus)) {
+            CANcoderConfiguration c = new CANcoderConfiguration();
+            c.MagnetSensor.MagnetOffset = rc.magnetOffset;
+            c.MagnetSensor.SensorDirection = rc.sensorDirection;
+            coder.getConfigurator().apply(c);
+        }
     }
 
     @Override

@@ -10,8 +10,6 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
-import frc.robot.subsystems.Intaker.IntakerConfig.IntakerRollerParams;
-import frc.robot.subsystems.Intaker.IntakerConfig.IntakerPivotParams;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -91,19 +89,71 @@ public class IntakerSubsystem extends SubsystemBase{
         );
             
     }
+
+    private void setIntakeMode(IntakeMode mode) {
+        fallbackMode = mode;
+
+        if(currentMode != IntakeMode.FEEDING
+            && currentMode != IntakeMode.EXTENDED_REVERSE){
+            currentMode = mode;
+        }
+    }
     
 
     public Command runIntake(){
         return Commands.runOnce(
+            () -> setIntakeMode(IntakeMode.INTAKING)
+        );
+    }
+
+    public Command runIntakeContinuous(){
+        return Commands.startEnd(
+            () -> setIntakeMode(IntakeMode.INTAKING),
+            () -> setIntakeMode(IntakeMode.RETRACTED),
+            this
+        );
+    }
+
+    public Command runRetract(){
+        return Commands.runOnce(
+            () -> setIntakeMode(IntakeMode.RETRACTED)
+        );
+    }
+
+    public Command runExtendedIdle(){
+        return Commands.runOnce(
             () -> {
-                fallbackMode = IntakeMode.INTAKING;
+                fallbackMode = IntakeMode.EXTENDED_IDLE;
 
                 if(currentMode != IntakeMode.FEEDING 
                     && currentMode != IntakeMode.EXTENDED_REVERSE){
-                    currentMode = IntakeMode.INTAKING;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
                 }
 
             }
         );
+    }
+
+    public Command runFeed(){
+        return Commands.startEnd(
+            () -> currentMode = IntakeMode.FEEDING,
+            () -> currentMode = fallbackMode
+        );
+    }
+
+    public Command runExtendedReverse(){
+        return Commands.startEnd(
+            () -> currentMode = IntakeMode.EXTENDED_REVERSE,
+            () -> currentMode = fallbackMode
+        );
+    }
+
+    public Command zeroCommand(){
+        return pivot.zeroCommand();
+    }
+
+    /** Live pivot angle, for 3D mechanism visualization / logging. */
+    public Angle getPivotAngle() {
+        return pivot.getCurrPos();
     }
 }
