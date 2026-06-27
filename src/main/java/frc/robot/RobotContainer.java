@@ -123,7 +123,13 @@ public class RobotContainer {
     driverController.leftTrigger().onFalse(intaker.runRetract());
 
     // Swerve
-    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX(), () -> -driverController.getRightX(), swerve::getEstimatedPose, MetersPerSecond.of(0.025), DegreesPerSecond.of(10)));
+    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, 
+    () -> -driverController.getLeftY(), 
+    () -> -driverController.getLeftX(), 
+    () -> -driverController.getRightX(), 
+    swerve::getEstimatedPose, 
+    MetersPerSecond.of(0.03), 
+    DegreesPerSecond.of(12)));
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
     driverController.rightBumper().whileTrue(Commands.parallel(
