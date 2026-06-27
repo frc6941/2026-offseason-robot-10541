@@ -309,7 +309,9 @@ public class RobotContainer {
 
   private LimelightSubsystem buildLimelight() {
     LimelightIOConfig config = LimelightIOConfig.builder()
-        .name("limelight")
+        // Must exactly match the limelight's hostname (web UI -> Settings -> Hostname).
+        // Using the comp-bot's convention; rename the device to "limelight-a" to match.
+        .name("limelight-a")
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
         .build();

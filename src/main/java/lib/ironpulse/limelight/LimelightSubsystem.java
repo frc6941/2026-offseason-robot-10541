@@ -92,8 +92,10 @@ public class LimelightSubsystem extends SubsystemBase {
             io.updateInputs(inputs);
             Logger.processInputs("Limelight/" + io.getName(), inputs);
 
-            // Per-camera ghost: empty array (hidden) unless this camera trusts its target.
-            if (inputs.tv && inputs.reliability > 0 && inputs.pose != null) {
+            // Per-camera ghost: empty array (hidden) unless this camera produced a trusted pose.
+            // Gate on reliability only — matches the addVisionMeasurement() acceptance condition,
+            // so the ghost appears exactly when a measurement is actually fed to the estimator.
+            if (inputs.reliability > 0 && inputs.pose != null) {
                 Logger.recordOutput(
                         "Limelight/" + io.getName() + "/VisionPose", new Pose3d[] {inputs.pose});
                 visionGhosts.add(inputs.pose);
