@@ -42,6 +42,7 @@ import lib.ironpulse.swerve.mk5n.ImuIOPigeon;
 import lib.ironpulse.swerve.mk5n.SwerveModuleIOMK5N;
 import lib.ironpulse.swerve.sim.ImuIOSim;
 import lib.ironpulse.swerve.sim.SwerveModuleIOSimpleSim;
+import lib.ironpulse.utils.AllianceFlipUtil;
 
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
@@ -131,6 +132,14 @@ public class RobotContainer {
     swerve::getEstimatedPose, 
     MetersPerSecond.of(0.03), 
     DegreesPerSecond.of(12)));
+
+    // Field-relative heading zero: place the robot on the field facing the correct direction and
+    // press Start. Seeds the Pigeon to field yaw (0, or 180 on the flipped alliance) so MegaTag2 —
+    // which only solves X/Y from the gyro heading — corrects position correctly from then on.
+    driverController.start()
+        .onTrue(SwerveCommands.resetAngle(
+            swerve,
+            () -> AllianceFlipUtil.shouldFlip() ? Rotation2d.k180deg : Rotation2d.kZero));
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
     driverController.rightBumper().whileTrue(Commands.parallel(
