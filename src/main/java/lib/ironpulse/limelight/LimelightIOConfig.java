@@ -38,7 +38,7 @@ public class LimelightIOConfig {
      * default values set in this config seed the NT entries and act as fallbacks when a slider
      * has not been touched yet.
      *
-     * <p>NT keys: {@code Limelight/<name>/debug/<param>}
+     * <p>NT keys: {@code /LimelightDebug/<name>/<param>} (top-level table in Glass)
      *
      * @return a tunable {@code DeviationParamSources} (never null)
      */
