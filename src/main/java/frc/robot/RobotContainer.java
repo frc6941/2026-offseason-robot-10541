@@ -8,7 +8,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
-import java.util.function.Supplier;
 import frc.robot.commands.Autos;
 import frc.robot.commands.auto.AutoPoints;
 import frc.robot.commands.auto.AutoBuilder;
@@ -31,7 +30,6 @@ import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
-import lib.ironpulse.limelight.DeviationParamSources;
 import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
@@ -50,7 +48,6 @@ import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Degrees;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -314,19 +311,19 @@ public class RobotContainer {
         .name("limelight-a")
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
+        .defaultXStdDev(0.7)
+        .defaultYStdDev(0.7)
+        .defaultZStdDev(9999.0)
+        .defaultAngleStdDev(1.0)
+        .defaultImuCorrectionReliabilityThreshold(0.9)
         .build();
+
     LimelightIOReal io = new LimelightIOReal(
         config,
         swerve::getIMUYaw,
         swerve::getYawVelocityRadPerSec,
         () -> false,
-        new DeviationParamSources() {
-          public double xStdDev() { return 0.7; }
-          public double yStdDev() { return 0.7; }
-          public double zStdDev() { return 9999.0; }
-          public double angleStdDev() { return 1.0; }
-          public double imuCorrectionReliabilityThreshold() { return 0.9; }
-        });
+        config.createDeviationSources());
     return new LimelightSubsystem(swerve, io);
   }
 
