@@ -19,9 +19,33 @@ public class LimelightIOConfig {
     @Builder.Default private final int portToForwardStream = 0;
     @Builder.Default private final int portToForwardPipeline = 0;
 
+    /**
+     * When enabled, standard-deviation parameters (xStdDev, yStdDev, zStdDev, angleStdDev,
+     * imuCorrectionReliabilityThreshold) are read from NetworkTables at runtime so they can be
+     * tuned live via Shuffleboard / Glass without re-deploying code.
+     *
+     * @see #createDeviationSources()
+     */
+    @Builder.Default private final boolean debug = false;
+
     private final MountPosition mountPosition;
 
     private final Limelight4Config limeLight4Config;
+
+    /**
+     * Creates a {@link DeviationParamSources} instance. When {@link #debug} is true, returns an
+     * NT-tunable implementation that reads/writes values via SmartDashboard so they can be adjusted
+     * live. When {@link #debug} is false, returns {@code null} — the caller should fall back to
+     * hard-coded defaults.
+     *
+     * @return a tunable {@code DeviationParamSources} if debug is enabled, or {@code null}
+     */
+    public DeviationParamSources createDeviationSources() {
+        if (debug) {
+            return new NTDeviationSources(name);
+        }
+        return null;
+    }
 
     public enum MountPosition {
         ON_ROBOT,

@@ -2,7 +2,6 @@ package frc.robot.commands.auto;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.path.PathConstraints;
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
@@ -100,10 +99,6 @@ public final class AutoCommands {
         return AllianceFlipUtil.shouldFlip()
                 ? currentHeading.rotateBy(Rotation2d.kPi)
                 : currentHeading;
-    }
-
-    private static Pose2d flipBluePose(Pose2d bluePose) {
-        return AllianceFlipUtil.apply(bluePose);
     }
 
     private static boolean headingAtBlueGoal(Rotation2d blueHeading) {

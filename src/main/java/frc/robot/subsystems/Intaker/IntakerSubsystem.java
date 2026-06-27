@@ -10,8 +10,6 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
-import frc.robot.subsystems.Intaker.IntakerConfig.IntakerRollerParams;
-import frc.robot.subsystems.Intaker.IntakerConfig.IntakerPivotParams;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;

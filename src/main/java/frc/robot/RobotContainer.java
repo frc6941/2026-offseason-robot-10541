@@ -8,7 +8,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
-import java.util.function.Supplier;
 import frc.robot.commands.Autos;
 import frc.robot.commands.auto.AutoPoints;
 import frc.robot.commands.auto.AutoBuilder;
@@ -50,7 +49,6 @@ import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Degrees;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -306,19 +304,27 @@ public class RobotContainer {
         .name("limelight")
         .useMegaTag2(true)
         .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
+        .debug(true)
         .build();
+
+    DeviationParamSources deviationParams = config.createDeviationSources();
+    if (deviationParams == null) {
+      // fallback to hard-coded defaults when debug is off
+      deviationParams = new DeviationParamSources() {
+        public double xStdDev() { return 0.7; }
+        public double yStdDev() { return 0.7; }
+        public double zStdDev() { return 9999.0; }
+        public double angleStdDev() { return 1.0; }
+        public double imuCorrectionReliabilityThreshold() { return 0.9; }
+      };
+    }
+
     LimelightIOReal io = new LimelightIOReal(
         config,
         swerve::getIMUYaw,
         swerve::getYawVelocityRadPerSec,
         () -> false,
-        new DeviationParamSources() {
-          public double xStdDev() { return 0.7; }
-          public double yStdDev() { return 0.7; }
-          public double zStdDev() { return 9999.0; }
-          public double angleStdDev() { return 1.0; }
-          public double imuCorrectionReliabilityThreshold() { return 0.9; }
-        });
+        deviationParams);
     return new LimelightSubsystem(swerve, io);
   }
 
