@@ -6,7 +6,6 @@ package frc.robot;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.Autos;
@@ -159,8 +158,13 @@ public class RobotContainer {
     // Vision pose correction is now continuous via MegaTag2 (seeded by the Start-button heading
     // zero), so the old one-shot resetPoseFromVision bindings (auto-start + driver X) were removed
     // with the lib-IP-2026 adoption.
-    // TODO: re-wire precision tag-align to the new lib's SwerveDriveToAllign (the old
-    // LimelightAlignToTag was dropped). Driver Y is free until then.
+    //
+    // Driver Y is intentionally unbound. The lib dropped the tag-following LimelightAlignToTag, and
+    // its replacement SwerveDriveToAllign is a generic "drive to a known Pose2d" command, not a tag
+    // follower — and the new LimelightSubsystem exposes only the robot field pose (getPose), not the
+    // tag pose. To add a "Y to align" feature, bind SwerveDriveToAllign/SwerveDriveToPose to a KNOWN
+    // field pose (e.g. a shooting pose relative to the hub) and tune SwerveDriveToAllignParamsNT on
+    // the real robot.
 
     // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
     driverController.b().onTrue(
