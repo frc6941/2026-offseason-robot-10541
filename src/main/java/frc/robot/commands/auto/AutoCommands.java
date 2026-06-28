@@ -180,6 +180,26 @@ public final class AutoCommands {
      * Command cmd = AutoCommands.pathfindToPose(targetPose, constraints);
      * }</pre>
      */
+    // --- Auto preview capture ---
+    // While a sink is set, every blue-frame pathfind target is recorded so the chooser can draw the
+    // selected auto's waypoints (Field2d "AutoPreview") without running it. Build-time only — no
+    // effect on the scheduled command. All blue pathfind variants funnel through pathfindToBluePose.
+    private static java.util.List<Pose2d> previewSink = null;
+
+    public static void startPreviewCapture(java.util.List<Pose2d> sink) {
+        previewSink = sink;
+    }
+
+    public static void stopPreviewCapture() {
+        previewSink = null;
+    }
+
+    private static void capturePreviewTarget(Pose2d targetPose) {
+        if (previewSink != null) {
+            previewSink.add(targetPose);
+        }
+    }
+
     public static Command pathfindToPose(Pose2d targetPose, PathConstraints constraints) {
         return AutoBuilder.pathfindToPose(targetPose, constraints);
     }
@@ -189,6 +209,7 @@ public final class AutoCommands {
      * alliance.
      */
     public static Command pathfindToBluePose(Pose2d targetPose, PathConstraints constraints) {
+        capturePreviewTarget(targetPose);
         return AutoBuilder.pathfindToPoseFlipped(targetPose, constraints);
     }
 
@@ -200,6 +221,7 @@ public final class AutoCommands {
             Pose2d targetPose,
             PathConstraints constraints,
             double goalEndVelocityMetersPerSecond) {
+        capturePreviewTarget(targetPose);
         return AutoBuilder.pathfindToPoseFlipped(
                 targetPose, constraints, goalEndVelocityMetersPerSecond);
     }

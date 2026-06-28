@@ -38,4 +38,9 @@ public final class FieldPublisher {
     public static void setRobotPose(Pose2d pose) {
         field.setRobotPose(pose);
     }
+
+    /** Draw the selected auto's target waypoints (preview, before the auto runs). */
+    public static void setPreview(java.util.List<Pose2d> poses) {
+        field.getObject("AutoPreview").setPoses(poses);
+    }
 }

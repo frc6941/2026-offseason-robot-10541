@@ -1,9 +1,12 @@
 package frc.robot.commands.auto;
 
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.FieldPublisher;
+import lib.ironpulse.utils.AllianceFlipUtil;
 
 public class AutoSelector {
     private final AutoBuilder autoBuilder;
@@ -80,8 +83,12 @@ public class AutoSelector {
     public Command getCommand() {
         String selectionSummary = getSelectionSummary();
         SmartDashboard.putString("Auto/Selected", selectionSummary);
+        return buildSelectedCommand().withName(selectionSummary);
+    }
 
-        Command command = switch (selectedRoutine()) {
+    /** Builds the command for the current selection (no withName) — reused for preview capture. */
+    private Command buildSelectedCommand() {
+        return switch (selectedRoutine()) {
             case DO_NOTHING -> Commands.none();
             case DRIVE_FORWARD -> driveForwardCommand;
             case DEPOT_COLLECT -> selectedDepotAxis() == DepotAxis.X
@@ -105,12 +112,40 @@ public class AutoSelector {
                     ? autoBuilder.buildDepotLeftThroughAuto()
                     : autoBuilder.buildDepotRightThroughAuto();
         };
-
-        return command.withName(selectionSummary);
     }
 
+    private String lastPreviewKey = "";
+
     public void updateDashboard() {
-        SmartDashboard.putString("Auto/Selected", getSelectionSummary());
+        String summary = getSelectionSummary();
+        SmartDashboard.putString("Auto/Selected", summary);
+
+        // Publish the selected auto's target waypoints to the Field2d for an Elastic preview.
+        // Re-capture only when the selection or alliance changes (each capture builds a throwaway
+        // command to record its pathfind targets).
+        String previewKey = summary + "|" + AllianceFlipUtil.shouldFlip();
+        if (!previewKey.equals(lastPreviewKey)) {
+            lastPreviewKey = previewKey;
+            FieldPublisher.setPreview(captureSelectedTargets());
+        }
+    }
+
+    /** Builds the selected command under preview capture and returns its alliance-applied waypoints. */
+    private java.util.List<Pose2d> captureSelectedTargets() {
+        java.util.List<Pose2d> blue = new java.util.ArrayList<>();
+        AutoCommands.startPreviewCapture(blue);
+        try {
+            buildSelectedCommand(); // build-only; records pathfind targets, then discarded
+        } catch (RuntimeException e) {
+            // best-effort preview — ignore any build hiccup
+        } finally {
+            AutoCommands.stopPreviewCapture();
+        }
+        java.util.List<Pose2d> out = new java.util.ArrayList<>(blue.size());
+        for (Pose2d p : blue) {
+            out.add(AllianceFlipUtil.apply(p));
+        }
+        return out;
     }
 
     public String getSelectionSummary() {
