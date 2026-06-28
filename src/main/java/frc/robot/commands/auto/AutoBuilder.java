@@ -10,6 +10,8 @@ import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import com.pathplanner.lib.auto.*;
+import com.pathplanner.lib.util.*;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -18,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import lib.ironpulse.display.FieldView;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
 
@@ -41,6 +44,10 @@ public final class AutoBuilder {
         if (configured) {
             return;
         }
+
+        FieldView.Init();
+        PathPlannerLogging.setLogActivePathCallback(poses -> FieldView.updateObjectPoses(poses, "AutoPath"));
+        PathPlannerLogging.setLogTargetPoseCallback(pose -> FieldView.updateObjectPose(pose, "AutoTarget"));
 
         com.pathplanner.lib.auto.AutoBuilder.configure(
                 () -> swerve.getEstimatedPose().toPose2d(),

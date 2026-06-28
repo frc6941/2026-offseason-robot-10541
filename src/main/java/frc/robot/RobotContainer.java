@@ -8,7 +8,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
-import frc.robot.commands.Autos;
+import frc.robot.commands.DefaultAuto;
 import frc.robot.commands.auto.AutoPoints;
 import frc.robot.commands.auto.AutoBuilder;
 import frc.robot.commands.auto.AutoCommands;
@@ -22,6 +22,7 @@ import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import lib.ironpulse.display.FieldView;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -101,8 +102,11 @@ public class RobotContainer {
     hopperSubsystem.configureDefaultCommand();
     AutoBuilder.configure(swerve);
     configureBindings();
-    autoSelector = new AutoSelector(autoBuilder, Autos.driveForward(swerve));
+    autoSelector = new AutoSelector(autoBuilder, DefaultAuto.driveForward(swerve));
     new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
+
+    // Publish the Field2d ("Field") for Elastic + hook PathPlanner active-path logging (one-time).
+    FieldPublisher.init();
   }
 
   /**
@@ -203,6 +207,10 @@ public class RobotContainer {
 
   public void updateDashboard() {
     autoSelector.updateDashboard();
+
+    // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's callbacks).
+    FieldPublisher.setRobotPose(swerve.getEstimatedPose().toPose2d());
+    FieldView.updateRobotPose(swerve.getEstimatedPose().toPose2d());
 
     // Vision ghost — re-homed out of the vendored lib so future lib copies stay drop-in. Logs the
     // tag-derived robot pose as a Pose2d[], hidden (empty array) when there's no target so it
