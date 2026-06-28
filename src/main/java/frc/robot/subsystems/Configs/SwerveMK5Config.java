@@ -23,9 +23,9 @@ public final class SwerveMK5Config {
     // TODO: tune Pigeon IMU mounting angles for this robot (currently copied from competition robot)
     public static final ImuPigeonConfig pigeonConfig =
             ImuPigeonConfig.builder()
-                    .mountPoseYaw(-0.52185)
-                    .mountPosePitch(-4.042969)
-                    .mountPoseRoll(0.263672)
+                    .mountPoseYaw(-24.29374389648438)
+                    .mountPosePitch(-0.0090445756912231)
+                    .mountPoseRoll(-4.7371618461608887)
                     .gyroScalarZ(-3.5)
                     .build();
 
