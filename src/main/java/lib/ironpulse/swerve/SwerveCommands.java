@@ -20,7 +20,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import lib.ironpulse.swerve.commands.SwerveDriveToPose;
 import lib.ironpulse.swerve.commands.SwerveFollowPathPlannerTrajectory;
-import lib.ironpulse.utils.AllianceFlipUtil;
 import org.littletonrobotics.junction.Logger;
 
 public class SwerveCommands {
@@ -77,28 +76,18 @@ public class SwerveCommands {
 
                             // compose to chassis speeds
                             // NOTE: the so-called "FieldRelative" is actually
-                            // "DriverStationRelative". we take the relative speed of the
-                            // drivetrain w.r.t the DriverStation, based on alliance color.
-                            // The pose estimator heading is always in the blue-origin world
-                            // frame, so on red we rotate it by 180 deg to express it relative
-                            // to the red driver's perspective. This keeps the yaw zero (and
-                            // therefore odometry/MegaTag2) correct while making "forward" on
-                            // the stick mean "away from the driver" on both alliances.
-                            Rotation2d driverHeading =
-                                    poseDriveRobotSupplier
-                                            .get()
-                                            .getRotation()
-                                            .toRotation2d()
-                                            .rotateBy(
-                                                    AllianceFlipUtil.shouldFlip()
-                                                            ? Rotation2d.k180deg
-                                                            : Rotation2d.kZero);
+                            // "DriverStationRelative". we
+                            // take the relative speed
+                            // of the drivetrain w.r.t DriverStation, based on alliance color
                             ChassisSpeeds chassisSpeeds =
                                     ChassisSpeeds.fromFieldRelativeSpeeds(
                                             v.getX(),
                                             v.getY(),
                                             omega.in(RadiansPerSecond),
-                                            driverHeading);
+                                            poseDriveRobotSupplier
+                                                    .get()
+                                                    .getRotation()
+                                                    .toRotation2d());
 
                             swerve.runTwist(chassisSpeeds);
                         });

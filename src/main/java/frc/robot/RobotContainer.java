@@ -43,11 +43,14 @@ import lib.ironpulse.swerve.mk5n.SwerveModuleIOMK5N;
 import lib.ironpulse.swerve.sim.ImuIOSim;
 import lib.ironpulse.swerve.sim.SwerveModuleIOSimpleSim;
 import lib.ironpulse.utils.AllianceFlipUtil;
+import lib.ironpulse.math.rbd.TransformRecorder;
 
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Seconds;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -134,21 +137,39 @@ public class RobotContainer {
     driverController.leftTrigger().onFalse(intaker.runRetract());
 
     // Swerve
-    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve, 
-    () -> -driverController.getLeftY(), 
-    () -> -driverController.getLeftX(), 
-    () -> -driverController.getRightX(), 
-    swerve::getEstimatedPose, 
-    MetersPerSecond.of(0.03), 
+    // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick means
+    // away-from-driver on both alliances. The 180deg flip lives in the DriverStation frame inside
+    // RobotStateRecorder, not in a hand-written shouldFlip() here. (comp-bot does the same.)
+    swerve.setDefaultCommand(SwerveCommands.driveWithJoystick(swerve,
+    () -> -driverController.getLeftY(),
+    () -> -driverController.getLeftX(),
+    () -> -driverController.getRightX(),
+    RobotStateRecorder::getPoseDriverRobotCurrent,
+    MetersPerSecond.of(0.03),
     DegreesPerSecond.of(12)));
 
     // Field-relative heading zero: place the robot on the field facing the correct direction and
     // press Start. Seeds the Pigeon to field yaw (0, or 180 on the flipped alliance) so MegaTag2 —
     // which only solves X/Y from the gyro heading — corrects position correctly from then on.
     driverController.start()
-        .onTrue(SwerveCommands.resetAngle(
-            swerve,
-            () -> AllianceFlipUtil.shouldFlip() ? Rotation2d.k180deg : Rotation2d.kZero));
+        .onTrue(
+            Commands.sequence(
+                    SwerveCommands.resetAngle(
+                                    swerve,
+                                    () ->
+                                            AllianceFlipUtil.shouldFlip()
+                                                    ? Rotation2d.k180deg
+                                                    : Rotation2d.kZero)
+                            .alongWith(
+                                    Commands.runOnce(
+                                            () ->
+                                                    RobotStateRecorder.getInstance()
+                                                            .resetTransform(
+                                                                    TransformRecorder.kFrameWorld,
+                                                                    TransformRecorder.kFrameRobot))),
+                    Commands.runOnce(limelightSubsystem::requestInternalIMUReseedAll))
+                .alongWith(
+                    indicator.indicateWithTimeout(IndicatorIO.Patterns.RESET_ODOM, 1)));
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
     driverController.rightBumper().whileTrue(Commands.parallel(
@@ -205,6 +226,17 @@ public class RobotContainer {
   }
 
   public void updateDashboard() {
+    // Feed the swerve pose into the transform tree (World->Robot). This is the single place the
+    // robot's world pose enters RobotStateRecorder; everything alliance-aware (driver-relative
+    // driving, flipped targets) derives from here. Runs every loop incl. disabled.
+    RobotStateRecorder.getInstance()
+        .putTransform(
+            swerve.getEstimatedPose(),
+            Seconds.of(Timer.getTimestamp()),
+            TransformRecorder.kFrameWorld,
+            TransformRecorder.kFrameRobot);
+    RobotStateRecorder.periodic();
+
     autoSelector.updateDashboard();
 
     // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's callbacks).

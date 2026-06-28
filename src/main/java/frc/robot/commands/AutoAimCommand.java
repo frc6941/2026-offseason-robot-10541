@@ -11,8 +11,8 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.FieldConstants;
+import frc.robot.RobotStateRecorder;
 import lib.ironpulse.swerve.Swerve;
-import lib.ironpulse.utils.AllianceFlipUtil;
 import lib.ntext.NTParameter;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -52,7 +52,11 @@ public class AutoAimCommand extends Command {
             new Transform2d(-0.15, 0.0, Rotation2d.fromRadians(Math.PI));
 
     public static Translation2d getTarget() {
-        return AllianceFlipUtil.apply(FieldConstants.Hub.getTarget2d());
+        // Hub goal via the transform tree (stored blue, returned alliance-flipped). Equivalent to
+        // AllianceFlipUtil.apply(FieldConstants.Hub.getTarget2d()) but sourced from RobotStateRecorder.
+        return RobotStateRecorder.getPoseWorldTargetCurrent(RobotStateRecorder.kFrameGoal)
+                .getTranslation()
+                .toTranslation2d();
     }
 
     public static double getDistanceToTarget(Translation2d robotPos) {
@@ -97,8 +101,12 @@ public class AutoAimCommand extends Command {
         double y = MathUtil.applyDeadband(ySupplier.getAsDouble(), 0.1);
         double vNorm = Math.hypot(x, y) * maxSpeed;
         Translation2d v = new Translation2d(vNorm, new Rotation2d(x, y));
+        // Driver-relative heading (same convention as driveWithJoystick) so translation isn't
+        // mirrored on the red alliance while auto-aiming. The aim omega above is unaffected.
+        Rotation2d driverHeading =
+                RobotStateRecorder.getPoseDriverRobotCurrent().getRotation().toRotation2d();
         ChassisSpeeds speeds = ChassisSpeeds.fromFieldRelativeSpeeds(
-                v.getX(), v.getY(), omega, robotPose.getRotation());
+                v.getX(), v.getY(), omega, driverHeading);
         swerve.runTwist(speeds);
 
         Logger.recordOutput("AutoAim/TargetHeading", target.getDegrees());
