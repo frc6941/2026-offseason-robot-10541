@@ -1,7 +1,5 @@
 package lib.ironpulse.display;
 
-import java.util.List;
-
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -11,15 +9,11 @@ public class FieldView {
     private static final Field2d mField2d = new Field2d();
 
     public static void Init() {
-        SmartDashboard.putData("Field", mField2d);
+        SmartDashboard.putData(mField2d);
     }
 
     public static void updateObjectPose(Pose2d pose, String name) {
         mField2d.getObject(name).setPose(pose);
-    }
-
-    public static void updateObjectPoses(List<Pose2d> pose, String name) {
-        mField2d.getObject(name).setPoses(pose);
     }
 
     public static void updateObjectTraj(Trajectory traj, String name) {
