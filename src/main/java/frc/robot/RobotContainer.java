@@ -152,7 +152,8 @@ public class RobotContainer {
     driverController.rightBumper().onFalse(Commands.sequence(
         Commands.parallel(
             shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
-            hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE)),
+            hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE))
+            .withTimeout(0.02),
         indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
 
     // Vision pose correction is now continuous via MegaTag2 (seeded by the Start-button heading
@@ -182,7 +183,7 @@ public class RobotContainer {
         shootingSuperstructure.aimAndShoot()
     ));
     driverController.a().onFalse(Commands.sequence(
-        shootingSuperstructure.idle(),
+        shootingSuperstructure.idle().withTimeout(0.02),
         indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
   }
 

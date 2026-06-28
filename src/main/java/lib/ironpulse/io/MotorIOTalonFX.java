@@ -129,14 +129,14 @@ public class MotorIOTalonFX implements MotorIO {
                     followerCurrentLimits.SupplyCurrentLimitEnable = true;
                     followerCurrentLimits.SupplyCurrentLimit = f.supplyCurrentLimitAmps;
                 }
-                if (!Double.isNaN(f.ramp)) {
-                    followers[i]
-                            .getConfigurator()
-                            .apply(
-                                    new ClosedLoopRampsConfigs()
-                                            .withVoltageClosedLoopRampPeriod(f.ramp));
-                }
                 followers[i].getConfigurator().apply(followerCurrentLimits);
+            }
+            if (!Double.isNaN(f.ramp)) {
+                followers[i]
+                        .getConfigurator()
+                        .apply(
+                                new ClosedLoopRampsConfigs()
+                                        .withVoltageClosedLoopRampPeriod(f.ramp));
             }
         }
 
