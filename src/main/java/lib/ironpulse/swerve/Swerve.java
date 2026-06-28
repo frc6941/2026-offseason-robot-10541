@@ -212,8 +212,16 @@ public class Swerve extends SubsystemBase implements Localizable {
         List<SwerveModulePosition[]> samplesByModule =
                 modules.stream().map(SwerveModule::getSampledSwerveModulePositions).toList();
 
-        List<Pair<Double, SwerveModulePosition[]>> result = new ArrayList<>(timestamps.length);
-        for (int sampleIdx = 0; sampleIdx < timestamps.length; sampleIdx++) {
+        // The IMU and per-module sample queues are filled/drained independently by the odometry
+        // thread and can momentarily differ in length. Clamp to the smallest common count so we
+        // never index past a shorter array (was an AIOOBE crash once the sampler runs).
+        // TODO(lib-IP-2026): upstream this guard (or read all queues under one lock).
+        int sampleCount = timestamps.length;
+        for (SwerveModulePosition[] moduleSamples : samplesByModule)
+            sampleCount = Math.min(sampleCount, moduleSamples.length);
+
+        List<Pair<Double, SwerveModulePosition[]>> result = new ArrayList<>(sampleCount);
+        for (int sampleIdx = 0; sampleIdx < sampleCount; sampleIdx++) {
             // build the array of positions at this timestamp
             SwerveModulePosition[] positionsAtTime = new SwerveModulePosition[moduleCount];
             for (int moduleIdx = 0; moduleIdx < moduleCount; moduleIdx++)
