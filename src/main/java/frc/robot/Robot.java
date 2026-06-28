@@ -14,7 +14,6 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
 import lib.ntext.NTParameterRegistry;
-import lib.ironpulse.utils.PhoenixUtils;
 
 /**
  * The methods in this class are called automatically corresponding to each mode, as described in
@@ -60,11 +59,6 @@ public class Robot extends LoggedRobot {
     // commands, running already-scheduled commands, removing finished or interrupted commands,
     // and running subsystem periodic() methods.  This must be called from the robot's periodic
     // block in order for anything in the Command-based framework to work.
-    // Refresh all registered Phoenix status signals (swerve modules + Pigeon) at the top of the
-    // loop. The multi-bus lib registers signals but does NOT refresh them itself — without this,
-    // module/IMU readings stay stale (frozen pose, frozen yaw). See SwerveModuleIOMK5N ctor.
-    PhoenixUtils.refreshAll();
-
     CommandScheduler.getInstance().run();
 
     // Pull the latest @NTParameter values from NetworkTables and fire onChange hooks so all

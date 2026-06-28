@@ -91,11 +91,6 @@ public class RobotContainer {
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
-    // Start the swerve odometry sampler thread now that all modules + the Pigeon have registered
-    // their signals (during field init above). The lib creates the thread lazily but never starts
-    // it; without this the odometry queues stay empty and the pose estimator never updates. No-op
-    // in sim (no MK5N modules -> syncThread is null).
-    SwerveModuleIOMK5N.startSyncThread();
 
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
