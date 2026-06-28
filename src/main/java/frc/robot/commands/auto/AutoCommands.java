@@ -2,11 +2,13 @@ package frc.robot.commands.auto;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.path.PathConstraints;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
@@ -18,9 +20,8 @@ import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.swerve.Swerve;
-import lib.ironpulse.swerve.SwerveCommands;
-import lib.ironpulse.swerve.commands.SwerveAimToHeading;
 import lib.ironpulse.utils.AllianceFlipUtil;
+import java.util.function.Supplier;
 
 public final class AutoCommands {
     public static final PathConstraints PRECISE_CONSTRAINTS =
@@ -34,9 +35,11 @@ public final class AutoCommands {
     public static final double AUTO_SHOOT_READY_TIMEOUT_SECONDS = 2.0;
     public static final double AUTO_SHOOT_FEED_SECONDS = 3.0;
     public static final double AUTO_MOVE_SHOT_FEED_SECONDS = 2.5;
+    private static final double AUTO_THROUGH_VELOCITY_METERS_PER_SECOND = 2.0;
+    private static final double AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND = 1.5;
     private static final double MOVE_SHOT_TRANSLATION_KP = 10.0;
     private static final double MOVE_SHOT_TRANSLATION_KD = 0.35;
-    private static final double MOVE_SHOT_ROTATION_KP = 7.0;
+    private static final double MOVE_SHOT_ROTATION_KP = 8.0;
     private static final double MOVE_SHOT_ROTATION_KD = 0.2;
     private static final double AUTO_TRANSLATION_TOLERANCE_METERS = 0.10;
     private static final Angle AUTO_ROTATION_TOLERANCE = Units.Degrees.of(3.0);
@@ -114,14 +117,87 @@ public final class AutoCommands {
         return current.getDistance(goal) <= AUTO_TRANSLATION_TOLERANCE_METERS;
     }
 
+    private static boolean poseAtGoal(
+            Pose2d currentPose,
+            Pose2d targetPose,
+            Distance translationTolerance,
+            Angle rotationTolerance) {
+        return currentPose.getTranslation().getDistance(targetPose.getTranslation())
+                        <= translationTolerance.in(Units.Meters)
+                && Math.abs(currentPose.getRotation().minus(targetPose.getRotation()).getDegrees())
+                        <= rotationTolerance.in(Units.Degrees);
+    }
+
     private static Command settleToBlueHeading(Swerve swerve, Rotation2d blueHeading) {
-        return new SwerveAimToHeading(
-                swerve,
-                swerve::getEstimatedPose,
-                () -> flipBlueHeading(blueHeading),
-                new PIDController(5.0, 0.0, 0.0),
-                AUTO_ROTATION_TOLERANCE,
-                () -> Units.DegreesPerSecond.of(180.0));
+        PIDController rotationController =
+                new PIDController(AutoAimCommand.AutoAimParams.kP, 0.0, 0.0);
+        rotationController.enableContinuousInput(-Math.PI, Math.PI);
+        return Commands.run(
+                        () -> {
+                            Rotation2d goalHeading = flipBlueHeading(blueHeading);
+                            Rotation2d currentHeading = swerve.getEstimatedPose().toPose2d().getRotation();
+                            double omega = rotationController.calculate(
+                                    currentHeading.getRadians(), goalHeading.getRadians());
+                            omega = MathUtil.clamp(
+                                    omega,
+                                    -AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec,
+                                    AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec);
+                            swerve.runTwist(new ChassisSpeeds(0.0, 0.0, omega));
+                        },
+                        swerve)
+                .beforeStarting(rotationController::reset)
+                .until(() -> headingAtBlueGoal(blueHeading))
+                .finallyDo(interrupted -> swerve.runStop());
+    }
+
+    private static Command driveToDynamicPose(
+            Swerve swerve,
+            Supplier<Pose2d> targetPoseSupplier,
+            PIDController translationController,
+            PIDController rotationController,
+            Distance translationTolerance,
+            Angle rotationTolerance) {
+        rotationController.enableContinuousInput(-Math.PI, Math.PI);
+        return Commands.run(
+                        () -> {
+                            Pose2d currentPose = swerve.getEstimatedPose().toPose2d();
+                            Pose2d targetPose = targetPoseSupplier.get();
+                            Pose2d targetRobot = targetPose.relativeTo(currentPose);
+
+                            Translation2d translationError = targetRobot.getTranslation();
+                            double translationErrorNorm = translationError.getNorm();
+                            Rotation2d translationDirection =
+                                    translationErrorNorm <= 1e-6
+                                            ? Rotation2d.kZero
+                                            : translationError.getAngle();
+                            double translationCommand =
+                                    translationController.calculate(translationErrorNorm, 0.0);
+                            Translation2d velocityRobot =
+                                    new Translation2d(-translationCommand, translationDirection);
+
+                            double omega =
+                                    -rotationController.calculate(targetRobot.getRotation().getRadians(), 0.0);
+                            omega = MathUtil.clamp(
+                                    omega,
+                                    -AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec,
+                                    AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec);
+
+                            swerve.runTwist(new ChassisSpeeds(
+                                    velocityRobot.getX(),
+                                    velocityRobot.getY(),
+                                    omega));
+                        },
+                        swerve)
+                .beforeStarting(() -> {
+                    translationController.reset();
+                    rotationController.reset();
+                })
+                .until(() -> poseAtGoal(
+                        swerve.getEstimatedPose().toPose2d(),
+                        targetPoseSupplier.get(),
+                        translationTolerance,
+                        rotationTolerance))
+                .finallyDo(interrupted -> swerve.runStop());
     }
 
     /**
@@ -375,7 +451,7 @@ public final class AutoCommands {
                         start,
                         heading,
                         PRECISE_CONSTRAINTS,
-                        0.0),
+                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         end,
@@ -407,14 +483,11 @@ public final class AutoCommands {
             Angle rotationTolerance) {
         capturePreviewTarget(new Pose2d(targetTranslation, Rotation2d.kZero));
         return Commands.parallel(
-                SwerveCommands.driveToPose(
+                driveToDynamicPose(
                         swerve,
-                        swerve::getEstimatedPose,
-                        () -> new Pose3d(
-                                new Pose2d(
-                                        AllianceFlipUtil.apply(targetTranslation),
-                                        shootingSuperstructure.aimHeading())),
-                        () -> Pose2d.kZero,
+                        () -> new Pose2d(
+                                AllianceFlipUtil.apply(targetTranslation),
+                                shootingSuperstructure.aimHeading()),
                         new PIDController(MOVE_SHOT_TRANSLATION_KP, 0.0, MOVE_SHOT_TRANSLATION_KD),
                         new PIDController(MOVE_SHOT_ROTATION_KP, 0.0, MOVE_SHOT_ROTATION_KD),
                         translationTolerance,
@@ -438,6 +511,27 @@ public final class AutoCommands {
                 : depotYCollect(swerve, intaker);
     }
 
+    private static Command depotCollectFromCurrentStartSelection(
+            Swerve swerve,
+            IntakerSubsystem intaker,
+            AutoSelector.DepotAxis depotAxis) {
+        return depotAxis == AutoSelector.DepotAxis.X
+                ? runWhileIntaking(
+                        pathfindToBluePoseStrict(
+                                swerve,
+                                AutoPoints.DEPOT_X_END,
+                                INTAKE_MEDIUM_CONSTRAINTS,
+                                0.0),
+                        intaker)
+                : runWhileIntaking(
+                        pathfindToBluePoseStrict(
+                                swerve,
+                                AutoPoints.DEPOT_Y_END,
+                                INTAKE_MEDIUM_CONSTRAINTS,
+                                0.0),
+                        intaker);
+    }
+
     private static Command shootThenDepotCollect(
             Swerve swerve,
             IntakerSubsystem intaker,
@@ -454,7 +548,7 @@ public final class AutoCommands {
                         Units.Meters.of(0.15),
                         Units.Degrees.of(5.0)),
                 markStep(stepPrefix + ": depot collect"),
-                depotCollectFromSelection(swerve, intaker, depotAxis));
+                depotCollectFromCurrentStartSelection(swerve, intaker, depotAxis));
     }
 
     private static Command handlePostSweepAction(
@@ -470,7 +564,10 @@ public final class AutoCommands {
         if (depotRound == currentRound) {
             return Commands.sequence(
                     markStep("Round " + roundIndex + ": launch pose"),
-                    goToBumpLaunchForSweepEnd(swerve, sweepDirection)
+                    goToBumpLaunchForSweepEnd(
+                                    swerve,
+                                    sweepDirection,
+                                    AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
                             .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
                     shootThenDepotCollect(swerve, intaker, shootingSuperstructure, depotAxis, "Round " + roundIndex));
         }
@@ -488,15 +585,22 @@ public final class AutoCommands {
     public static Command goToBumpLaunchForSweepEnd(
             Swerve swerve,
             NeutralSweepDirection direction) {
+        return goToBumpLaunchForSweepEnd(swerve, direction, 0.0);
+    }
+
+    private static Command goToBumpLaunchForSweepEnd(
+            Swerve swerve,
+            NeutralSweepDirection direction,
+            double goalEndVelocityMetersPerSecond) {
         return direction == NeutralSweepDirection.LEFT_TO_RIGHT
                 ? pathfindToBlueTranslationPreserveHeading(
                         AutoPoints.Launch.RIGHT_BUMP.getTranslation(),
                         TRANSIT_CONSTRAINTS,
-                        0.0)
+                        goalEndVelocityMetersPerSecond)
                 : pathfindToBlueTranslationPreserveHeading(
                         AutoPoints.Launch.LEFT_BUMP.getTranslation(),
                         TRANSIT_CONSTRAINTS,
-                        0.0);
+                        goalEndVelocityMetersPerSecond);
     }
 
     public static Command midTwoCycle(
@@ -545,7 +649,11 @@ public final class AutoCommands {
     /** DEPOT X START -> intake on -> DEPOT X END */
     public static Command depotXCollect(Swerve swerve, IntakerSubsystem intaker) {
         return Commands.sequence(
-                pathfindToBluePoseStrict(swerve, AutoPoints.DEPOT_X_START, PRECISE_CONSTRAINTS, 0.0),
+                pathfindToBluePoseStrict(
+                        swerve,
+                        AutoPoints.DEPOT_X_START,
+                        PRECISE_CONSTRAINTS,
+                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
                 runWhileIntaking(
                         pathfindToBluePoseStrict(
                                 swerve,
@@ -558,7 +666,11 @@ public final class AutoCommands {
     /** DEPOT Y START -> intake on -> DEPOT Y END */
     public static Command depotYCollect(Swerve swerve, IntakerSubsystem intaker) {
         return Commands.sequence(
-                pathfindToBluePoseStrict(swerve, AutoPoints.DEPOT_Y_START, PRECISE_CONSTRAINTS, 0.0),
+                pathfindToBluePoseStrict(
+                        swerve,
+                        AutoPoints.DEPOT_Y_START,
+                        PRECISE_CONSTRAINTS,
+                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
                 runWhileIntaking(
                         pathfindToBluePoseStrict(
                                 swerve,
@@ -589,7 +701,7 @@ public final class AutoCommands {
                         AutoPoints.Trench.LEFT_START,
                         Rotation2d.kPi,
                         PRECISE_CONSTRAINTS,
-                        0.0),
+                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Trench.LEFT_CLEAR,
@@ -605,7 +717,7 @@ public final class AutoCommands {
                         AutoPoints.Trench.RIGHT_START,
                         Rotation2d.kPi,
                         PRECISE_CONSTRAINTS,
-                        0.0),
+                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Trench.RIGHT_CLEAR,
@@ -621,7 +733,7 @@ public final class AutoCommands {
                         AutoPoints.Bump.LEFT_INNER,
                         Rotation2d.kPi,
                         PRECISE_CONSTRAINTS,
-                        0.0),
+                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Bump.LEFT_OUTER,
@@ -637,7 +749,7 @@ public final class AutoCommands {
                         AutoPoints.Bump.RIGHT_INNER,
                         Rotation2d.kPi,
                         PRECISE_CONSTRAINTS,
-                        0.0),
+                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Bump.RIGHT_OUTER,
