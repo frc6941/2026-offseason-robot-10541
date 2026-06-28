@@ -405,6 +405,7 @@ public final class AutoCommands {
             Translation2d targetTranslation,
             Distance translationTolerance,
             Angle rotationTolerance) {
+        capturePreviewTarget(new Pose2d(targetTranslation, Rotation2d.kZero));
         return Commands.parallel(
                 SwerveCommands.driveToPose(
                         swerve,

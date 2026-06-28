@@ -22,7 +22,6 @@ import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
-import lib.ironpulse.display.FieldView;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -210,7 +209,6 @@ public class RobotContainer {
 
     // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's callbacks).
     FieldPublisher.setRobotPose(swerve.getEstimatedPose().toPose2d());
-    FieldView.updateRobotPose(swerve.getEstimatedPose().toPose2d());
 
     // Vision ghost — re-homed out of the vendored lib so future lib copies stay drop-in. Logs the
     // tag-derived robot pose as a Pose2d[], hidden (empty array) when there's no target so it
