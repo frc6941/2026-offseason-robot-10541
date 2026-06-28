@@ -369,13 +369,17 @@ public class RobotContainer {
 
   private Swerve buildSwerve() {
     if (RobotBase.isReal()) {
-      return new Swerve(
-          SwerveMK5Config.kRealConfig,
-          new ImuIOPigeon(SwerveMK5Config.kRealConfig, SwerveMK5Config.pigeonConfig),
-          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 0),
-          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 1),
-          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 2),
-          new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 3));
+      // Build the modules BEFORE the IMU. SwerveModuleIOMK5N lazily creates the shared
+      // PhoenixSynchronizationThread; ImuIOPigeon then grabs it via getSyncThread() to register its
+      // yaw + the odometry timestamp queue. If the IMU is constructed first, getSyncThread() returns
+      // null, the IMU silently skips registration, and the pose estimator never gets sampled
+      // timestamps — frozen pose even though the wheels still drive. (Arg order to Swerve unchanged.)
+      var module0 = new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 0);
+      var module1 = new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 1);
+      var module2 = new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 2);
+      var module3 = new SwerveModuleIOMK5N(SwerveMK5Config.kRealConfig, 3);
+      var imu = new ImuIOPigeon(SwerveMK5Config.kRealConfig, SwerveMK5Config.pigeonConfig);
+      return new Swerve(SwerveMK5Config.kRealConfig, imu, module0, module1, module2, module3);
     } else {
       return new Swerve(
           SwerveMK5Config.kRealConfig,
