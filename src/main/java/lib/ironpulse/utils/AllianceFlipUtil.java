@@ -8,20 +8,17 @@
 package lib.ironpulse.utils;
 
 import edu.wpi.first.math.geometry.*;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
+import frc.robot.FieldConstants;
 import lib.ironpulse.math.obstacle.PolygonObstacle2d;
 
 public class AllianceFlipUtil {
-    private static final double FIELD_LENGTH_METERS = Units.inchesToMeters(690.876);
-    private static final double FIELD_WIDTH_METERS = Units.inchesToMeters(317.0);
-
     public static double applyX(double x) {
-        return shouldFlip() ? FIELD_LENGTH_METERS - x : x;
+        return shouldFlip() ? FieldConstants.fieldLength - x : x;
     }
 
     public static double applyY(double y) {
-        return shouldFlip() ? FIELD_WIDTH_METERS - y : y;
+        return shouldFlip() ? FieldConstants.fieldWidth - y : y;
     }
 
     public static Translation2d apply(Translation2d translation) {
@@ -47,8 +44,8 @@ public class AllianceFlipUtil {
 
     public static Translation3d apply(Translation3d t3) {
         if (shouldFlip()) {
-            double x = FIELD_LENGTH_METERS - t3.getX();
-            double y = FIELD_WIDTH_METERS - t3.getY();
+            double x = FieldConstants.fieldLength - t3.getX();
+            double y = FieldConstants.fieldWidth - t3.getY();
             return new Translation3d(x, y, t3.getZ());
         }
         return t3;
