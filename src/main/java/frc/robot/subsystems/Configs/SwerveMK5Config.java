@@ -55,7 +55,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(kSwerveHalfLength, kSwerveHalfWidth))
                     .driveMotorId(9).steerMotorId(8).encoderId(7)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.481689))
+                    .steerMotorEncoderOffset(Rotations.of(0.412354))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -65,7 +65,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(kSwerveHalfLength, -kSwerveHalfWidth))
                     .driveMotorId(12).steerMotorId(11).encoderId(10)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(-0.328613))
+                    .steerMotorEncoderOffset(Rotations.of(0.373291))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -75,7 +75,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(-kSwerveHalfLength, kSwerveHalfWidth))
                     .driveMotorId(6).steerMotorId(5).encoderId(4)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.243164))
+                    .steerMotorEncoderOffset(Rotations.of(0.076172))
                     .driveInverted(false).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -85,7 +85,7 @@ public final class SwerveMK5Config {
                     .location(new Translation2d(-kSwerveHalfLength, -kSwerveHalfWidth))
                     .driveMotorId(3).steerMotorId(2).encoderId(1)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.493164))
+                    .steerMotorEncoderOffset(Rotations.of(-0.180420))
                     .driveInverted(true).steerInverted(false).encoderInverted(false)
                     .build();
 
@@ -95,10 +95,10 @@ public final class SwerveMK5Config {
                     .name("Swerve")
                     .dtS(RobotConstants.LOOPER_DT)
                     .wheelDiameter(Inch.of(4.0))
-                    .driveGearRatio(7.03)
+                    .driveGearRatio(6.03)
                     .steerGearRatio(287.0 / 11.0)
                     .driveMotorKt(0.0182)
-                    .driveMass(Kilograms.of(52))
+                    .driveMass(Kilograms.of(22))
                     .driveMotor(DCMotor.getKrakenX60Foc(1))
                     .driveMomentOfInertia(KilogramSquareMeters.of(0.04))
                     .driveStdDevPos(0.0000001)
@@ -120,10 +120,10 @@ public final class SwerveMK5Config {
                     .name("Swerve")
                     .dtS(RobotConstants.LOOPER_DT)
                     .wheelDiameter(Inch.of(4.0))
-                    .driveGearRatio(7.03)
+                    .driveGearRatio(6.03)
                     .steerGearRatio(287.0 / 11.0)
                     .driveMotorKt(0.0182)
-                    .driveMass(Kilograms.of(52))
+                    .driveMass(Kilograms.of(22))
                     .pigeonConfig(pigeonConfig)
                     .defaultSwerveLimit(kDefaultSwerveLimit)
                     .defaultSwerveModuleLimit(kDefaultSwerveModuleLimit)
@@ -133,8 +133,8 @@ public final class SwerveMK5Config {
                     .odometryFrequency(Hertz.of(100))
                     .driveStatorCurrentLimit(Amps.of(100))
                     .driveSupplyCurrentLimit(Amps.of(65))
-                    .steerStatorCurrentLimit(Amps.of(55))
-                    .steerSupplyCurrentLimit(Amps.of(40))
+                    .steerStatorCurrentLimit(Amps.of(45))
+                    .steerSupplyCurrentLimit(Amps.of(35))
                     .canivoreCanBus(CANIVORE_CAN_BUS)
                     .pigeonId(RobotConstants.PIGEON_ID)
                     .build();
