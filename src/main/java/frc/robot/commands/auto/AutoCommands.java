@@ -457,7 +457,7 @@ public final class AutoCommands {
                         end,
                         heading,
                         INTAKE_MEDIUM_CONSTRAINTS,
-                        0.0));
+                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
 
         return runWhileIntaking(sweep, intaker);
     }
