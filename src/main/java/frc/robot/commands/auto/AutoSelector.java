@@ -19,6 +19,8 @@ public class AutoSelector {
     private final SendableChooser<AutoCommands.NeutralSweepMode> secondMidModeChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepDirection> firstMidDirectionChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepDirection> secondMidDirectionChooser = new SendableChooser<>();
+    private final SendableChooser<Side> firstShootPositionChooser = new SendableChooser<>();
+    private final SendableChooser<Side> secondShootPositionChooser = new SendableChooser<>();
     private final SendableChooser<Side> sideChooser = new SendableChooser<>();
     private final SendableChooser<TargetPoint> targetChooser = new SendableChooser<>();
 
@@ -55,6 +57,9 @@ public class AutoSelector {
         configureMidDirectionChooser(firstMidDirectionChooser, AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT);
         configureMidDirectionChooser(secondMidDirectionChooser, AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT);
 
+        configureShootPositionChooser(firstShootPositionChooser, Side.RIGHT);
+        configureShootPositionChooser(secondShootPositionChooser, Side.LEFT);
+
         sideChooser.setDefaultOption("Left", Side.LEFT);
         sideChooser.addOption("Right", Side.RIGHT);
 
@@ -78,6 +83,8 @@ public class AutoSelector {
         SmartDashboard.putData("Auto/Second Mid Mode", secondMidModeChooser);
         SmartDashboard.putData("Auto/First Mid Direction", firstMidDirectionChooser);
         SmartDashboard.putData("Auto/Second Mid Direction", secondMidDirectionChooser);
+        SmartDashboard.putData("Auto/First Shoot Position", firstShootPositionChooser);
+        SmartDashboard.putData("Auto/Second Shoot Position", secondShootPositionChooser);
         SmartDashboard.putData("Auto/Side", sideChooser);
         SmartDashboard.putData("Auto/Target", targetChooser);
     }
@@ -104,6 +111,8 @@ public class AutoSelector {
                     selectedSecondMidMode(),
                     selectedFirstMidDirection(),
                     selectedSecondMidDirection(),
+                    selectedFirstShootPosition(),
+                    selectedSecondShootPosition(),
                     selectedDepotAxis(),
                     selectedDepotRound());
             case GO_TO_TARGET -> buildTargetCommand(selectedTarget());
@@ -161,6 +170,8 @@ public class AutoSelector {
                 + ", SecondMidMode=" + selectedSecondMidMode()
                 + ", FirstMidDirection=" + selectedFirstMidDirection()
                 + ", SecondMidDirection=" + selectedSecondMidDirection()
+                + ", FirstShootPosition=" + selectedFirstShootPosition()
+                + ", SecondShootPosition=" + selectedSecondShootPosition()
                 + ", Side=" + selectedSide()
                 + ", Target=" + selectedTarget();
     }
@@ -216,6 +227,16 @@ public class AutoSelector {
         }
     }
 
+    private void configureShootPositionChooser(SendableChooser<Side> chooser, Side defaultPosition) {
+        if (defaultPosition == Side.LEFT) {
+            chooser.setDefaultOption("Left", Side.LEFT);
+            chooser.addOption("Right", Side.RIGHT);
+        } else {
+            chooser.setDefaultOption("Right", Side.RIGHT);
+            chooser.addOption("Left", Side.LEFT);
+        }
+    }
+
     private AutoCommands.NeutralSweepMode selectedFirstMidMode() {
         AutoCommands.NeutralSweepMode selected = firstMidModeChooser.getSelected();
         return selected == null ? AutoCommands.NeutralSweepMode.SALESMAN : selected;
@@ -242,6 +263,16 @@ public class AutoSelector {
     private AutoCommands.NeutralSweepDirection selectedSecondMidDirection() {
         AutoCommands.NeutralSweepDirection selected = secondMidDirectionChooser.getSelected();
         return selected == null ? AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT : selected;
+    }
+
+    private Side selectedFirstShootPosition() {
+        Side selected = firstShootPositionChooser.getSelected();
+        return selected == null ? Side.RIGHT : selected;
+    }
+
+    private Side selectedSecondShootPosition() {
+        Side selected = secondShootPositionChooser.getSelected();
+        return selected == null ? Side.LEFT : selected;
     }
 
     private Side selectedSide() {

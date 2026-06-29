@@ -675,7 +675,7 @@ public final class AutoCommands {
             Swerve swerve,
             IntakerSubsystem intaker,
             ShootingSuperstructure shootingSuperstructure,
-            NeutralSweepDirection sweepDirection,
+            AutoSelector.Side shootPosition,
             AutoSelector.DepotAxis depotAxis,
             DepotVisitRound depotRound,
             int roundIndex) {
@@ -686,7 +686,7 @@ public final class AutoCommands {
                     markStep("Round " + roundIndex + ": launch pose"),
                     goToBumpLaunchForSweepEnd(
                                     swerve,
-                                    sweepDirection,
+                                    shootPosition,
                                     AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
                             .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
                     shootThenDepotCollect(swerve, intaker, shootingSuperstructure, depotAxis, "Round " + roundIndex));
@@ -694,9 +694,7 @@ public final class AutoCommands {
 
         return Commands.sequence(
                 markStep("Round " + roundIndex + ": launch pose"),
-                goToBumpLaunchForSweepEnd(swerve, roundIndex == 1
-                        ? NeutralSweepDirection.LEFT_TO_RIGHT
-                        : NeutralSweepDirection.RIGHT_TO_LEFT)
+                goToBumpLaunchForSweepEnd(swerve, shootPosition)
                         .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
                 markStep("Round " + roundIndex + ": shoot"),
                 autoAimAndShoot(swerve, shootingSuperstructure));
@@ -708,17 +706,38 @@ public final class AutoCommands {
         return goToBumpLaunchForSweepEnd(swerve, direction, 0.0);
     }
 
+    public static Command goToBumpLaunchForSweepEnd(
+            Swerve swerve,
+            AutoSelector.Side shootPosition) {
+        return goToBumpLaunchForSweepEnd(swerve, shootPosition, 0.0);
+    }
+
     private static Command goToBumpLaunchForSweepEnd(
             Swerve swerve,
             NeutralSweepDirection direction,
             double goalEndVelocityMetersPerSecond) {
         return direction == NeutralSweepDirection.LEFT_TO_RIGHT
+                ? goToBumpLaunchForSweepEnd(
+                        swerve,
+                        AutoSelector.Side.RIGHT,
+                        goalEndVelocityMetersPerSecond)
+                : goToBumpLaunchForSweepEnd(
+                        swerve,
+                        AutoSelector.Side.LEFT,
+                        goalEndVelocityMetersPerSecond);
+    }
+
+    private static Command goToBumpLaunchForSweepEnd(
+            Swerve swerve,
+            AutoSelector.Side shootPosition,
+            double goalEndVelocityMetersPerSecond) {
+        return shootPosition == AutoSelector.Side.LEFT
                 ? pathfindToBlueTranslationPreserveHeading(
-                        AutoPoints.Launch.RIGHT_BUMP.getTranslation(),
+                        AutoPoints.Launch.LEFT_BUMP.getTranslation(),
                         TRANSIT_CONSTRAINTS,
                         goalEndVelocityMetersPerSecond)
                 : pathfindToBlueTranslationPreserveHeading(
-                        AutoPoints.Launch.LEFT_BUMP.getTranslation(),
+                        AutoPoints.Launch.RIGHT_BUMP.getTranslation(),
                         TRANSIT_CONSTRAINTS,
                         goalEndVelocityMetersPerSecond);
     }
@@ -731,6 +750,8 @@ public final class AutoCommands {
             NeutralSweepMode secondMode,
             NeutralSweepDirection firstDirection,
             NeutralSweepDirection secondDirection,
+            AutoSelector.Side firstShootPosition,
+            AutoSelector.Side secondShootPosition,
             AutoSelector.DepotAxis depotAxis,
             DepotVisitRound depotRound) {
         return Commands.sequence(
@@ -746,7 +767,7 @@ public final class AutoCommands {
                         swerve,
                         intaker,
                         shootingSuperstructure,
-                        firstDirection,
+                        firstShootPosition,
                         depotAxis,
                         depotRound,
                         1),
@@ -756,7 +777,7 @@ public final class AutoCommands {
                         swerve,
                         intaker,
                         shootingSuperstructure,
-                        secondDirection,
+                        secondShootPosition,
                         depotAxis,
                         depotRound,
                         2))

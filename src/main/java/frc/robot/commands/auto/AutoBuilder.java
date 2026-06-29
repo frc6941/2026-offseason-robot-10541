@@ -116,6 +116,8 @@ public final class AutoBuilder {
             AutoCommands.NeutralSweepMode secondMode,
             AutoCommands.NeutralSweepDirection firstDirection,
             AutoCommands.NeutralSweepDirection secondDirection,
+            AutoSelector.Side firstShootPosition,
+            AutoSelector.Side secondShootPosition,
             AutoSelector.DepotAxis depotAxis,
             AutoCommands.DepotVisitRound depotRound) {
         return AutoCommands.midTwoCycle(
@@ -126,6 +128,8 @@ public final class AutoBuilder {
                 secondMode,
                 firstDirection,
                 secondDirection,
+                firstShootPosition,
+                secondShootPosition,
                 depotAxis,
                 depotRound);
     }
