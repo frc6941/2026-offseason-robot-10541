@@ -55,12 +55,14 @@ public final class AutoCommands {
         CONSERVATIVE,
         NEUTRAL,
         FLIGHTLESS,
+        FLIGHTLESS_WIDE,
         DAVIS,
         DAVIS_FRIENDSHIP,
         CORIOLIS,
         SALESMAN,
         SALESMAN_TURN,
-        WAVE
+        WAVE,
+        FLIGHTLESS_WAVE
     }
 
     public enum NeutralSweepDirection {
@@ -416,6 +418,14 @@ public final class AutoCommands {
                 AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
                 AutoPoints.NeutralZone.RIGHT_FLIGHTLESS
             };
+            case FLIGHTLESS_WIDE -> new Translation2d[] {
+                AutoPoints.NeutralZone.LEFT_FLIGHTLESS_WIDE,
+                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS_WIDE
+            };
+            case FLIGHTLESS_WAVE -> new Translation2d[] {
+                AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
+                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS
+            };
             case DAVIS -> new Translation2d[] {
                 AutoPoints.NeutralZone.LEFT_DAVIS,
                 AutoPoints.NeutralZone.RIGHT_DAVIS
@@ -471,9 +481,13 @@ public final class AutoCommands {
         return tangent.getAngle();
     }
 
-    private static PathPlannerPath buildWaveSweepPath(NeutralSweepDirection direction) {
-        Translation2d start = AutoPoints.NeutralZone.LEFT_CENTER;
-        Translation2d end = AutoPoints.NeutralZone.RIGHT_CENTER;
+    private static PathPlannerPath buildWaveSweepPath(
+            Translation2d leftToRightStart,
+            Translation2d leftToRightEnd,
+            NeutralSweepDirection direction,
+            double amplitudeMeters) {
+        Translation2d start = leftToRightStart;
+        Translation2d end = leftToRightEnd;
         if (direction == NeutralSweepDirection.RIGHT_TO_LEFT) {
             Translation2d temp = start;
             start = end;
@@ -490,10 +504,9 @@ public final class AutoCommands {
         for (int i = 0; i < MID_WAVE_SAMPLE_COUNT; i++) {
             double t = (double) i / (MID_WAVE_SAMPLE_COUNT - 1);
             Translation2d base = start.interpolate(end, t);
-            double offset = AutoPoints.NeutralZone.waveOffset(t);
+            double offset = AutoPoints.NeutralZone.waveOffset(t, amplitudeMeters);
             Translation2d point = base.plus(unitNormal.times(offset));
-            Rotation2d heading =
-                    waveTangentHeading(start, end, t, AutoPoints.NeutralZone.WAVE_AMPLITUDE_METERS);
+            Rotation2d heading = waveTangentHeading(start, end, t, amplitudeMeters);
             wavePoses.add(new Pose2d(point, heading));
             if (i < MID_WAVE_SAMPLE_COUNT - 1) {
                 rotationTargets.add(new RotationTarget(i, heading));
@@ -517,8 +530,13 @@ public final class AutoCommands {
     }
 
     private static Command waveNeutralZoneSweep(
-            IntakerSubsystem intaker, NeutralSweepDirection direction) {
-        PathPlannerPath path = buildWaveSweepPath(direction);
+            IntakerSubsystem intaker,
+            Translation2d leftToRightStart,
+            Translation2d leftToRightEnd,
+            NeutralSweepDirection direction,
+            double amplitudeMeters) {
+        PathPlannerPath path =
+                buildWaveSweepPath(leftToRightStart, leftToRightEnd, direction, amplitudeMeters);
         capturePreviewPath(path);
         return runWhileIntaking(
                 AutoBuilder.pathfindThenFollowPath(path, PRECISE_CONSTRAINTS),
@@ -531,7 +549,20 @@ public final class AutoCommands {
             NeutralSweepMode mode,
             NeutralSweepDirection direction) {
         if (mode == NeutralSweepMode.WAVE) {
-            return waveNeutralZoneSweep(intaker, direction);
+            return waveNeutralZoneSweep(
+                    intaker,
+                    AutoPoints.NeutralZone.LEFT_CENTER,
+                    AutoPoints.NeutralZone.RIGHT_CENTER,
+                    direction,
+                    AutoPoints.NeutralZone.WAVE_AMPLITUDE_METERS);
+        }
+        if (mode == NeutralSweepMode.FLIGHTLESS_WAVE) {
+            return waveNeutralZoneSweep(
+                    intaker,
+                    AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
+                    AutoPoints.NeutralZone.RIGHT_FLIGHTLESS,
+                    direction,
+                    AutoPoints.NeutralZone.FLIGHTLESS_WAVE_AMPLITUDE_METERS);
         }
 
         Rotation2d heading = neutralSweepHeading(direction);
@@ -699,12 +730,9 @@ public final class AutoCommands {
             NeutralSweepMode firstMode,
             NeutralSweepMode secondMode,
             NeutralSweepDirection firstDirection,
+            NeutralSweepDirection secondDirection,
             AutoSelector.DepotAxis depotAxis,
             DepotVisitRound depotRound) {
-        NeutralSweepDirection secondDirection = firstDirection == NeutralSweepDirection.LEFT_TO_RIGHT
-                ? NeutralSweepDirection.RIGHT_TO_LEFT
-                : NeutralSweepDirection.LEFT_TO_RIGHT;
-
         return Commands.sequence(
                 Commands.either(
                         Commands.sequence(

@@ -122,6 +122,9 @@ public final class AutoPoints {
                                 + 0.3,
                         FieldConstants.LinesHorizontal.leftBumpMiddle);
         public static final Translation2d RIGHT_FLIGHTLESS = verticalFlip(LEFT_FLIGHTLESS);
+        public static final Translation2d LEFT_FLIGHTLESS_WIDE =
+                new Translation2d(LEFT_FLIGHTLESS.getX(), LEFT_EDGE.getY());
+        public static final Translation2d RIGHT_FLIGHTLESS_WIDE = verticalFlip(LEFT_FLIGHTLESS_WIDE);
 
         public static final Translation2d LEFT_DAVIS =
                 new Translation2d(FieldConstants.fieldCenter.getX() + 0.75, LEFT_EDGE.getY());
@@ -140,9 +143,10 @@ public final class AutoPoints {
         public static final Translation2d RIGHT_SALESMAN_TURN = verticalFlip(LEFT_SALESMAN_TURN);
 
         public static final double WAVE_AMPLITUDE_METERS = 0.65;
+        public static final double FLIGHTLESS_WAVE_AMPLITUDE_METERS = 0.35;
 
-        public static double waveOffset(double progress) {
-            return WAVE_AMPLITUDE_METERS * Math.sin(progress * 2.0 * Math.PI);
+        public static double waveOffset(double progress, double amplitudeMeters) {
+            return amplitudeMeters * Math.sin(progress * 2.0 * Math.PI);
         }
 
         private NeutralZone() {}
