@@ -91,7 +91,14 @@ public class AutoAimCommand extends Command {
         double kP = AutoAimParamsNT.kP.getValue();
         double kD = AutoAimParamsNT.kD.getValue();
         double maxOmega = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
-        double omega = ffVel + kP * error + kD * (ffVel - measureOmega);
+        // Heading deadband: once we're within tolerance, stop closed-loop hunting (which flips omega
+        // sign and scrubs the module azimuths back and forth → settle-wiggle). Feedforward only —
+        // ffVel is ~0 when stopped, so this commands ~0 omega and lets the chassis sit still.
+        double toleranceRad = Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue());
+        boolean withinTolerance = Math.abs(error) < toleranceRad;
+        double omega = withinTolerance
+                ? ffVel
+                : ffVel + kP * error + kD * (ffVel - measureOmega);
         omega = MathUtil.clamp(omega, -maxOmega, maxOmega);
 
 
@@ -113,9 +120,20 @@ public class AutoAimCommand extends Command {
         Logger.recordOutput("AutoAim/Distance", toTarget.getNorm());
         // Tuning observability — plot these over time to spot oscillation / steady-state error / sign.
         Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
+        Logger.recordOutput("AutoAim/withinTolerance", withinTolerance);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
         Logger.recordOutput("AutoAim/omegaMeas", measureOmega);
         Logger.recordOutput("AutoAim/ffVel", ffVel);
+        // Reversal diagnosis — compare against the same quantities in teleop driveWithJoystick while
+        // pushing the stick straight forward. stickX should be +forward, stickY +left.
+        // driverHeadingDeg is the robot heading in the driver-station frame fed to
+        // fromFieldRelativeSpeeds; if it reads ~0 while the robot is clearly rotated, the transform
+        // lookup is falling back to identity. speedsVx/Vy are the resulting robot-frame commands.
+        Logger.recordOutput("AutoAim/stickX", x);
+        Logger.recordOutput("AutoAim/stickY", y);
+        Logger.recordOutput("AutoAim/driverHeadingDeg", driverHeading.getDegrees());
+        Logger.recordOutput("AutoAim/speedsVx", speeds.vxMetersPerSecond);
+        Logger.recordOutput("AutoAim/speedsVy", speeds.vyMetersPerSecond);
     }
 
     @Override
@@ -140,5 +158,7 @@ public class AutoAimCommand extends Command {
         public static final double kP = 8.0;
         public static final double kD = 0.0;
         public static final double maxAngularVelRadPerSec = 7.0;
+        // Within this heading error, the loop stops hunting and commands feedforward only.
+        public static final double toleranceDeg = 1.0;
     }
 }
