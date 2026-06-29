@@ -1,7 +1,11 @@
 package frc.robot.commands.auto;
 
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.path.GoalEndState;
+import com.pathplanner.lib.path.IdealStartingState;
 import com.pathplanner.lib.path.PathConstraints;
+import com.pathplanner.lib.path.PathPlannerPath;
+import com.pathplanner.lib.path.RotationTarget;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -19,6 +23,8 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import java.util.ArrayList;
+import java.util.List;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
 import java.util.function.Supplier;
@@ -43,6 +49,7 @@ public final class AutoCommands {
     private static final double MOVE_SHOT_ROTATION_KD = 0.2;
     private static final double AUTO_TRANSLATION_TOLERANCE_METERS = 0.10;
     private static final Angle AUTO_ROTATION_TOLERANCE = Units.Degrees.of(3.0);
+    private static final int MID_WAVE_SAMPLE_COUNT = 9;
 
     public enum NeutralSweepMode {
         CONSERVATIVE,
@@ -52,7 +59,8 @@ public final class AutoCommands {
         DAVIS_FRIENDSHIP,
         CORIOLIS,
         SALESMAN,
-        SALESMAN_TURN
+        SALESMAN_TURN,
+        WAVE
     }
 
     public enum NeutralSweepDirection {
@@ -276,6 +284,12 @@ public final class AutoCommands {
         }
     }
 
+    private static void capturePreviewPath(PathPlannerPath path) {
+        if (previewSink != null) {
+            previewSink.addAll(path.getPathPoses());
+        }
+    }
+
     public static Command pathfindToPose(Pose2d targetPose, PathConstraints constraints) {
         return AutoBuilder.pathfindToPose(targetPose, constraints);
     }
@@ -428,6 +442,10 @@ public final class AutoCommands {
                 AutoPoints.NeutralZone.RIGHT_CENTER,
                 AutoPoints.NeutralZone.RIGHT_SALESMAN_TURN
             };
+            case WAVE -> new Translation2d[] {
+                AutoPoints.NeutralZone.LEFT_CENTER,
+                AutoPoints.NeutralZone.RIGHT_CENTER
+            };
         };
 
         return direction == NeutralSweepDirection.LEFT_TO_RIGHT
@@ -435,29 +453,100 @@ public final class AutoCommands {
                 : reverse(leftToRightPoints);
     }
 
+    private static Rotation2d waveTangentHeading(
+            Translation2d start,
+            Translation2d end,
+            double t,
+            double amplitudeMeters) {
+        Translation2d line = end.minus(start);
+        double length = line.getNorm();
+        if (length <= 1e-6) {
+            return Rotation2d.kZero;
+        }
+
+        Translation2d unitLine = new Translation2d(line.getX() / length, line.getY() / length);
+        Translation2d unitNormal = new Translation2d(-unitLine.getY(), unitLine.getX());
+        double waveSlopeMeters = amplitudeMeters * 2.0 * Math.PI * Math.cos(2.0 * Math.PI * t);
+        Translation2d tangent = line.plus(unitNormal.times(waveSlopeMeters));
+        return tangent.getAngle();
+    }
+
+    private static PathPlannerPath buildWaveSweepPath(NeutralSweepDirection direction) {
+        Translation2d start = AutoPoints.NeutralZone.LEFT_CENTER;
+        Translation2d end = AutoPoints.NeutralZone.RIGHT_CENTER;
+        if (direction == NeutralSweepDirection.RIGHT_TO_LEFT) {
+            Translation2d temp = start;
+            start = end;
+            end = temp;
+        }
+
+        List<Pose2d> wavePoses = new ArrayList<>(MID_WAVE_SAMPLE_COUNT);
+        List<RotationTarget> rotationTargets = new ArrayList<>(MID_WAVE_SAMPLE_COUNT - 1);
+        Translation2d line = end.minus(start);
+        double lineLength = line.getNorm();
+        Translation2d unitNormal = lineLength <= 1e-6
+                ? new Translation2d(0.0, 0.0)
+                : new Translation2d(-line.getY() / lineLength, line.getX() / lineLength);
+        for (int i = 0; i < MID_WAVE_SAMPLE_COUNT; i++) {
+            double t = (double) i / (MID_WAVE_SAMPLE_COUNT - 1);
+            Translation2d base = start.interpolate(end, t);
+            double offset = AutoPoints.NeutralZone.waveOffset(t);
+            Translation2d point = base.plus(unitNormal.times(offset));
+            Rotation2d heading =
+                    waveTangentHeading(start, end, t, AutoPoints.NeutralZone.WAVE_AMPLITUDE_METERS);
+            wavePoses.add(new Pose2d(point, heading));
+            if (i < MID_WAVE_SAMPLE_COUNT - 1) {
+                rotationTargets.add(new RotationTarget(i, heading));
+            }
+        }
+
+        Pose2d startPose = wavePoses.get(0);
+        Pose2d endPose = wavePoses.get(wavePoses.size() - 1);
+        return new PathPlannerPath(
+                PathPlannerPath.waypointsFromPoses(wavePoses),
+                rotationTargets,
+                List.of(),
+                List.of(),
+                List.of(),
+                INTAKE_MEDIUM_CONSTRAINTS,
+                new IdealStartingState(0.0, startPose.getRotation()),
+                new GoalEndState(
+                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND,
+                        endPose.getRotation()),
+                false);
+    }
+
+    private static Command waveNeutralZoneSweep(
+            IntakerSubsystem intaker, NeutralSweepDirection direction) {
+        PathPlannerPath path = buildWaveSweepPath(direction);
+        capturePreviewPath(path);
+        return runWhileIntaking(
+                AutoBuilder.pathfindThenFollowPath(path, PRECISE_CONSTRAINTS),
+                intaker);
+    }
+
     public static Command neutralZoneSweep(
             Swerve swerve,
             IntakerSubsystem intaker,
             NeutralSweepMode mode,
             NeutralSweepDirection direction) {
+        if (mode == NeutralSweepMode.WAVE) {
+            return waveNeutralZoneSweep(intaker, direction);
+        }
+
         Rotation2d heading = neutralSweepHeading(direction);
         Translation2d[] points = neutralSweepPoints(mode, direction);
-        Translation2d start = points[0];
-        Translation2d end = points[points.length - 1];
+        List<Command> sweepSegments = new ArrayList<>(points.length);
+        for (int i = 0; i < points.length; i++) {
+            sweepSegments.add(pathfindToBlueTranslationWithHeadingStrict(
+                    swerve,
+                    points[i],
+                    heading,
+                    i == 0 ? PRECISE_CONSTRAINTS : INTAKE_MEDIUM_CONSTRAINTS,
+                    AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+        }
 
-        Command sweep = Commands.sequence(
-                pathfindToBlueTranslationWithHeadingStrict(
-                        swerve,
-                        start,
-                        heading,
-                        PRECISE_CONSTRAINTS,
-                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
-                pathfindToBlueTranslationWithHeadingStrict(
-                        swerve,
-                        end,
-                        heading,
-                        INTAKE_MEDIUM_CONSTRAINTS,
-                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+        Command sweep = Commands.sequence(sweepSegments.toArray(Command[]::new));
 
         return runWhileIntaking(sweep, intaker);
     }

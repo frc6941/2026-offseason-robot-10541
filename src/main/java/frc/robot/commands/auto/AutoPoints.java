@@ -139,6 +139,12 @@ public final class AutoPoints {
                         FieldConstants.FuelPool.leftCenter.getY() - 1.0);
         public static final Translation2d RIGHT_SALESMAN_TURN = verticalFlip(LEFT_SALESMAN_TURN);
 
+        public static final double WAVE_AMPLITUDE_METERS = 0.65;
+
+        public static double waveOffset(double progress) {
+            return WAVE_AMPLITUDE_METERS * Math.sin(progress * 2.0 * Math.PI);
+        }
+
         private NeutralZone() {}
     }
 

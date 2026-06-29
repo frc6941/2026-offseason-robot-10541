@@ -193,6 +193,7 @@ public class AutoSelector {
         chooser.addOption("Davis Friendship", AutoCommands.NeutralSweepMode.DAVIS_FRIENDSHIP);
         chooser.addOption("Coriolis", AutoCommands.NeutralSweepMode.CORIOLIS);
         chooser.addOption("Salesman Turn", AutoCommands.NeutralSweepMode.SALESMAN_TURN);
+        chooser.addOption("Wave", AutoCommands.NeutralSweepMode.WAVE);
     }
 
     private AutoCommands.NeutralSweepMode selectedFirstMidMode() {
