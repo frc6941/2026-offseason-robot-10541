@@ -17,6 +17,8 @@ public class AutoSelector {
     private final SendableChooser<AutoCommands.DepotVisitRound> depotRoundChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepMode> firstMidModeChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepMode> secondMidModeChooser = new SendableChooser<>();
+    private final SendableChooser<AutoCommands.MidKind> firstMidKindChooser = new SendableChooser<>();
+    private final SendableChooser<AutoCommands.MidKind> secondMidKindChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepDirection> firstMidDirectionChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepDirection> secondMidDirectionChooser = new SendableChooser<>();
     private final SendableChooser<Side> firstShootPositionChooser = new SendableChooser<>();
@@ -53,6 +55,8 @@ public class AutoSelector {
 
         configureMidModeChooser(firstMidModeChooser);
         configureMidModeChooser(secondMidModeChooser);
+        configureMidKindChooser(firstMidKindChooser);
+        configureMidKindChooser(secondMidKindChooser);
 
         configureMidDirectionChooser(firstMidDirectionChooser, AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT);
         configureMidDirectionChooser(secondMidDirectionChooser, AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT);
@@ -81,6 +85,8 @@ public class AutoSelector {
         SmartDashboard.putData("Auto/Depot Round", depotRoundChooser);
         SmartDashboard.putData("Auto/First Mid Mode", firstMidModeChooser);
         SmartDashboard.putData("Auto/Second Mid Mode", secondMidModeChooser);
+        SmartDashboard.putData("Auto/First Mid Kind", firstMidKindChooser);
+        SmartDashboard.putData("Auto/Second Mid Kind", secondMidKindChooser);
         SmartDashboard.putData("Auto/First Mid Direction", firstMidDirectionChooser);
         SmartDashboard.putData("Auto/Second Mid Direction", secondMidDirectionChooser);
         SmartDashboard.putData("Auto/First Shoot Position", firstShootPositionChooser);
@@ -105,12 +111,15 @@ public class AutoSelector {
                     : autoBuilder.buildDepotYAuto();
             case MID_STEP_ONLY -> autoBuilder.buildNeutralSweepAuto(
                     selectedFirstMidMode(),
-                    selectedFirstMidDirection());
+                    selectedFirstMidDirection(),
+                    selectedFirstMidKind());
             case MID_TWO_CYCLE -> autoBuilder.buildMidTwoCycleAuto(
                     selectedFirstMidMode(),
                     selectedSecondMidMode(),
                     selectedFirstMidDirection(),
                     selectedSecondMidDirection(),
+                    selectedFirstMidKind(),
+                    selectedSecondMidKind(),
                     selectedFirstShootPosition(),
                     selectedSecondShootPosition(),
                     selectedDepotAxis(),
@@ -166,14 +175,33 @@ public class AutoSelector {
         return "Routine=" + selectedRoutine()
                 + ", DepotAxis=" + selectedDepotAxis()
                 + ", DepotRound=" + selectedDepotRound()
-                + ", FirstMidMode=" + selectedFirstMidMode()
-                + ", SecondMidMode=" + selectedSecondMidMode()
+                + ", FirstMidMode=" + midModeLabel(selectedFirstMidMode())
+                + ", SecondMidMode=" + midModeLabel(selectedSecondMidMode())
+                + ", FirstMidKind=" + selectedFirstMidKind()
+                + ", SecondMidKind=" + selectedSecondMidKind()
                 + ", FirstMidDirection=" + selectedFirstMidDirection()
                 + ", SecondMidDirection=" + selectedSecondMidDirection()
                 + ", FirstShootPosition=" + selectedFirstShootPosition()
                 + ", SecondShootPosition=" + selectedSecondShootPosition()
                 + ", Side=" + selectedSide()
                 + ", Target=" + selectedTarget();
+    }
+
+    private String midModeLabel(AutoCommands.NeutralSweepMode mode) {
+        return switch (mode) {
+            case CONSERVATIVE -> "Safe Inner Sweep";
+            case NEUTRAL -> "Center Line Sweep";
+            case FLIGHTLESS -> "Near Tower Sweep";
+            case FLIGHTLESS_WIDE -> "Near Tower Wide Sweep";
+            case FLIGHTLESS_WAVE -> "Near Tower Wave Sweep";
+            case DAVIS -> "Far Edge Sweep";
+            case DAVIS_FRIENDSHIP -> "Far Edge + Center Sweep";
+            case CORIOLIS -> "Back Center Sweep";
+            case CENTER_FORWARD -> "Mid-Back Center Sweep";
+            case SALESMAN -> "Full Pool Sweep";
+            case SALESMAN_TURN -> "Full Pool Turn-In Sweep";
+            case WAVE -> "Center Wave Sweep";
+        };
     }
 
     private Command buildTargetCommand(TargetPoint target) {
@@ -202,17 +230,23 @@ public class AutoSelector {
     }
 
     private void configureMidModeChooser(SendableChooser<AutoCommands.NeutralSweepMode> chooser) {
-        chooser.setDefaultOption("Salesman", AutoCommands.NeutralSweepMode.SALESMAN);
-        chooser.addOption("Conservative", AutoCommands.NeutralSweepMode.CONSERVATIVE);
-        chooser.addOption("Neutral", AutoCommands.NeutralSweepMode.NEUTRAL);
-        chooser.addOption("Flightless", AutoCommands.NeutralSweepMode.FLIGHTLESS);
-        chooser.addOption("Flightless Wide", AutoCommands.NeutralSweepMode.FLIGHTLESS_WIDE);
-        chooser.addOption("Flightless Wave", AutoCommands.NeutralSweepMode.FLIGHTLESS_WAVE);
-        chooser.addOption("Davis", AutoCommands.NeutralSweepMode.DAVIS);
-        chooser.addOption("Davis Friendship", AutoCommands.NeutralSweepMode.DAVIS_FRIENDSHIP);
-        chooser.addOption("Coriolis", AutoCommands.NeutralSweepMode.CORIOLIS);
-        chooser.addOption("Salesman Turn", AutoCommands.NeutralSweepMode.SALESMAN_TURN);
-        chooser.addOption("Wave", AutoCommands.NeutralSweepMode.WAVE);
+        chooser.setDefaultOption("Full Pool Sweep", AutoCommands.NeutralSweepMode.SALESMAN);
+        chooser.addOption("Safe Inner Sweep", AutoCommands.NeutralSweepMode.CONSERVATIVE);
+        chooser.addOption("Center Line Sweep", AutoCommands.NeutralSweepMode.NEUTRAL);
+        chooser.addOption("Near Tower Sweep", AutoCommands.NeutralSweepMode.FLIGHTLESS);
+        chooser.addOption("Near Tower Wide Sweep", AutoCommands.NeutralSweepMode.FLIGHTLESS_WIDE);
+        chooser.addOption("Near Tower Wave Sweep", AutoCommands.NeutralSweepMode.FLIGHTLESS_WAVE);
+        chooser.addOption("Far Edge Sweep", AutoCommands.NeutralSweepMode.DAVIS);
+        chooser.addOption("Far Edge + Center Sweep", AutoCommands.NeutralSweepMode.DAVIS_FRIENDSHIP);
+        chooser.addOption("Back Center Sweep", AutoCommands.NeutralSweepMode.CORIOLIS);
+        chooser.addOption("Mid-Back Center Sweep", AutoCommands.NeutralSweepMode.CENTER_FORWARD);
+        chooser.addOption("Full Pool Turn-In Sweep", AutoCommands.NeutralSweepMode.SALESMAN_TURN);
+        chooser.addOption("Center Wave Sweep", AutoCommands.NeutralSweepMode.WAVE);
+    }
+
+    private void configureMidKindChooser(SendableChooser<AutoCommands.MidKind> chooser) {
+        chooser.setDefaultOption("Full", AutoCommands.MidKind.FULL);
+        chooser.addOption("Half", AutoCommands.MidKind.HALF);
     }
 
     private void configureMidDirectionChooser(
@@ -245,6 +279,16 @@ public class AutoSelector {
     private AutoCommands.NeutralSweepMode selectedSecondMidMode() {
         AutoCommands.NeutralSweepMode selected = secondMidModeChooser.getSelected();
         return selected == null ? AutoCommands.NeutralSweepMode.SALESMAN : selected;
+    }
+
+    private AutoCommands.MidKind selectedFirstMidKind() {
+        AutoCommands.MidKind selected = firstMidKindChooser.getSelected();
+        return selected == null ? AutoCommands.MidKind.FULL : selected;
+    }
+
+    private AutoCommands.MidKind selectedSecondMidKind() {
+        AutoCommands.MidKind selected = secondMidKindChooser.getSelected();
+        return selected == null ? AutoCommands.MidKind.FULL : selected;
     }
 
     private AutoCommands.DepotVisitRound selectedDepotRound() {

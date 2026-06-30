@@ -111,11 +111,20 @@ public final class AutoBuilder {
         return AutoCommands.neutralZoneSweep(swerve, intaker, mode, direction);
     }
 
+    public Command buildNeutralSweepAuto(
+            AutoCommands.NeutralSweepMode mode,
+            AutoCommands.NeutralSweepDirection direction,
+            AutoCommands.MidKind kind) {
+        return AutoCommands.neutralZoneSweep(swerve, intaker, mode, direction, kind);
+    }
+
     public Command buildMidTwoCycleAuto(
             AutoCommands.NeutralSweepMode firstMode,
             AutoCommands.NeutralSweepMode secondMode,
             AutoCommands.NeutralSweepDirection firstDirection,
             AutoCommands.NeutralSweepDirection secondDirection,
+            AutoCommands.MidKind firstKind,
+            AutoCommands.MidKind secondKind,
             AutoSelector.Side firstShootPosition,
             AutoSelector.Side secondShootPosition,
             AutoSelector.DepotAxis depotAxis,
@@ -128,6 +137,8 @@ public final class AutoBuilder {
                 secondMode,
                 firstDirection,
                 secondDirection,
+                firstKind,
+                secondKind,
                 firstShootPosition,
                 secondShootPosition,
                 depotAxis,

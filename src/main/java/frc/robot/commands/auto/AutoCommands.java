@@ -59,6 +59,7 @@ public final class AutoCommands {
         DAVIS,
         DAVIS_FRIENDSHIP,
         CORIOLIS,
+        CENTER_FORWARD,
         SALESMAN,
         SALESMAN_TURN,
         WAVE,
@@ -68,6 +69,11 @@ public final class AutoCommands {
     public enum NeutralSweepDirection {
         LEFT_TO_RIGHT,
         RIGHT_TO_LEFT
+    }
+
+    public enum MidKind {
+        FULL,
+        HALF
     }
 
     public enum DepotVisitRound {
@@ -440,6 +446,10 @@ public final class AutoCommands {
                 AutoPoints.NeutralZone.LEFT_CORIOLIS,
                 AutoPoints.NeutralZone.RIGHT_CORIOLIS
             };
+            case CENTER_FORWARD -> new Translation2d[] {
+                AutoPoints.NeutralZone.LEFT_CENTER_FORWARD,
+                AutoPoints.NeutralZone.RIGHT_CENTER_FORWARD
+            };
             case SALESMAN -> new Translation2d[] {
                 AutoPoints.NeutralZone.LEFT_EDGE,
                 AutoPoints.NeutralZone.LEFT_CENTER,
@@ -461,6 +471,32 @@ public final class AutoCommands {
         return direction == NeutralSweepDirection.LEFT_TO_RIGHT
                 ? leftToRightPoints
                 : reverse(leftToRightPoints);
+    }
+
+    private static boolean isFlightlessModeForHalf(NeutralSweepMode mode) {
+        return mode == NeutralSweepMode.FLIGHTLESS
+                || mode == NeutralSweepMode.FLIGHTLESS_WIDE
+                || mode == NeutralSweepMode.FLIGHTLESS_WAVE;
+    }
+
+    private static Translation2d[] halfSweepPoints(Translation2d[] fullPoints) {
+        Translation2d start = fullPoints[0];
+        Translation2d end = fullPoints[fullPoints.length - 1];
+        Translation2d middle = start.interpolate(end, 0.5);
+
+        List<Translation2d> halfPoints = new ArrayList<>();
+        halfPoints.add(start);
+        for (int i = 1; i < fullPoints.length - 1; i++) {
+            if (start.getDistance(fullPoints[i]) < start.getDistance(middle)) {
+                halfPoints.add(fullPoints[i]);
+            }
+        }
+        halfPoints.add(middle);
+        return halfPoints.toArray(Translation2d[]::new);
+    }
+
+    private static Translation2d halfSweepHomeTowerPoint(Translation2d middlePoint) {
+        return new Translation2d(AutoPoints.NeutralZone.LEFT_FLIGHTLESS.getX(), middlePoint.getY());
     }
 
     private static Rotation2d waveTangentHeading(
@@ -485,7 +521,8 @@ public final class AutoCommands {
             Translation2d leftToRightStart,
             Translation2d leftToRightEnd,
             NeutralSweepDirection direction,
-            double amplitudeMeters) {
+            double amplitudeMeters,
+            double endProgress) {
         Translation2d start = leftToRightStart;
         Translation2d end = leftToRightEnd;
         if (direction == NeutralSweepDirection.RIGHT_TO_LEFT) {
@@ -502,7 +539,7 @@ public final class AutoCommands {
                 ? new Translation2d(0.0, 0.0)
                 : new Translation2d(-line.getY() / lineLength, line.getX() / lineLength);
         for (int i = 0; i < MID_WAVE_SAMPLE_COUNT; i++) {
-            double t = (double) i / (MID_WAVE_SAMPLE_COUNT - 1);
+            double t = endProgress * i / (MID_WAVE_SAMPLE_COUNT - 1);
             Translation2d base = start.interpolate(end, t);
             double offset = AutoPoints.NeutralZone.waveOffset(t, amplitudeMeters);
             Translation2d point = base.plus(unitNormal.times(offset));
@@ -530,17 +567,35 @@ public final class AutoCommands {
     }
 
     private static Command waveNeutralZoneSweep(
+            Swerve swerve,
             IntakerSubsystem intaker,
             Translation2d leftToRightStart,
             Translation2d leftToRightEnd,
             NeutralSweepDirection direction,
-            double amplitudeMeters) {
+            double amplitudeMeters,
+            MidKind kind,
+            boolean skipHalfHomeLeg) {
         PathPlannerPath path =
-                buildWaveSweepPath(leftToRightStart, leftToRightEnd, direction, amplitudeMeters);
+                buildWaveSweepPath(
+                        leftToRightStart,
+                        leftToRightEnd,
+                        direction,
+                        amplitudeMeters,
+                        kind == MidKind.HALF ? 0.5 : 1.0);
         capturePreviewPath(path);
-        return runWhileIntaking(
-                AutoBuilder.pathfindThenFollowPath(path, PRECISE_CONSTRAINTS),
-                intaker);
+        Command sweep = AutoBuilder.pathfindThenFollowPath(path, PRECISE_CONSTRAINTS);
+        if (kind == MidKind.HALF && !skipHalfHomeLeg) {
+            Pose2d endPose = path.getPathPoses().get(path.getPathPoses().size() - 1);
+            sweep = Commands.sequence(
+                    sweep,
+                    pathfindToBlueTranslationWithHeadingStrict(
+                            swerve,
+                            halfSweepHomeTowerPoint(endPose.getTranslation()),
+                            Rotation2d.kPi,
+                            INTAKE_MEDIUM_CONSTRAINTS,
+                            AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+        }
+        return runWhileIntaking(sweep, intaker);
     }
 
     public static Command neutralZoneSweep(
@@ -548,25 +603,44 @@ public final class AutoCommands {
             IntakerSubsystem intaker,
             NeutralSweepMode mode,
             NeutralSweepDirection direction) {
+        return neutralZoneSweep(swerve, intaker, mode, direction, MidKind.FULL);
+    }
+
+    public static Command neutralZoneSweep(
+            Swerve swerve,
+            IntakerSubsystem intaker,
+            NeutralSweepMode mode,
+            NeutralSweepDirection direction,
+            MidKind kind) {
         if (mode == NeutralSweepMode.WAVE) {
             return waveNeutralZoneSweep(
+                    swerve,
                     intaker,
                     AutoPoints.NeutralZone.LEFT_CENTER,
                     AutoPoints.NeutralZone.RIGHT_CENTER,
                     direction,
-                    AutoPoints.NeutralZone.WAVE_AMPLITUDE_METERS);
+                    AutoPoints.NeutralZone.WAVE_AMPLITUDE_METERS,
+                    kind,
+                    false);
         }
         if (mode == NeutralSweepMode.FLIGHTLESS_WAVE) {
             return waveNeutralZoneSweep(
+                    swerve,
                     intaker,
                     AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
                     AutoPoints.NeutralZone.RIGHT_FLIGHTLESS,
                     direction,
-                    AutoPoints.NeutralZone.FLIGHTLESS_WAVE_AMPLITUDE_METERS);
+                    AutoPoints.NeutralZone.FLIGHTLESS_WAVE_AMPLITUDE_METERS,
+                    kind,
+                    true);
         }
 
         Rotation2d heading = neutralSweepHeading(direction);
         Translation2d[] points = neutralSweepPoints(mode, direction);
+        if (kind == MidKind.HALF) {
+            points = halfSweepPoints(points);
+        }
+
         List<Command> sweepSegments = new ArrayList<>(points.length);
         for (int i = 0; i < points.length; i++) {
             sweepSegments.add(pathfindToBlueTranslationWithHeadingStrict(
@@ -574,6 +648,14 @@ public final class AutoCommands {
                     points[i],
                     heading,
                     i == 0 ? PRECISE_CONSTRAINTS : INTAKE_MEDIUM_CONSTRAINTS,
+                    AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+        }
+        if (kind == MidKind.HALF && !isFlightlessModeForHalf(mode)) {
+            sweepSegments.add(pathfindToBlueTranslationWithHeadingStrict(
+                    swerve,
+                    halfSweepHomeTowerPoint(points[points.length - 1]),
+                    Rotation2d.kPi,
+                    INTAKE_MEDIUM_CONSTRAINTS,
                     AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
         }
 
@@ -750,6 +832,8 @@ public final class AutoCommands {
             NeutralSweepMode secondMode,
             NeutralSweepDirection firstDirection,
             NeutralSweepDirection secondDirection,
+            MidKind firstKind,
+            MidKind secondKind,
             AutoSelector.Side firstShootPosition,
             AutoSelector.Side secondShootPosition,
             AutoSelector.DepotAxis depotAxis,
@@ -762,7 +846,7 @@ public final class AutoCommands {
                         Commands.none(),
                         () -> depotRound == DepotVisitRound.START),
                 markStep("Mid Two Cycle: first intake"),
-                neutralZoneSweep(swerve, intaker, firstMode, firstDirection),
+                neutralZoneSweep(swerve, intaker, firstMode, firstDirection, firstKind),
                 handlePostSweepAction(
                         swerve,
                         intaker,
@@ -772,7 +856,7 @@ public final class AutoCommands {
                         depotRound,
                         1),
                 markStep("Mid Two Cycle: second intake"),
-                neutralZoneSweep(swerve, intaker, secondMode, secondDirection),
+                neutralZoneSweep(swerve, intaker, secondMode, secondDirection, secondKind),
                 handlePostSweepAction(
                         swerve,
                         intaker,

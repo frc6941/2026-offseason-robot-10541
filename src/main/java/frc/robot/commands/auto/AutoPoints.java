@@ -136,6 +136,11 @@ public final class AutoPoints {
         public static final Translation2d RIGHT_CORIOLIS =
                 new Translation2d(FieldConstants.fieldCenter.getX() - 0.75, RIGHT_CENTER.getY());
 
+        public static final Translation2d LEFT_CENTER_FORWARD =
+                new Translation2d(FieldConstants.fieldCenter.getX() - 0.35, LEFT_CENTER.getY());
+        public static final Translation2d RIGHT_CENTER_FORWARD =
+                new Translation2d(FieldConstants.fieldCenter.getX() - 0.35, RIGHT_CENTER.getY());
+
         public static final Translation2d LEFT_SALESMAN_TURN =
                 new Translation2d(
                         FieldConstants.FuelPool.leftCenter.getX() - 0.8,
