@@ -128,7 +128,8 @@ public final class AutoBuilder {
             AutoSelector.Side firstShootPosition,
             AutoSelector.Side secondShootPosition,
             AutoSelector.DepotAxis depotAxis,
-            AutoCommands.DepotVisitRound depotRound) {
+            AutoCommands.DepotVisitRound depotRound,
+            AutoCommands.DepotVisitRound outpostRound) {
         return AutoCommands.midTwoCycle(
                 swerve,
                 intaker,
@@ -142,7 +143,8 @@ public final class AutoBuilder {
                 firstShootPosition,
                 secondShootPosition,
                 depotAxis,
-                depotRound);
+                depotRound,
+                outpostRound);
     }
 
     public Command buildLeftTrenchClearAuto() {

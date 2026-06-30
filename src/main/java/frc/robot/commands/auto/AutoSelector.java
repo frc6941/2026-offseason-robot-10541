@@ -15,6 +15,7 @@ public class AutoSelector {
     private final SendableChooser<Routine> routineChooser = new SendableChooser<>();
     private final SendableChooser<DepotAxis> depotAxisChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.DepotVisitRound> depotRoundChooser = new SendableChooser<>();
+    private final SendableChooser<AutoCommands.DepotVisitRound> outpostRoundChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepMode> firstMidModeChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.NeutralSweepMode> secondMidModeChooser = new SendableChooser<>();
     private final SendableChooser<AutoCommands.MidKind> firstMidKindChooser = new SendableChooser<>();
@@ -53,6 +54,10 @@ public class AutoSelector {
         depotRoundChooser.addOption("Depot Round 1", AutoCommands.DepotVisitRound.FIRST);
         depotRoundChooser.addOption("Depot Round 2", AutoCommands.DepotVisitRound.SECOND);
 
+        outpostRoundChooser.setDefaultOption("No Outpost", AutoCommands.DepotVisitRound.NONE);
+        outpostRoundChooser.addOption("Outpost Round 1", AutoCommands.DepotVisitRound.FIRST);
+        outpostRoundChooser.addOption("Outpost Round 2", AutoCommands.DepotVisitRound.SECOND);
+
         configureMidModeChooser(firstMidModeChooser);
         configureMidModeChooser(secondMidModeChooser);
         configureMidKindChooser(firstMidKindChooser);
@@ -83,6 +88,7 @@ public class AutoSelector {
         SmartDashboard.putData("Auto/Routine", routineChooser);
         SmartDashboard.putData("Auto/Depot Axis", depotAxisChooser);
         SmartDashboard.putData("Auto/Depot Round", depotRoundChooser);
+        SmartDashboard.putData("Auto/Outpost Round", outpostRoundChooser);
         SmartDashboard.putData("Auto/First Mid Mode", firstMidModeChooser);
         SmartDashboard.putData("Auto/Second Mid Mode", secondMidModeChooser);
         SmartDashboard.putData("Auto/First Mid Kind", firstMidKindChooser);
@@ -123,7 +129,8 @@ public class AutoSelector {
                     selectedFirstShootPosition(),
                     selectedSecondShootPosition(),
                     selectedDepotAxis(),
-                    selectedDepotRound());
+                    selectedDepotRound(),
+                    selectedOutpostRound());
             case GO_TO_TARGET -> buildTargetCommand(selectedTarget());
             case TRENCH_CLEAR -> selectedSide() == Side.LEFT
                     ? autoBuilder.buildLeftTrenchClearAuto()
@@ -175,6 +182,7 @@ public class AutoSelector {
         return "Routine=" + selectedRoutine()
                 + ", DepotAxis=" + selectedDepotAxis()
                 + ", DepotRound=" + selectedDepotRound()
+                + ", OutpostRound=" + selectedOutpostRound()
                 + ", FirstMidMode=" + midModeLabel(selectedFirstMidMode())
                 + ", SecondMidMode=" + midModeLabel(selectedSecondMidMode())
                 + ", FirstMidKind=" + selectedFirstMidKind()
@@ -297,6 +305,17 @@ public class AutoSelector {
             selected = AutoCommands.DepotVisitRound.NONE;
         }
         return selected;
+    }
+
+    private AutoCommands.DepotVisitRound selectedOutpostRound() {
+        AutoCommands.DepotVisitRound selected = outpostRoundChooser.getSelected();
+        if (selected == null || selected == AutoCommands.DepotVisitRound.START) {
+            selected = AutoCommands.DepotVisitRound.NONE;
+        }
+        AutoCommands.DepotVisitRound depotRound = selectedDepotRound();
+        return selected == depotRound && selected != AutoCommands.DepotVisitRound.NONE
+                ? AutoCommands.DepotVisitRound.NONE
+                : selected;
     }
 
     private AutoCommands.NeutralSweepDirection selectedFirstMidDirection() {

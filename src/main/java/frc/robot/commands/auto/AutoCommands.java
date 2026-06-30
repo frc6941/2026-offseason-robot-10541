@@ -753,6 +753,27 @@ public final class AutoCommands {
                 depotCollectFromCurrentStartSelection(swerve, intaker, depotAxis));
     }
 
+    private static Command moveShotToOutpost(
+            Swerve swerve,
+            ShootingSuperstructure shootingSuperstructure,
+            String stepPrefix) {
+        return Commands.sequence(
+                markStep(stepPrefix + ": outpost approach"),
+                pathfindToBluePoseStrict(
+                        swerve,
+                        AutoPoints.OUTPOST_APPROACH,
+                        TRANSIT_CONSTRAINTS,
+                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
+                        .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
+                markStep(stepPrefix + ": move-shot to outpost"),
+                driveAndShootToBlueTranslation(
+                        swerve,
+                        shootingSuperstructure,
+                        AutoPoints.OUTPOST.getTranslation(),
+                        Units.Meters.of(0.15),
+                        Units.Degrees.of(5.0)));
+    }
+
     private static Command handlePostSweepAction(
             Swerve swerve,
             IntakerSubsystem intaker,
@@ -760,6 +781,7 @@ public final class AutoCommands {
             AutoSelector.Side shootPosition,
             AutoSelector.DepotAxis depotAxis,
             DepotVisitRound depotRound,
+            DepotVisitRound outpostRound,
             int roundIndex) {
         DepotVisitRound currentRound = roundIndex == 1 ? DepotVisitRound.FIRST : DepotVisitRound.SECOND;
 
@@ -772,6 +794,10 @@ public final class AutoCommands {
                                     AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
                             .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
                     shootThenDepotCollect(swerve, intaker, shootingSuperstructure, depotAxis, "Round " + roundIndex));
+        }
+
+        if (outpostRound == currentRound) {
+            return moveShotToOutpost(swerve, shootingSuperstructure, "Round " + roundIndex);
         }
 
         return Commands.sequence(
@@ -837,7 +863,8 @@ public final class AutoCommands {
             AutoSelector.Side firstShootPosition,
             AutoSelector.Side secondShootPosition,
             AutoSelector.DepotAxis depotAxis,
-            DepotVisitRound depotRound) {
+            DepotVisitRound depotRound,
+            DepotVisitRound outpostRound) {
         return Commands.sequence(
                 Commands.either(
                         Commands.sequence(
@@ -854,6 +881,7 @@ public final class AutoCommands {
                         firstShootPosition,
                         depotAxis,
                         depotRound,
+                        outpostRound,
                         1),
                 markStep("Mid Two Cycle: second intake"),
                 neutralZoneSweep(swerve, intaker, secondMode, secondDirection, secondKind),
@@ -864,6 +892,7 @@ public final class AutoCommands {
                         secondShootPosition,
                         depotAxis,
                         depotRound,
+                        outpostRound,
                         2))
                 .withTimeout(AUTO_DURATION_SECONDS);
     }
