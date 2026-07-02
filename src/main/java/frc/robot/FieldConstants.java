@@ -267,6 +267,24 @@ public final class FieldConstants {
     }
 
     // ========================================================================
+    // Pass targets — when the robot is in the neutral zone it lobs the ball back
+    // toward its own alliance zone instead of shooting the hub. Two points mirrored
+    // across the field's horizontal centerline sit just off the driver-station wall;
+    // AutoAimCommand aims the shooter at whichever is on the robot's own Y-half, so
+    // the pass stays down its sideline and never crosses through the hub.
+    // Blue-alliance frame — red equivalents come from AllianceFlipUtil at runtime.
+    // ========================================================================
+    public static class PassTargets {
+        /** Distance from the blue wall — near the driver station (≈ LaunchPositions.BLUE_NEAR). */
+        public static final double X = 2.50;
+        /** Off-center lateral offset; matches the alliance-zone corners, well clear of the hub. */
+        public static final Translation2d BLUE_LEFT = new Translation2d(X, 6.75);
+        public static final Translation2d BLUE_RIGHT = new Translation2d(X, 1.30);
+
+        private PassTargets() {}
+    }
+
+    // ========================================================================
     // Launch positions — poses from which the robot can shoot at the hub
     // Rotation2d.k180deg = facing the red side (toward the hub from blue)
     // ========================================================================

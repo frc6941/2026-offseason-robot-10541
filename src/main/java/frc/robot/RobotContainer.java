@@ -8,6 +8,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
+import frc.robot.commands.AutoTrenchCommand;
 import frc.robot.commands.DefaultAuto;
 import frc.robot.commands.auto.AutoPoints;
 import frc.robot.commands.auto.AutoBuilder;
@@ -214,6 +215,11 @@ public class RobotContainer {
     driverController.a().onFalse(Commands.sequence(
         shootingSuperstructure.idle().withTimeout(0.02),
         indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
+
+    // Auto-trench: hold Y to lock lateral (Y) + heading to the nearest trench center, leaving only
+    // the through-trench (forward/back) axis free so the driver can pass the trench squared-up.
+    driverController.y().whileTrue(
+        new AutoTrenchCommand(swerve, () -> -driverController.getLeftY()));
   }
 
   /**

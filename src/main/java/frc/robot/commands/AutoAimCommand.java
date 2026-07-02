@@ -3,6 +3,8 @@ package frc.robot.commands;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.ProfiledPIDController;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -13,6 +15,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.FieldConstants;
 import frc.robot.RobotStateRecorder;
 import lib.ironpulse.swerve.Swerve;
+import lib.ironpulse.utils.AllianceFlipUtil;
 import lib.ntext.NTParameter;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -33,13 +36,29 @@ public class AutoAimCommand extends Command {
     private final Supplier<Rotation2d> targetHeading;
     private final DoubleSupplier targetHeadingRate;
 
+    // Heading is motion-profiled: the trapezoid plans deceleration from the remaining angle so the
+    // chassis arrives at the target at zero velocity (overshoot-free), while still allowing an
+    // aggressive max velocity/accel for a quick lock. Constraints/gains are refreshed live from NT.
+    private final ProfiledPIDController headingController =
+            new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0.0, 0.0));
+
     public AutoAimCommand(Swerve swerve, DoubleSupplier xSupplier, DoubleSupplier ySupplier, Supplier<Rotation2d> targetHeading, DoubleSupplier targetHeadingRate) {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
         this.ySupplier = ySupplier;
         this.targetHeading = targetHeading;
         this.targetHeadingRate = targetHeadingRate;
+        // Heading wraps at ±π, so let the controller take the short way around.
+        headingController.enableContinuousInput(-Math.PI, Math.PI);
         addRequirements(swerve);
+    }
+
+    @Override
+    public void initialize() {
+        // Seed the profile with the robot's CURRENT heading and yaw rate so engaging aim mid-motion
+        // (e.g. while already rotating/translating) doesn't cause a velocity discontinuity / jump.
+        double headingRad = swerve.getEstimatedPose().toPose2d().getRotation().getRadians();
+        headingController.reset(headingRad, swerve.getYawVelocityRadPerSec());
     }
 
     
@@ -51,7 +70,25 @@ public class AutoAimCommand extends Command {
     public static final Transform2d ROBOT_TO_SHOOTER =
             new Transform2d(-0.15, 0.0, Rotation2d.fromRadians(Math.PI));
 
+    /**
+     * The point the shooter should aim at, given where the robot is. Normally the hub, but once the
+     * robot crosses into the neutral zone we switch to passing: aim at a point near our own driver
+     * station so the ball is lobbed back to the alliance zone instead of contested at the hub.
+     *
+     * <p>Because the whole shot solution (hood angle + flywheel speed via {@link
+     * frc.robot.subsystems.Shooter.ShootingSuperstructure}) is derived from this target, switching it
+     * here makes the pass a real pass — the superstructure ranges to the pass point, not the hub.
+     */
+    public static Translation2d getTarget(Translation2d robotPos) {
+        return inNeutralZone(robotPos) ? getPassTarget(robotPos) : getHubTarget();
+    }
+
+    /** Robot-agnostic overload — resolves the robot position from the state recorder. */
     public static Translation2d getTarget() {
+        return getTarget(RobotStateRecorder.getPoseWorldRobotCurrent().getTranslation().toTranslation2d());
+    }
+
+    private static Translation2d getHubTarget() {
         // Hub goal via the transform tree (stored blue, returned alliance-flipped). Equivalent to
         // AllianceFlipUtil.apply(FieldConstants.Hub.getTarget2d()) but sourced from RobotStateRecorder.
         return RobotStateRecorder.getPoseWorldTargetCurrent(RobotStateRecorder.kFrameGoal)
@@ -59,8 +96,28 @@ public class AutoAimCommand extends Command {
                 .toTranslation2d();
     }
 
+    /** True when the robot is between the two field neutral-zone lines (world X, alliance-agnostic). */
+    public static boolean inNeutralZone(Translation2d robotPos) {
+        double x = robotPos.getX();
+        return x >= FieldConstants.LinesVertical.neutralZoneNear
+                && x <= FieldConstants.LinesVertical.neutralZoneFar;
+    }
+
+    /**
+     * The pass point on the robot's own Y-half. Both mirrored points are alliance-flipped into the
+     * world frame first, then we pick the one nearer the robot in Y — so on either alliance the ball
+     * goes back down the robot's sideline and the aim never sweeps through the central hub.
+     */
+    public static Translation2d getPassTarget(Translation2d robotPos) {
+        Translation2d left = AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_LEFT);
+        Translation2d right = AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_RIGHT);
+        return Math.abs(left.getY() - robotPos.getY()) <= Math.abs(right.getY() - robotPos.getY())
+                ? left
+                : right;
+    }
+
     public static double getDistanceToTarget(Translation2d robotPos) {
-        return getTarget().getDistance(robotPos);
+        return getTarget(robotPos).getDistance(robotPos);
     }
 
     /**
@@ -68,7 +125,7 @@ public class AutoAimCommand extends Command {
      * bearingToHub + asin(shooterLateralY / distance) + shooterFiringYaw.
      */
     public static Rotation2d getShooterAimHeading(Pose2d robotPose) {
-        Translation2d target = getTarget();
+        Translation2d target = getTarget(robotPose.getTranslation());
         Rotation2d bearing = target.minus(robotPose.getTranslation()).getAngle();
         double distance = target.getDistance(robotPose.getTranslation());
         Rotation2d lateralCorrection = new Rotation2d(MathUtil.clamp(
@@ -80,26 +137,41 @@ public class AutoAimCommand extends Command {
     @Override
     public void execute() {
         var robotPose = swerve.getEstimatedPose().toPose2d();
-        Translation2d toTarget = getTarget().minus(robotPose.getTranslation()); // get aiming vector
+        boolean passing = inNeutralZone(robotPose.getTranslation());
+        Translation2d toTarget =
+                getTarget(robotPose.getTranslation()).minus(robotPose.getTranslation()); // aiming vector
 
         Rotation2d target = targetHeading.get();
+        double headingRad = robotPose.getRotation().getRadians();
         double error = target.minus(robotPose.getRotation()).getRadians();
         double ffVel = targetHeadingRate.getAsDouble();
         double measureOmega = swerve.getYawVelocityRadPerSec();
-        // NT-tunable gains (Params/AutoAim). The "kD" term is angular-velocity feedback (commanded
-        // ffVel vs measured omega), not a derivative-of-error — preserved from the original law.
+
+        // Refresh gains + profile constraints live from NT. kP/kD now act on heading error against
+        // the PROFILED setpoint (kD is a real derivative-on-error, no longer the old delayed-omega
+        // feedback that rang). maxVel/maxAccel set how hard the profile drives the lock-on.
         double kP = AutoAimParamsNT.kP.getValue();
         double kD = AutoAimParamsNT.kD.getValue();
-        double maxOmega = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
-        // Heading deadband: once we're within tolerance, stop closed-loop hunting (which flips omega
-        // sign and scrubs the module azimuths back and forth → settle-wiggle). Feedforward only —
-        // ffVel is ~0 when stopped, so this commands ~0 omega and lets the chassis sit still.
-        double toleranceRad = Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue());
-        boolean withinTolerance = Math.abs(error) < toleranceRad;
-        double omega = withinTolerance
-                ? ffVel
-                : ffVel + kP * error + kD * (ffVel - measureOmega);
-        omega = MathUtil.clamp(omega, -maxOmega, maxOmega);
+        double maxVel = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
+        double maxAccel = AutoAimParamsNT.maxAngularAccelRadPerSec2.getValue();
+        headingController.setP(kP);
+        headingController.setD(kD);
+        headingController.setConstraints(new TrapezoidProfile.Constraints(maxVel, maxAccel));
+        headingController.setTolerance(Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue()));
+
+        // Goal carries the target's angular velocity (ffVel) so the profile tracks a moving aim point
+        // while you translate. Feedback drives heading→profiled setpoint; add the profile's own
+        // velocity as feedforward so we move at profile speed even at zero position error.
+        double feedback = headingController.calculate(
+                headingRad, new TrapezoidProfile.State(target.getRadians(), ffVel));
+        double omega = feedback + headingController.getSetpoint().velocity;
+        // Once on target, hand off to pure feedforward so residual feedback doesn't jitter the
+        // azimuths in steady state. ffVel is ~0 when stopped → chassis sits still.
+        boolean withinTolerance = headingController.atGoal();
+        if (withinTolerance) {
+            omega = ffVel;
+        }
+        omega = MathUtil.clamp(omega, -maxVel, maxVel);
 
 
         // Joystick translation — same convention as driveWithJoystick
@@ -118,12 +190,18 @@ public class AutoAimCommand extends Command {
 
         Logger.recordOutput("AutoAim/TargetHeading", target.getDegrees());
         Logger.recordOutput("AutoAim/Distance", toTarget.getNorm());
+        // Passing = aiming at the sideline pass point instead of the hub (robot in neutral zone).
+        Logger.recordOutput("AutoAim/Passing", passing);
         // Tuning observability — plot these over time to spot oscillation / steady-state error / sign.
         Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
         Logger.recordOutput("AutoAim/withinTolerance", withinTolerance);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
         Logger.recordOutput("AutoAim/omegaMeas", measureOmega);
         Logger.recordOutput("AutoAim/ffVel", ffVel);
+        // Profile tracking — setpointPosDeg should lead the heading and converge to target with no
+        // overshoot; setpointVel is the planned (trapezoid) angular velocity.
+        Logger.recordOutput("AutoAim/setpointPosDeg", Math.toDegrees(headingController.getSetpoint().position));
+        Logger.recordOutput("AutoAim/setpointVel", headingController.getSetpoint().velocity);
         // Reversal diagnosis — compare against the same quantities in teleop driveWithJoystick while
         // pushing the stick straight forward. stickX should be +forward, stickY +left.
         // driverHeadingDeg is the robot heading in the driver-station frame fed to
@@ -155,10 +233,17 @@ public class AutoAimCommand extends Command {
      */
     @NTParameter(tableName = "Params/AutoAim")
     public static final class AutoAimParams {
+        // Feedback on heading error vs the profiled setpoint. With profiling, kP only trims small
+        // tracking error, so it can be fairly stiff for a snappy lock without causing overshoot.
         public static final double kP = 8.0;
         public static final double kD = 0.0;
+        // Profile limits — these set how fast the lock-on is. Drivetrain caps are 450°/s (7.85 rad/s)
+        // and 5000°/s² (~87 rad/s²); start aggressive and back off only if it feels twitchy. The
+        // profile guarantees it still decelerates into the target without overshoot.
         public static final double maxAngularVelRadPerSec = 7.0;
-        // Within this heading error, the loop stops hunting and commands feedforward only.
+        public static final double maxAngularAccelRadPerSec2 = 60.0;
+        // Within this heading error the profile is "at goal" → hand off to feedforward only (no
+        // steady-state feedback jitter on the module azimuths).
         public static final double toleranceDeg = 1.0;
     }
 }
