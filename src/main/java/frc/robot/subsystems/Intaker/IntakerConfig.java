@@ -85,8 +85,8 @@ public class IntakerConfig {
 
         // NT integers come back from NetworkTables as Long, which breaks the generated
         // Integer wrapper on refresh() — keep all tunable NT numerics as double.
-        public final static double intakeRPS = 0.0;
-        public final static double outtakeRPS = 0.0;
+        public final static double intakeRPS = 20.0;
+        public final static double outtakeRPS = -15.0;
     }
 
     @NTParameter(tableName = "Params/"+INTAKER_PIVOT_NAME)
