@@ -10,11 +10,13 @@ import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.RobotStateRecorder;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
@@ -35,6 +37,10 @@ public final class AutoBuilder {
         this.intaker = intaker;
         this.swerve = swerve;
         this.shootingSuperstructure = shootingSuperstructure;
+    }
+
+    public Pose2d getCurrentPose() {
+        return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
     }
 
     public static void configure(Swerve swerve) {

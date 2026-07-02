@@ -865,13 +865,14 @@ public final class AutoCommands {
             AutoSelector.DepotAxis depotAxis,
             DepotVisitRound depotRound,
             DepotVisitRound outpostRound) {
-        return Commands.sequence(
-                Commands.either(
-                        Commands.sequence(
+        Command startAction =
+                depotRound == DepotVisitRound.START
+                        ? Commands.sequence(
                                 markStep("Start: depot collect"),
-                                depotCollectFromSelection(swerve, intaker, depotAxis)),
-                        Commands.none(),
-                        () -> depotRound == DepotVisitRound.START),
+                                depotCollectFromSelection(swerve, intaker, depotAxis))
+                        : Commands.none();
+        return Commands.sequence(
+                startAction,
                 markStep("Mid Two Cycle: first intake"),
                 neutralZoneSweep(swerve, intaker, firstMode, firstDirection, firstKind),
                 handlePostSweepAction(

@@ -1,6 +1,7 @@
 package frc.robot.commands.auto;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -36,10 +37,10 @@ public class AutoSelector {
     }
 
     private void configureChoosers() {
-        routineChooser.setDefaultOption("Do Nothing", Routine.DO_NOTHING);
+        routineChooser.setDefaultOption("Mid Sweep", Routine.MID_TWO_CYCLE);
+        routineChooser.addOption("Do Nothing", Routine.DO_NOTHING);
         routineChooser.addOption("Drive Forward", Routine.DRIVE_FORWARD);
         routineChooser.addOption("Depot Collect", Routine.DEPOT_COLLECT);
-        routineChooser.addOption("Mid Sweep", Routine.MID_TWO_CYCLE);
         routineChooser.addOption("Mid Step Only", Routine.MID_STEP_ONLY);
         routineChooser.addOption("Go To Target", Routine.GO_TO_TARGET);
         routineChooser.addOption("Trench Clear", Routine.TRENCH_CLEAR);
@@ -149,19 +150,23 @@ public class AutoSelector {
     public void updateDashboard() {
         String summary = getSelectionSummary();
         SmartDashboard.putString("Auto/Selected", summary);
+        Pose2d startPose = autoBuilder.getCurrentPose();
+        SmartDashboard.putString("Auto/Start Pose", formatPose(startPose));
+        FieldPublisher.setAutoStartPose(startPose);
 
         // Publish the selected auto's target waypoints to the Field2d for an Elastic preview.
         // Re-capture only when the selection or alliance changes (each capture builds a throwaway
         // command to record its pathfind targets).
-        String previewKey = summary + "|" + AllianceFlipUtil.shouldFlip();
+        String previewKey = summary + "|" + AllianceFlipUtil.shouldFlip() + "|" + disabledStartPoseKey();
         if (!previewKey.equals(lastPreviewKey)) {
             lastPreviewKey = previewKey;
-            FieldPublisher.setPreview(captureSelectedTargets());
+            FieldPublisher.setPreview(captureSelectedPreview());
         }
     }
 
-    /** Builds the selected command under preview capture and returns its alliance-applied waypoints. */
-    private java.util.List<Pose2d> captureSelectedTargets() {
+    /** Builds the selected command under preview capture and returns its alliance-applied preview. */
+    private java.util.List<Pose2d> captureSelectedPreview() {
+        Pose2d startPose = autoStartPose();
         java.util.List<Pose2d> blue = new java.util.ArrayList<>();
         AutoCommands.startPreviewCapture(blue);
         try {
@@ -175,7 +180,34 @@ public class AutoSelector {
         for (Pose2d p : blue) {
             out.add(AllianceFlipUtil.apply(p));
         }
+        if (!out.isEmpty()) {
+            out.add(0, startPose);
+        }
         return out;
+    }
+
+    private String disabledStartPoseKey() {
+        if (!DriverStation.isDisabled()) {
+            return "enabled";
+        }
+        Pose2d pose = autoStartPose();
+        return Math.round(pose.getX() * 4.0)
+                + ":"
+                + Math.round(pose.getY() * 4.0)
+                + ":"
+                + Math.round(pose.getRotation().getDegrees() / 15.0);
+    }
+
+    private Pose2d autoStartPose() {
+        return autoBuilder.getCurrentPose();
+    }
+
+    private String formatPose(Pose2d pose) {
+        return String.format(
+                "x=%.2f m, y=%.2f m, heading=%.1f deg",
+                pose.getX(),
+                pose.getY(),
+                pose.getRotation().getDegrees());
     }
 
     public String getSelectionSummary() {

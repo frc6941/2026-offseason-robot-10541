@@ -43,4 +43,9 @@ public final class FieldPublisher {
     public static void setPreview(java.util.List<Pose2d> poses) {
         field.getObject("AutoPreview").setPoses(poses);
     }
+
+    /** Mark the pose used as the selected auto's preview start. */
+    public static void setAutoStartPose(Pose2d pose) {
+        field.getObject("AutoStartPose").setPose(pose);
+    }
 }
