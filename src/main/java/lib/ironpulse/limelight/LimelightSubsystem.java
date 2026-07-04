@@ -5,6 +5,7 @@ import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N4;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.HashMap;
@@ -55,8 +56,10 @@ public class LimelightSubsystem extends SubsystemBase {
             LimelightIO io = entry.getKey();
             LimelightIOInputsAutoLogged input = entry.getValue();
             if (MathTools.epsilonEquals(input.reliability, 0)) {
+                Logger.recordOutput("Limelight/" + io.getName() + "/AcceptedVisionMeasurement", false);
                 continue;
             }
+            Logger.recordOutput("Limelight/" + io.getName() + "/AcceptedVisionMeasurement", true);
             localizationProvider.addVisionMeasurement(
                     input.pose, input.timestampSeconds, getVisionStdDev(io, input.reliability));
         }
@@ -79,6 +82,10 @@ public class LimelightSubsystem extends SubsystemBase {
             io.updateInputs(inputs);
             Logger.processInputs("Limelight/" + io.getName(), inputs);
 
+            SmartDashboard.putBoolean(
+                    "Limelight/" + io.getName() + "alive",
+                    Objects.equals(inputs.status, "Connected"));
+
             if (!io.canUseInternalIMU()) {
                 continue;
             }
@@ -88,13 +95,8 @@ public class LimelightSubsystem extends SubsystemBase {
             Logger.recordOutput("Limelight/IMU/" + io.getName() + "_INT", io.getIMUYawInternal());
             Logger.recordOutput("Limelight/IMU/" + io.getName() + "_ROBOT", io.getIMUYawRobot());
 
-            SmartDashboard.putBoolean(
-                    "Limelight/" + io.getName() + "alive",
-                    Objects.equals(inputs.status, "Connected"));
-
             if (inputs.reliability >= io.getImuCorrectionReliabilityThreshold()) {
-                // trustworthy enough to correct the swerve's IMU perhaps?
-                // localizationProvider.setIMUYaw(io.getIMUYawRobot());
+                localizationProvider.setIMUYaw(io.getIMUYawRobot());
             }
         }
 
@@ -138,6 +140,8 @@ public class LimelightSubsystem extends SubsystemBase {
 
     public Pose2d getPose(String id) {
         LimelightIOInputsAutoLogged inputs = ios.get(getIoById(id));
-        return inputs.pose == null ? new Pose2d() : inputs.pose.toPose2d();
+        return inputs == null || inputs.pose == null || MathTools.epsilonEquals(inputs.reliability, 0)
+                ? new Pose2d()
+                : inputs.pose.toPose2d();
     }
 }

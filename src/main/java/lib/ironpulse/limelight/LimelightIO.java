@@ -36,7 +36,7 @@ public interface LimelightIO {
             0.7 * (2 - reliability),
             0.7 * (2 - reliability),
             1.0 * (2 - reliability),
-            99999 * (2 - reliability)
+            1.0 * (2 - reliability)
         };
     }
 

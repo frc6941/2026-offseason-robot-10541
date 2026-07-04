@@ -86,6 +86,11 @@ public class RobotContainer {
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
   private final IndicatorSubsystem indicator = buildIndicator();
   private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
+  @SuppressWarnings("unused")
+  private final FieldCoreBridge fieldCoreBridge =
+      RobotBase.isSimulation()
+          ? new FieldCoreBridge(swerve, intaker, hopperSubsystem, shooterSubsystem, hoodSubsystem)
+          : null;
 
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
@@ -100,7 +105,6 @@ public class RobotContainer {
     // it; without this the odometry queues stay empty and the pose estimator never updates. No-op
     // in sim (no MK5N modules -> syncThread is null).
     SwerveModuleIOMK5N.startSyncThread();
-
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
     AutoBuilder.configure(swerve);
@@ -110,6 +114,7 @@ public class RobotContainer {
 
     // Publish the Field2d ("Field") for Elastic + hook PathPlanner active-path logging (one-time).
     FieldPublisher.init();
+
   }
 
   /**
@@ -386,7 +391,7 @@ public class RobotContainer {
         swerve::getIMUYaw,
         swerve::getYawVelocityRadPerSec,
         () -> false,
-        // TODO: tune vision std-devs on the real robot (x/y trusted; z & heading distrusted for MT2).
+        // TODO: tune vision std-devs on the real robot.
         new DeviationParamSources() {
           public double xStdDev() { return 0.7; }
           public double yStdDev() { return 0.7; }
@@ -431,7 +436,7 @@ public class RobotContainer {
       return new Swerve(SwerveMK5Config.kRealConfig, imu, module0, module1, module2, module3);
     } else {
       return new Swerve(
-          SwerveMK5Config.kRealConfig,
+          SwerveMK5Config.kSimConfig,
           new ImuIOSim(),
           new SwerveModuleIOSimpleSim(SwerveMK5Config.kSimConfig, 0),
           new SwerveModuleIOSimpleSim(SwerveMK5Config.kSimConfig, 1),

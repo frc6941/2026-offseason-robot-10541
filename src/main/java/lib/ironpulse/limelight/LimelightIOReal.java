@@ -3,6 +3,7 @@ package lib.ironpulse.limelight;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.net.PortForwarder;
 import edu.wpi.first.wpilibj.RobotState;
+import edu.wpi.first.wpilibj.Timer;
 import java.util.Arrays;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
@@ -23,6 +24,8 @@ public class LimelightIOReal implements LimelightIO {
     private double lastHeartbeat = -1;
     private double lastTsBootMs = -1;
     private double lastSeenTime = 0.0;
+    private double lastPoseFrameSignature = Double.NaN;
+    private double latestPoseFrameSignature = Double.NaN;
     private int reseedFramesRemaining = 0;
 
     public LimelightIOReal(
@@ -85,36 +88,35 @@ public class LimelightIOReal implements LimelightIO {
         return Math.max(0.0, Math.min(1.0, reliability));
     }
 
-    private String updateStatus() {
-        // TODO: fix me, ERR reason not accurate
-        String status = "Connected";
+    private String updateStatus(LimelightHelpers.PoseEstimate estimate) {
         double now = edu.wpi.first.wpilibj.Timer.getFPGATimestamp();
         double hb = LimelightHelpers.getHeartbeat(config.getName());
 
-        if (now - lastSeenTime > 0.5) {
-            status = "Disconnected";
-        }
+        boolean seenHeartbeat = hb != lastHeartbeat;
+        boolean poseFrameUpdated =
+                estimate.tagCount > 0
+                        && Double.isFinite(latestPoseFrameSignature)
+                        && (!Double.isFinite(lastPoseFrameSignature)
+                                || Double.compare(latestPoseFrameSignature, lastPoseFrameSignature)
+                                        != 0);
 
-        if (hb != lastHeartbeat) {
+        if (seenHeartbeat || poseFrameUpdated) {
             double tsBootMs =
                     LimelightHelpers.getLatestResults(config.getName()).timestamp_LIMELIGHT_publish;
-
-            if (lastSeenTime > 0 && now - lastSeenTime > 0.5) {
-                if (lastTsBootMs >= 0 && tsBootMs < lastTsBootMs) {
-                    status = "Reconnected, previously likely power ERR";
-                } else {
-                    status = "Reconnected, previously likely network ERR";
-                }
-            } else {
-                status = "Connected";
+            if (tsBootMs <= 0.0) {
+                tsBootMs = estimate.timestampSeconds * 1000.0;
             }
 
             lastHeartbeat = hb;
             lastTsBootMs = tsBootMs;
+            lastPoseFrameSignature = latestPoseFrameSignature;
             lastSeenTime = now;
         }
 
-        return status;
+        if (now - lastSeenTime > 0.5) {
+            return "Disconnected";
+        }
+        return "Connected";
     }
 
     private boolean isLimelight4() {
@@ -250,6 +252,72 @@ public class LimelightIOReal implements LimelightIO {
         Logger.recordOutput("Limelight/IMU/Swerve", yawSupplier.getAsDouble());
     }
 
+    private LimelightHelpers.PoseEstimate getPoseEstimate() {
+        String entryName = config.isUseMegaTag2() ? "botpose_orb_wpiblue" : "botpose_wpiblue";
+        double[] poseArray = LimelightHelpers.getLimelightNTDoubleArray(config.getName(), entryName);
+        latestPoseFrameSignature = poseFrameSignature(poseArray);
+        Logger.recordOutput("Limelight/" + config.getName() + "/PoseArrayLength", poseArray.length);
+
+        if (poseArray.length < 11) {
+            return config.isUseMegaTag2()
+                    ? LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(config.getName())
+                    : LimelightHelpers.getBotPoseEstimate_wpiBlue(config.getName());
+        }
+
+        double latencyMs = extractArrayEntry(poseArray, 6);
+        int tagCount = (int) extractArrayEntry(poseArray, 7);
+        double tagSpan = extractArrayEntry(poseArray, 8);
+        double tagDist = extractArrayEntry(poseArray, 9);
+        double tagArea = extractArrayEntry(poseArray, 10);
+        int valsPerFiducial = 7;
+        int expectedTotalVals = 11 + valsPerFiducial * tagCount;
+        LimelightHelpers.RawFiducial[] rawFiducials;
+
+        if (tagCount <= 0 || poseArray.length != expectedTotalVals) {
+            rawFiducials = new LimelightHelpers.RawFiducial[0];
+        } else {
+            rawFiducials = new LimelightHelpers.RawFiducial[tagCount];
+            for (int i = 0; i < tagCount; i++) {
+                int baseIndex = 11 + i * valsPerFiducial;
+                rawFiducials[i] =
+                        new LimelightHelpers.RawFiducial(
+                                (int) poseArray[baseIndex],
+                                poseArray[baseIndex + 1],
+                                poseArray[baseIndex + 2],
+                                poseArray[baseIndex + 3],
+                                poseArray[baseIndex + 4],
+                                poseArray[baseIndex + 5],
+                                poseArray[baseIndex + 6]);
+            }
+        }
+
+        return new LimelightHelpers.PoseEstimate(
+                LimelightHelpers.toPose2D(poseArray),
+                Timer.getFPGATimestamp() - latencyMs / 1000.0,
+                latencyMs,
+                tagCount,
+                tagSpan,
+                tagDist,
+                tagArea,
+                rawFiducials,
+                config.isUseMegaTag2());
+    }
+
+    private static double extractArrayEntry(double[] values, int index) {
+        return values.length > index ? values[index] : 0.0;
+    }
+
+    private static double poseFrameSignature(double[] values) {
+        if (values.length < 11) {
+            return Double.NaN;
+        }
+        double signature = values.length;
+        for (int i = 0; i < values.length; i++) {
+            signature += values[i] * (i + 1);
+        }
+        return signature;
+    }
+
     @Override
     public void updateInputs(LimelightIOInputs inputs) {
         if (canUseInternalIMU()) {
@@ -264,13 +332,7 @@ public class LimelightIOReal implements LimelightIO {
         }
         isPrevDisabled = RobotState.isDisabled();
 
-        // generate pose Estimate
-        LimelightHelpers.PoseEstimate estimate;
-        if (config.isUseMegaTag2()) {
-            estimate = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(config.getName());
-        } else {
-            estimate = LimelightHelpers.getBotPoseEstimate_wpiBlue(config.getName());
-        }
+        LimelightHelpers.PoseEstimate estimate = getPoseEstimate();
         inputs.pose = new Pose3d(estimate.pose);
         inputs.timestampSeconds = estimate.timestampSeconds;
         inputs.latency = estimate.latency;
@@ -279,7 +341,7 @@ public class LimelightIOReal implements LimelightIO {
         inputs.tagSpan = estimate.tagSpan;
         inputs.avgTagArea = estimate.avgTagArea;
         inputs.avgTagDist = estimate.avgTagDist;
-        inputs.status = updateStatus();
+        inputs.status = updateStatus(estimate);
         inputs.lastHeartbeat = lastHeartbeat;
         inputs.lastTsBootMs = lastTsBootMs;
         inputs.lastSeenTime = lastSeenTime;
@@ -292,7 +354,7 @@ public class LimelightIOReal implements LimelightIO {
             deviationParams.xStdDev() * (2 - reliability),
             deviationParams.yStdDev() * (2 - reliability),
             deviationParams.zStdDev() * (2 - reliability),
-            999999 * deviationParams.angleStdDev() * (2 - reliability)
+            deviationParams.angleStdDev() * (2 - reliability)
         };
     }
 

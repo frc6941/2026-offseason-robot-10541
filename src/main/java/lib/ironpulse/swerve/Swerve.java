@@ -191,7 +191,7 @@ public class Swerve extends SubsystemBase implements Localizable {
     }
 
     // ------- Getters -------
-    private SwerveModuleState[] getModuleStates() {
+    public SwerveModuleState[] getModuleStates() {
         SwerveModuleState[] states = new SwerveModuleState[modules.size()];
         for (int i = 0; i < modules.size(); i++) states[i] = modules.get(i).getSwerveModuleState();
         return states;
@@ -290,6 +290,8 @@ public class Swerve extends SubsystemBase implements Localizable {
             Pose3d visionRobotPoseMeters,
             double timestampSeconds,
             Matrix<N4, N1> visionMeasurementStdDevs) {
+        Logger.recordOutput(config.name + "/VisionCorrectionPose", visionRobotPoseMeters);
+        Logger.recordOutput(config.name + "/VisionCorrectionTimestampSeconds", timestampSeconds);
         poseEstimator.addVisionMeasurement(
                 visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
     }
