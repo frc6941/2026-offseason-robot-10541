@@ -138,6 +138,10 @@ public class MotorIOTalonFX implements MotorIO {
                                 new ClosedLoopRampsConfigs()
                                         .withVoltageClosedLoopRampPeriod(f.ramp));
             }
+            // We never read followers back through status signals, so silence their default frames
+            // to keep them off the (shared roboRIO) CAN bus. The Follower control request still
+            // drives them; only telemetry publishing is reduced.
+            followers[i].optimizeBusUtilization();
         }
 
         // Signals
@@ -152,13 +156,18 @@ public class MotorIOTalonFX implements MotorIO {
                 new BaseStatusSignal[] {
                     posSig, velSig, motorVoltSig, supplyVoltSig, statorSig, supplySig
                 };
-        // configure update frequencies and register signals
-        posSig.setUpdateFrequency(1000.0);
-        velSig.setUpdateFrequency(1000.0);
-        motorVoltSig.setUpdateFrequency(100.0);
-        supplyVoltSig.setUpdateFrequency(30.0);
-        statorSig.setUpdateFrequency(100.0);
-        supplySig.setUpdateFrequency(100.0);
+        // Configure update frequencies and register signals.
+        // NOTE: these mechanisms live on the roboRIO 1 Mbps CAN bus (only swerve is on the CANivore).
+        // 1000 Hz pos/vel per device saturates that shared bus (~11 devices -> 100% utilization,
+        // devices dropping offline). The TalonFX closed loop runs internally at 1 kHz regardless of
+        // these rates — this only sets how often the RIO reads back for logging/atGoal — so 100 Hz
+        // is ample. If a device is ever moved back onto the CANivore, these can be raised again.
+        posSig.setUpdateFrequency(100.0);
+        velSig.setUpdateFrequency(100.0);
+        motorVoltSig.setUpdateFrequency(50.0);
+        supplyVoltSig.setUpdateFrequency(10.0);
+        statorSig.setUpdateFrequency(50.0);
+        supplySig.setUpdateFrequency(20.0);
         PhoenixUtils.registerSignals(cfg.mainBus, signals);
         main.optimizeBusUtilization();
     }
