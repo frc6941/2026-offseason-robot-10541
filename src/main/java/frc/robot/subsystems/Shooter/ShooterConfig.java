@@ -1,7 +1,7 @@
 package frc.robot.subsystems.Shooter;
 
 import static edu.wpi.first.units.Units.Degrees;
-import static frc.robot.RobotConstants.CANIVORE_CAN_BUS;
+import static frc.robot.RobotConstants.ROBORIO_CAN_BUS;
 
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -13,7 +13,7 @@ import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ntext.NTParameter;
 
 public class ShooterConfig {
-    private static final CANBus CANBUS = CANIVORE_CAN_BUS;
+    private static final CANBus CANBUS = ROBORIO_CAN_BUS;
 
     // Shooter motors are numbered by physical layout:
     // left side top-to-bottom, then right side top-to-bottom.

@@ -13,6 +13,9 @@ public final class RobotConstants {
     public static final String ROBORIO_CAN_BUS_NAME = "rio";
     public static final String CANIVORE_CAN_BUS_NAME = "10541Canivore0";
     public static final CANBus CANIVORE_CAN_BUS = new CANBus(CANIVORE_CAN_BUS_NAME);
+    // Swerve lives on the CANivore; all other mechanisms (shooter, hood, hopper, intake) are on
+    // the roboRIO bus.
+    public static final CANBus ROBORIO_CAN_BUS = new CANBus(ROBORIO_CAN_BUS_NAME);
 
 
     // CAN_ID

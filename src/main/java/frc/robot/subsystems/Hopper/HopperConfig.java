@@ -1,6 +1,6 @@
 package frc.robot.subsystems.Hopper;
 
-import static frc.robot.RobotConstants.CANIVORE_CAN_BUS;
+import static frc.robot.RobotConstants.ROBORIO_CAN_BUS;
 
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -10,7 +10,7 @@ import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ntext.NTParameter;
 
 public class HopperConfig {
-    private static final CANBus CANBUS = CANIVORE_CAN_BUS;
+    private static final CANBus CANBUS = ROBORIO_CAN_BUS;
 
     private static final int HOPPER_L_ID = 20;
     private static final int HOPPER_R_ID = 21;
@@ -28,7 +28,7 @@ public class HopperConfig {
             .followers(new SubsystemConfig.FollowerConfig[] {
                 SubsystemConfig.FollowerConfig.builder()
                 .id(HOPPER_L_ID)
-                .bus(CANIVORE_CAN_BUS)
+                .bus(CANBUS)
                 .opposeMain(MotorAlignmentValue.Opposed)
                 .build()
             })

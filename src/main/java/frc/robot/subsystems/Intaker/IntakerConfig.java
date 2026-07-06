@@ -1,7 +1,7 @@
 package frc.robot.subsystems.Intaker;
 
 import static edu.wpi.first.units.Units.Degrees;
-import static frc.robot.RobotConstants.CANIVORE_CAN_BUS;
+import static frc.robot.RobotConstants.ROBORIO_CAN_BUS;
 
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -12,7 +12,7 @@ import lib.ntext.NTParameter;
 
 public class IntakerConfig {
 
-    private final static CANBus CANBUS = CANIVORE_CAN_BUS;
+    private final static CANBus CANBUS = ROBORIO_CAN_BUS;
 
     private final static int INTAKER_PIVOT_ID = 22;
     private final static int INTAKER_ROLLER_ID = 23;
