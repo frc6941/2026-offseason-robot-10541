@@ -14,8 +14,8 @@ public class IntakerConfig {
 
     private final static CANBus CANBUS = CANIVORE_CAN_BUS;
 
-    private final static int INTAKER_ROLLER_ID = 10;
-    private final static int INTAKER_PIVOT_ID = 11;
+    private final static int INTAKER_ROLLER_ID = 21;
+    private final static int INTAKER_PIVOT_ID = 22;
 
     public final static String INTAKER_ROLLER_NAME = "IntakerRoller";
     public final static String INTAKER_PIVOT_NAME = "IntakerPivot";
@@ -24,7 +24,7 @@ public class IntakerConfig {
     private final static double INTAKER_PIVOT_GEAR_RATIO = 27 * 48.0 / 5.0;
 
     // Accessible angle per mechansim rotation
-    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(1 / INTAKER_PIVOT_GEAR_RATIO * 360);
+    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(360.0);
     public final static Angle INTAKER_PIVOT_MIN_ANGLE = Degrees.of(0.0);
     public final static Angle INTAKER_PIVOT_MAX_ANGLE = Degrees.of(135.0);
     // The real intake-pivot angle when the mechanism is resting against its zero hard stop.

@@ -15,14 +15,12 @@ import frc.robot.commands.auto.AutoBuilder;
 import frc.robot.commands.auto.AutoCommands;
 import frc.robot.commands.auto.AutoSelector;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
-import frc.robot.subsystems.Shooter.HoodConfig;
 import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
 import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
-import frc.robot.subsystems.Shooter.ShooterTopControlParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.indicator.IndicatorIO;
@@ -82,13 +80,11 @@ public class RobotContainer {
   private final HopperSubsystem hopperSubsystem = buildHopper();
   private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpperSubsystem = buildShooterUpper();
   private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLowerSubsystem = buildShooterLower();
-  private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> shooterTopControlSubsystem = buildShooterTopControl();
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
       new ShootingSuperstructure(
           shooterUpperSubsystem,
           shooterLowerSubsystem,
-          shooterTopControlSubsystem,
           hoodSubsystem,
           hopperSubsystem,
           swerve);
@@ -105,7 +101,6 @@ public class RobotContainer {
               hopperSubsystem,
               shooterUpperSubsystem,
               shooterLowerSubsystem,
-              shooterTopControlSubsystem,
               hoodSubsystem)
           : null;
 
@@ -125,8 +120,8 @@ public class RobotContainer {
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
     shootingSuperstructure.configureDefaultCommands();
-    // Top control starts at its mechanical zero; seed the sensor without moving the motor.
-    shootingSuperstructure.seedTopControlPositionAtZero();
+    // Hood starts at its mechanical zero; seed the sensor without moving the motor.
+    shootingSuperstructure.seedHoodPositionAtZero();
     AutoBuilder.configure(swerve);
     configureBindings();
     autoSelector = new AutoSelector(autoBuilder, DefaultAuto.driveForward(swerve));
@@ -147,14 +142,10 @@ public class RobotContainer {
    * joysticks}.
    */
   private void configureBindings() {
-    // Competition-style hood homing: zero on teleop enable so position control starts from a known reference.
-    new Trigger(DriverStation::isTeleopEnabled).onTrue(shootingSuperstructure.zeroHood());
-
     // Manual zeroing lives on the D-pad:
-    // Up = hood hard-stop zero, Left = intake pivot hard-stop zero, Right = top-control zero here.
-    driverController.povUp().onTrue(shootingSuperstructure.zeroHood());
+    // Up = hood zero here, Left = intake pivot hard-stop zero.
+    driverController.povUp().onTrue(shootingSuperstructure.zeroHoodHere());
     driverController.povLeft().onTrue(intaker.zeroCommand());
-    driverController.povRight().onTrue(shootingSuperstructure.zeroTopControlHere());
 
     // Intake: right trigger toggles intake on/off.
     // (Hopper feeds automatically off the intake state machine via its default command.)
@@ -309,7 +300,7 @@ public class RobotContainer {
     boolean shooterActive = shootingSuperstructure.isShooterActive();
 
     if (shooterActive) {
-      if (shootingSuperstructure.shooterAtGoal() && hoodSubsystem.positionAtGoal()) {
+      if (shootingSuperstructure.shooterAtGoal() && shootingSuperstructure.hoodAtGoal()) {
         // Flywheel at speed + hood on target → ready to feed
         indicator.setPattern(IndicatorIO.Patterns.HOLD_SHOOTING);
       } else {
@@ -399,18 +390,6 @@ public class RobotContainer {
         ShooterLowerParamsNT.asVelocityParamSources());
   }
 
-  private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildShooterTopControl() {
-    return new PositionMotorSubsystem<>(
-        ShooterConfig.SHOOTER_TOP_CONTROL_CONFIG,
-        new MotorInputsAutoLogged(),
-        RobotBase.isReal()
-            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_TOP_CONTROL_CONFIG)
-            : new MotorIOSim(ShooterConfig.SHOOTER_TOP_CONTROL_CONFIG),
-        ShooterTopControlParamsNT.asPositionParamSources(),
-        ShooterConfig.SHOOTER_TOP_CONTROL_STOW_ANGLE,
-        ShooterConfig.SHOOTER_TOP_CONTROL_ANGLE_PER_ROTATION);
-  }
-
   private LimelightSubsystem buildLimelight() {
     LimelightIOConfig config = LimelightIOConfig.builder()
         .name(LIMELIGHT_NAME)
@@ -443,14 +422,14 @@ public class RobotContainer {
 
   private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildHood() {
     return new PositionMotorSubsystem<>(
-        HoodConfig.HOOD_CONFIG,
+        ShooterConfig.HOOD_CONFIG,
         new MotorInputsAutoLogged(),
         RobotBase.isReal()
-            ? new MotorIOTalonFX(HoodConfig.HOOD_CONFIG)
-            : new MotorIOSim(HoodConfig.HOOD_CONFIG),
+            ? new MotorIOTalonFX(ShooterConfig.HOOD_CONFIG)
+            : new MotorIOSim(ShooterConfig.HOOD_CONFIG),
         HoodParamsNT.asPositionParamSources(),
-        HoodConfig.HOOD_MIN_ANGLE,
-        HoodConfig.HOOD_ANGLE_PER_ROTATION);
+        ShooterConfig.HOOD_STOW_ANGLE,
+        ShooterConfig.HOOD_ANGLE_PER_ROTATION);
   }
 
   private Swerve buildSwerve() {

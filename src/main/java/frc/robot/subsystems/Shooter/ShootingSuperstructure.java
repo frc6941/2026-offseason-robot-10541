@@ -41,7 +41,6 @@ import org.littletonrobotics.junction.Logger;
 public class ShootingSuperstructure extends SubsystemBase {
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
-    private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> topControl;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
     private final HopperSubsystem hopper;
     private final Swerve swerve;
@@ -54,13 +53,11 @@ public class ShootingSuperstructure extends SubsystemBase {
     public ShootingSuperstructure(
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower,
-            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> topControl,
             PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood,
             HopperSubsystem hopper,
             Swerve swerve) {
         this.shooterUpper = shooterUpper;
         this.shooterLower = shooterLower;
-        this.topControl = topControl;
         this.hood = hood;
         this.hopper = hopper;
         this.swerve = swerve;
@@ -122,8 +119,8 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Degrees.of(
                 MathUtil.clamp(
                         angle.in(Degrees),
-                        HoodConfig.HOOD_MIN_ANGLE.in(Degrees),
-                        HoodConfig.HOOD_MAX_ANGLE.in(Degrees)));
+                        ShooterConfig.HOOD_MIN_ANGLE.in(Degrees),
+                        ShooterConfig.HOOD_MAX_ANGLE.in(Degrees)));
     }
 
     /** True when the SHOOTER is pointed at the hub within the (NT-tunable) heading tolerance. */
@@ -141,6 +138,10 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public boolean shooterAtGoal() {
         return shooterUpper.velocityAtGoal() && shooterLower.velocityAtGoal();
+    }
+
+    public boolean hoodAtGoal() {
+        return hood.positionAtGoal();
     }
 
     public boolean isShooterActive() {
@@ -165,8 +166,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         shooterLower.setDefaultCommand(
                 shooterLower.runVelVolt(
                         () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
-        topControl.setDefaultCommand(
-                topControl.runMotionMagic(ShooterConfig.SHOOTER_TOP_CONTROL_STOW_ANGLE));
+        hood.setDefaultCommand(hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE));
     }
 
     private Angle clampHoodAngleForSolution() {
@@ -245,34 +245,22 @@ public class ShootingSuperstructure extends SubsystemBase {
                         () ->
                                 RotationsPerSecond.of(
                                         ShooterLowerParamsNT.shootRPS.getValue())),
-                hood.runMotionMagic(HoodConfig.HOOD_MAX_ANGLE),
+                hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
                 Commands.waitUntil(() -> shooterAtGoal() && hood.positionAtGoal())
                         .andThen(hopper.feed()));
     }
 
-    public Command runTopControlAngle(Angle angle) {
-        return topControl.runMotionMagic(() -> clampTopControlAngle(angle));
+    public void seedHoodPositionAtZero() {
+        hood.setCurrPos(ShooterConfig.HOOD_MIN_ANGLE);
     }
 
-    public void seedTopControlPositionAtZero() {
-        topControl.setCurrPos(ShooterConfig.SHOOTER_TOP_CONTROL_MIN_ANGLE);
+    /** Treat the current hood position as the zero angle without moving the mechanism. */
+    public Command zeroHoodHere() {
+        return Commands.runOnce(this::seedHoodPositionAtZero, hood);
     }
 
-    /** Treat the current top-control position as the zero angle without moving the mechanism. */
-    public Command zeroTopControlHere() {
-        return Commands.runOnce(this::seedTopControlPositionAtZero, topControl);
-    }
-
-    public Angle getTopControlAngle() {
-        return topControl.getCurrPos();
-    }
-
-    private Angle clampTopControlAngle(Angle angle) {
-        return Degrees.of(
-                MathUtil.clamp(
-                        angle.in(Degrees),
-                        ShooterConfig.SHOOTER_TOP_CONTROL_MIN_ANGLE.in(Degrees),
-                        ShooterConfig.SHOOTER_TOP_CONTROL_MAX_ANGLE.in(Degrees)));
+    public Angle getHoodAngle() {
+        return hood.getCurrPos();
     }
 
     /**
@@ -282,12 +270,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     public Command idle() {
         return Commands.parallel(
                 runShooterPrespin(),
-                hood.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE));
-    }
-
-    /** Zero only the hood mechanism. */
-    public Command zeroHood() {
-        return hood.zeroCommand();
+                hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE));
     }
 
     @Override

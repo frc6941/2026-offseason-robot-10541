@@ -30,7 +30,6 @@ public class FieldCoreBridge extends SubsystemBase {
     private final HopperSubsystem hopper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
-    private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> shooterTopControl;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> hood;
     private final NetworkTable table;
 
@@ -43,7 +42,6 @@ public class FieldCoreBridge extends SubsystemBase {
             HopperSubsystem hopper,
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower,
-            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> shooterTopControl,
             PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> hood) {
         super("FieldCoreBridge");
         this.swerve = swerve;
@@ -51,7 +49,6 @@ public class FieldCoreBridge extends SubsystemBase {
         this.hopper = hopper;
         this.shooterUpper = shooterUpper;
         this.shooterLower = shooterLower;
-        this.shooterTopControl = shooterTopControl;
         this.hood = hood;
         this.table = NetworkTableInstance.getDefault().getTable("FieldCore/Robot");
     }
@@ -88,9 +85,8 @@ public class FieldCoreBridge extends SubsystemBase {
                 .setDouble(shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
         table.getEntry("ShooterLowerRPM")
                 .setDouble(shooterLower.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
-        table.getEntry("ShooterTopControlAngleDeg")
-                .setDouble(shooterTopControl.getCurrPos().in(Degrees));
-        table.getEntry("HoodAngleDeg").setDouble(hood.getCurrSetpoint().in(Degrees));
+        table.getEntry("HoodAngleDeg").setDouble(hood.getCurrPos().in(Degrees));
+        table.getEntry("HoodTargetDeg").setDouble(hood.getCurrSetpoint().in(Degrees));
         table.getEntry("ShootCommand").setBoolean(shootCommand);
         table.getEntry("ShootCount").setDouble(shootCount);
 
@@ -103,9 +99,8 @@ public class FieldCoreBridge extends SubsystemBase {
         Logger.recordOutput(
                 "FieldCoreBridge/ShooterLowerRPM",
                 shooterLower.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
-        Logger.recordOutput(
-                "FieldCoreBridge/ShooterTopControlAngleDeg",
-                shooterTopControl.getCurrPos().in(Degrees));
+        Logger.recordOutput("FieldCoreBridge/HoodAngleDeg", hood.getCurrPos().in(Degrees));
+        Logger.recordOutput("FieldCoreBridge/HoodTargetDeg", hood.getCurrSetpoint().in(Degrees));
         Logger.recordOutput("FieldCoreBridge/ShootCommand", shootCommand);
         Logger.recordOutput("FieldCoreBridge/ShootCount", shootCount);
         Logger.recordOutput("FieldCoreBridge/ModuleStates", moduleStates);
