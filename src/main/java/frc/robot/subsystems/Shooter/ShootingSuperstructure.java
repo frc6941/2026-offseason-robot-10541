@@ -250,6 +250,27 @@ public class ShootingSuperstructure extends SubsystemBase {
                         .andThen(hopper.feed()));
     }
 
+    /**
+     * Bench test: rotate the hood to the NT-tunable test angle ({@code Params/Hood/testAngleDeg}),
+     * clamped to the hood limits. Flywheel/feed untouched. Bind {@code whileTrue} so the hood returns
+     * to stow on release. Requires kP (and likely kG) tuned in {@code Params/Hood} or it won't move.
+     */
+    public Command hoodToTestAngle() {
+        return hood.runMotionMagic(
+                () -> clampHoodAngle(Degrees.of(HoodParamsNT.testAngleDeg.getValue())));
+    }
+
+    /**
+     * Bench test: spin ONLY the shooter drum (upper) at the NT-tunable test RPS
+     * ({@code Params/ShooterDrum/testRPS}); the feed roller stays on its idle default. Bind
+     * {@code whileTrue} so the drum drops back to idle on release. Requires kV/kP tuned in
+     * {@code Params/ShooterDrum} or it won't reach speed.
+     */
+    public Command spinDrumAtTestRPS() {
+        return shooterUpper.runVelVolt(
+                () -> RotationsPerSecond.of(ShooterUpperParamsNT.testRPS.getValue()));
+    }
+
     public void seedHoodPositionAtZero() {
         hood.setCurrPos(ShooterConfig.HOOD_MIN_ANGLE);
     }

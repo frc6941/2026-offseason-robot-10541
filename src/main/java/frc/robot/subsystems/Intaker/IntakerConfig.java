@@ -14,19 +14,20 @@ public class IntakerConfig {
 
     private final static CANBus CANBUS = CANIVORE_CAN_BUS;
 
-    private final static int INTAKER_ROLLER_ID = 21;
     private final static int INTAKER_PIVOT_ID = 22;
+    private final static int INTAKER_ROLLER_ID = 23;
 
     public final static String INTAKER_ROLLER_NAME = "IntakerRoller";
     public final static String INTAKER_PIVOT_NAME = "IntakerPivot";
 
-    private final static double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0; // FIX
-    private final static double INTAKER_PIVOT_GEAR_RATIO = 27 * 48.0 / 5.0;
+    private final static double INTAKER_ROLLER_GEAR_RATIO = 20.0 / 35.0;
+    private final static double INTAKER_PIVOT_GEAR_RATIO = 1.0 / 12 * 20 / 36 * 20 / 36 * 15 / 36;
 
     // Accessible angle per mechansim rotation
-    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(360.0);
+    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(360.0 * INTAKER_PIVOT_GEAR_RATIO);
     public final static Angle INTAKER_PIVOT_MIN_ANGLE = Degrees.of(0.0);
     public final static Angle INTAKER_PIVOT_MAX_ANGLE = Degrees.of(135.0);
+
     // The real intake-pivot angle when the mechanism is resting against its zero hard stop.
     // Measure on the robot and update this value so getCurrPos() reports the true mechanism angle after homing.
     public final static Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
@@ -50,7 +51,7 @@ public class IntakerConfig {
             .name(INTAKER_ROLLER_NAME)
             .mainBus(CANBUS)
             .mainId(INTAKER_ROLLER_ID)
-            .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
+            .motorInvertedValue(InvertedValue.Clockwise_Positive)
             .SensorToMechanismRatio(INTAKER_ROLLER_GEAR_RATIO)
             .build();
 
@@ -103,10 +104,10 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 150.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 135.0;
-        public static final double retractPosAngle = 0.0;
-        public static final double feedPosAngle = 100.0;
-        public static final double retractedfeedPosAngle = 60.0;
+        public static final double deployPosAngle = 0.0;
+        public static final double retractPosAngle = 135.0;
+        public static final double feedPosAngle = 35.0;
+        public static final double retractedfeedPosAngle = 75.0;
 
     }
 

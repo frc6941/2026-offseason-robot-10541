@@ -78,8 +78,8 @@ public class RobotContainer {
   private final IntakerSubsystem intaker = new IntakerSubsystem(intakerRoller, intakerPivot);
   private final Swerve swerve = buildSwerve();
   private final HopperSubsystem hopperSubsystem = buildHopper();
-  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpperSubsystem = buildShooterUpper();
-  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLowerSubsystem = buildShooterLower();
+  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpperSubsystem = buildShooterDrum();
+  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLowerSubsystem = buildShooterFeed();
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
       new ShootingSuperstructure(
@@ -146,6 +146,13 @@ public class RobotContainer {
     // Up = hood zero here, Left = intake pivot hard-stop zero.
     driverController.povUp().onTrue(shootingSuperstructure.zeroHoodHere());
     driverController.povLeft().onTrue(intaker.zeroCommand());
+
+    // Bench tests with NT-tunable setpoints (whileTrue → mechanisms return to default on release):
+    //   D-pad Down  → rotate hood to Params/Hood/testAngleDeg (hood only, no flywheel/feed)
+    //   Left Bumper → spin only the drum at Params/ShooterDrum/testRPS
+    // Tune the setpoints + PID/FF gains live over NetworkTables; no redeploy needed.
+    driverController.povDown().whileTrue(shootingSuperstructure.hoodToTestAngle());
+    driverController.leftBumper().whileTrue(shootingSuperstructure.spinDrumAtTestRPS());
 
     // Intake: right trigger toggles intake on/off.
     // (Hopper feeds automatically off the intake state machine via its default command.)
@@ -370,23 +377,23 @@ public class RobotContainer {
             : new MotorIOSim(HopperConfig.HOPPER_CONFIG));
   }
 
-  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterUpper() {
+  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterDrum() {
     return new VelocityMotorSubsystem<>(
-        ShooterConfig.SHOOTER_UPPER_CONFIG,
+        ShooterConfig.SHOOTER_DRUM_CONFIG,
         new MotorInputsAutoLogged(),
         RobotBase.isReal()
-            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_UPPER_CONFIG)
-            : new MotorIOSim(ShooterConfig.SHOOTER_UPPER_CONFIG),
+            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_DRUM_CONFIG)
+            : new MotorIOSim(ShooterConfig.SHOOTER_DRUM_CONFIG),
         ShooterUpperParamsNT.asVelocityParamSources());
   }
 
-  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterLower() {
+  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterFeed() {
     return new VelocityMotorSubsystem<>(
-        ShooterConfig.SHOOTER_LOWER_CONFIG,
+        ShooterConfig.SHOOTER_FEED_CONFIG,
         new MotorInputsAutoLogged(),
         RobotBase.isReal()
-            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_LOWER_CONFIG)
-            : new MotorIOSim(ShooterConfig.SHOOTER_LOWER_CONFIG),
+            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_FEED_CONFIG)
+            : new MotorIOSim(ShooterConfig.SHOOTER_FEED_CONFIG),
         ShooterLowerParamsNT.asVelocityParamSources());
   }
 
