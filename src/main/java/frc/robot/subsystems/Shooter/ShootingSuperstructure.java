@@ -13,12 +13,14 @@ import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotConstants;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
+import java.util.function.Supplier;
 import lib.ironpulse.command.VisualizeProjectileShot;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
@@ -37,7 +39,9 @@ import org.littletonrobotics.junction.Logger;
  * drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
-    private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooter;
+    private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
+    private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
+    private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> topControl;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
     private final HopperSubsystem hopper;
     private final Swerve swerve;
@@ -48,11 +52,15 @@ public class ShootingSuperstructure extends SubsystemBase {
     private static final double kRpsToMuzzleMps = 0.11;
 
     public ShootingSuperstructure(
-            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooter,
+            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
+            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower,
+            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> topControl,
             PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood,
             HopperSubsystem hopper,
             Swerve swerve) {
-        this.shooter = shooter;
+        this.shooterUpper = shooterUpper;
+        this.shooterLower = shooterLower;
+        this.topControl = topControl;
         this.hood = hood;
         this.hopper = hopper;
         this.swerve = swerve;
@@ -128,7 +136,69 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** All three shot DOFs satisfied: chassis aimed, hood at angle, flywheel up to speed. */
     public boolean readyToShoot() {
-        return headingAtGoal() && hood.positionAtGoal() && shooter.velocityAtGoal();
+        return headingAtGoal() && hood.positionAtGoal() && shooterAtGoal();
+    }
+
+    public boolean shooterAtGoal() {
+        return shooterUpper.velocityAtGoal() && shooterLower.velocityAtGoal();
+    }
+
+    public boolean isShooterActive() {
+        return shooterUpper.getCurrSetpoint().in(RotationsPerSecond)
+                        > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
+                || shooterLower.getCurrSetpoint().in(RotationsPerSecond)
+                        > ShooterLowerParamsNT.idleRPS.getValue() + 1.0;
+    }
+
+    public double getUpperSetpointRPS() {
+        return shooterUpper.getCurrSetpoint().in(RotationsPerSecond);
+    }
+
+    public double getLowerSetpointRPS() {
+        return shooterLower.getCurrSetpoint().in(RotationsPerSecond);
+    }
+
+    public void configureDefaultCommands() {
+        shooterUpper.setDefaultCommand(
+                shooterUpper.runVelVolt(
+                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())));
+        shooterLower.setDefaultCommand(
+                shooterLower.runVelVolt(
+                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
+        topControl.setDefaultCommand(
+                topControl.runMotionMagic(ShooterConfig.SHOOTER_TOP_CONTROL_STOW_ANGLE));
+    }
+
+    private Angle clampHoodAngleForSolution() {
+        return clampHoodAngle(currentSolution().hoodAngle());
+    }
+
+    private AngularVelocity lowerSpeedFor(AngularVelocity upperSpeed) {
+        return RotationsPerSecond.of(
+                upperSpeed.in(RotationsPerSecond)
+                        * ShootingParamsNT.lowerShooterSpeedScale.getValue());
+    }
+
+    private Command runShooterAt(Supplier<AngularVelocity> upperSpeedSupplier) {
+        return runShooterAt(
+                upperSpeedSupplier,
+                () -> lowerSpeedFor(upperSpeedSupplier.get()));
+    }
+
+    private Command runShooterAt(
+            Supplier<AngularVelocity> upperSpeedSupplier,
+            Supplier<AngularVelocity> lowerSpeedSupplier) {
+        return Commands.parallel(
+                shooterUpper.runVelVolt(upperSpeedSupplier),
+                shooterLower.runVelVolt(lowerSpeedSupplier));
+    }
+
+    private Command runShooterPrespin() {
+        return Commands.parallel(
+                shooterUpper.runVelVolt(
+                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())),
+                shooterLower.runVelVolt(
+                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
     }
 
     /**
@@ -140,17 +210,64 @@ public class ShootingSuperstructure extends SubsystemBase {
      */
     public Command aimAndShoot() {
         return Commands.parallel(
-                shooter.runVelVolt(() -> currentSolution().shooterSpeed()),
-                hood.runMotionMagic(() -> clampHoodAngle(currentSolution().hoodAngle())),
+                runShooterAt(() -> currentSolution().shooterSpeed()),
+                hood.runMotionMagic(this::clampHoodAngleForSolution),
+                Commands.waitUntil(this::readyToShoot).andThen(hopper.feed()));
+    }
+
+    public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
+        Command readyWindow =
+                Commands.sequence(
+                        Commands.waitUntil(this::readyToShoot).withTimeout(readyTimeoutSeconds),
+                        Commands.waitSeconds(feedSeconds));
+
+        return Commands.deadline(
+                readyWindow,
+                runShooterAt(() -> currentSolution().shooterSpeed()),
+                hood.runMotionMagic(this::clampHoodAngleForSolution),
                 Commands.waitUntil(this::readyToShoot).andThen(hopper.feed()));
     }
 
     public Command feedShotForSeconds(double seconds) {
         return Commands.deadline(
                 Commands.waitSeconds(seconds),
-                shooter.runVelVolt(() -> currentSolution().shooterSpeed()),
-                hood.runMotionMagic(() -> clampHoodAngle(currentSolution().hoodAngle())),
+                runShooterAt(() -> currentSolution().shooterSpeed()),
+                hood.runMotionMagic(this::clampHoodAngleForSolution),
                 hopper.feed());
+    }
+
+    public Command fixedShoot() {
+        return Commands.parallel(
+                runShooterAt(
+                        () ->
+                                RotationsPerSecond.of(
+                                        ShooterUpperParamsNT.shootRPS.getValue()),
+                        () ->
+                                RotationsPerSecond.of(
+                                        ShooterLowerParamsNT.shootRPS.getValue())),
+                hood.runMotionMagic(HoodConfig.HOOD_MAX_ANGLE),
+                Commands.waitUntil(() -> shooterAtGoal() && hood.positionAtGoal())
+                        .andThen(hopper.feed()));
+    }
+
+    public Command runTopControlAngle(Angle angle) {
+        return topControl.runMotionMagic(() -> clampTopControlAngle(angle));
+    }
+
+    public void seedTopControlPositionAtZero() {
+        topControl.setCurrPos(ShooterConfig.SHOOTER_TOP_CONTROL_MIN_ANGLE);
+    }
+
+    public Angle getTopControlAngle() {
+        return topControl.getCurrPos();
+    }
+
+    private Angle clampTopControlAngle(Angle angle) {
+        return Degrees.of(
+                MathUtil.clamp(
+                        angle.in(Degrees),
+                        ShooterConfig.SHOOTER_TOP_CONTROL_MIN_ANGLE.in(Degrees),
+                        ShooterConfig.SHOOTER_TOP_CONTROL_MAX_ANGLE.in(Degrees)));
     }
 
     /**
@@ -159,7 +276,7 @@ public class ShootingSuperstructure extends SubsystemBase {
      */
     public Command idle() {
         return Commands.parallel(
-                shooter.runVelVolt(() -> RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
+                runShooterPrespin(),
                 hood.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE));
     }
 
@@ -190,7 +307,12 @@ public class ShootingSuperstructure extends SubsystemBase {
         Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
         Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
-        Logger.recordOutput("Shooting/shooterTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
+        Logger.recordOutput(
+                "Shooting/shooterUpperTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
+        Logger.recordOutput(
+                "Shooting/shooterLowerTargetRPS",
+                lowerSpeedFor(solution.shooterSpeed()).in(RotationsPerSecond));
+        Logger.recordOutput("Shooting/shooterAtGoal", shooterAtGoal());
         Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal());
         Logger.recordOutput("Shooting/readyToShoot", readyToShoot());
 

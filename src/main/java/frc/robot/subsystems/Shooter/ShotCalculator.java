@@ -130,6 +130,7 @@ public class ShotCalculator {
         public static final double shooterRps4m = 70.0;
         public static final double shooterRps5m = 78.0;
         public static final double shooterRps6m = 85.0;
+        public static final double lowerShooterSpeedScale = 1.0;
 
         // TODO: measure ball time of flight (s) per distance breakpoint (drives shoot-on-move lead)
         public static final double tofSec2m = 0.85;

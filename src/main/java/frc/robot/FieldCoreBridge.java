@@ -14,7 +14,8 @@ import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Hopper.HopperParamsNT;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
-import frc.robot.subsystems.Shooter.ShooterParamsNT;
+import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
+import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -27,7 +28,9 @@ public class FieldCoreBridge extends SubsystemBase {
     private final Swerve swerve;
     private final IntakerSubsystem intaker;
     private final HopperSubsystem hopper;
-    private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooter;
+    private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
+    private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
+    private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> shooterTopControl;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> hood;
     private final NetworkTable table;
 
@@ -38,13 +41,17 @@ public class FieldCoreBridge extends SubsystemBase {
             Swerve swerve,
             IntakerSubsystem intaker,
             HopperSubsystem hopper,
-            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooter,
+            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
+            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower,
+            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> shooterTopControl,
             PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> hood) {
         super("FieldCoreBridge");
         this.swerve = swerve;
         this.intaker = intaker;
         this.hopper = hopper;
-        this.shooter = shooter;
+        this.shooterUpper = shooterUpper;
+        this.shooterLower = shooterLower;
+        this.shooterTopControl = shooterTopControl;
         this.hood = hood;
         this.table = NetworkTableInstance.getDefault().getTable("FieldCore/Robot");
     }
@@ -75,7 +82,14 @@ public class FieldCoreBridge extends SubsystemBase {
         table.getEntry("ModuleStates").setDoubleArray(moduleStatesToArray(moduleStates));
         table.getEntry("IntakeEnabled").setBoolean(intakeEnabled);
         table.getEntry("ShooterEnabled").setBoolean(shooterActive);
-        table.getEntry("ShooterRPM").setDouble(shooter.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
+        table.getEntry("ShooterRPM")
+                .setDouble(shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
+        table.getEntry("ShooterUpperRPM")
+                .setDouble(shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
+        table.getEntry("ShooterLowerRPM")
+                .setDouble(shooterLower.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
+        table.getEntry("ShooterTopControlAngleDeg")
+                .setDouble(shooterTopControl.getCurrPos().in(Degrees));
         table.getEntry("HoodAngleDeg").setDouble(hood.getCurrSetpoint().in(Degrees));
         table.getEntry("ShootCommand").setBoolean(shootCommand);
         table.getEntry("ShootCount").setDouble(shootCount);
@@ -83,6 +97,15 @@ public class FieldCoreBridge extends SubsystemBase {
         Logger.recordOutput("FieldCoreBridge/IntakeEnabled", intakeEnabled);
         Logger.recordOutput("FieldCoreBridge/FeedActive", feedActive);
         Logger.recordOutput("FieldCoreBridge/ShooterEnabled", shooterActive);
+        Logger.recordOutput(
+                "FieldCoreBridge/ShooterUpperRPM",
+                shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
+        Logger.recordOutput(
+                "FieldCoreBridge/ShooterLowerRPM",
+                shooterLower.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
+        Logger.recordOutput(
+                "FieldCoreBridge/ShooterTopControlAngleDeg",
+                shooterTopControl.getCurrPos().in(Degrees));
         Logger.recordOutput("FieldCoreBridge/ShootCommand", shootCommand);
         Logger.recordOutput("FieldCoreBridge/ShootCount", shootCount);
         Logger.recordOutput("FieldCoreBridge/ModuleStates", moduleStates);
@@ -97,7 +120,10 @@ public class FieldCoreBridge extends SubsystemBase {
     }
 
     private boolean isShooterActive() {
-        return shooter.getCurrSetpoint().in(RotationsPerSecond) > ShooterParamsNT.idleRPS.getValue() + 1.0;
+        return shooterUpper.getCurrSetpoint().in(RotationsPerSecond)
+                        > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
+                || shooterLower.getCurrSetpoint().in(RotationsPerSecond)
+                        > ShooterLowerParamsNT.idleRPS.getValue() + 1.0;
     }
 
     private boolean isFeedActive() {

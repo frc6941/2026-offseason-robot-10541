@@ -95,17 +95,15 @@ public final class AutoCommands {
 
     private static Command moveShotWindow(ShootingSuperstructure shootingSuperstructure) {
         return Commands.sequence(
-                Commands.waitUntil(shootingSuperstructure::readyToShoot)
-                        .withTimeout(AUTO_SHOOT_READY_TIMEOUT_SECONDS),
-                shootingSuperstructure.feedShotForSeconds(AUTO_SHOOT_FEED_SECONDS),
+                shootingSuperstructure.shootWhenReadyForSeconds(
+                        AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_SHOOT_FEED_SECONDS),
                 shootingSuperstructure.idle().withTimeout(0.05));
     }
 
     private static Command moveShotWindowShort(ShootingSuperstructure shootingSuperstructure) {
         return Commands.sequence(
-                Commands.waitUntil(shootingSuperstructure::readyToShoot)
-                        .withTimeout(AUTO_SHOOT_READY_TIMEOUT_SECONDS),
-                shootingSuperstructure.feedShotForSeconds(AUTO_MOVE_SHOT_FEED_SECONDS),
+                shootingSuperstructure.shootWhenReadyForSeconds(
+                        AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_MOVE_SHOT_FEED_SECONDS),
                 shootingSuperstructure.idle().withTimeout(0.05));
     }
 

@@ -21,7 +21,9 @@ import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
 import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
-import frc.robot.subsystems.Shooter.ShooterParamsNT;
+import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
+import frc.robot.subsystems.Shooter.ShooterTopControlParamsNT;
+import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
@@ -78,10 +80,18 @@ public class RobotContainer {
   private final IntakerSubsystem intaker = new IntakerSubsystem(intakerRoller, intakerPivot);
   private final Swerve swerve = buildSwerve();
   private final HopperSubsystem hopperSubsystem = buildHopper();
-  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterSubsystem = buildShooter();
+  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpperSubsystem = buildShooterUpper();
+  private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLowerSubsystem = buildShooterLower();
+  private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> shooterTopControlSubsystem = buildShooterTopControl();
   private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem = buildHood();
   private final ShootingSuperstructure shootingSuperstructure =
-      new ShootingSuperstructure(shooterSubsystem, hoodSubsystem, hopperSubsystem, swerve);
+      new ShootingSuperstructure(
+          shooterUpperSubsystem,
+          shooterLowerSubsystem,
+          shooterTopControlSubsystem,
+          hoodSubsystem,
+          hopperSubsystem,
+          swerve);
   private final AutoBuilder autoBuilder = new AutoBuilder(intaker, swerve, shootingSuperstructure);
   private final LimelightSubsystem limelightSubsystem = buildLimelight();
   private final IndicatorSubsystem indicator = buildIndicator();
@@ -89,7 +99,14 @@ public class RobotContainer {
   @SuppressWarnings("unused")
   private final FieldCoreBridge fieldCoreBridge =
       RobotBase.isSimulation()
-          ? new FieldCoreBridge(swerve, intaker, hopperSubsystem, shooterSubsystem, hoodSubsystem)
+          ? new FieldCoreBridge(
+              swerve,
+              intaker,
+              hopperSubsystem,
+              shooterUpperSubsystem,
+              shooterLowerSubsystem,
+              shooterTopControlSubsystem,
+              hoodSubsystem)
           : null;
 
 
@@ -107,6 +124,9 @@ public class RobotContainer {
     SwerveModuleIOMK5N.startSyncThread();
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
+    shootingSuperstructure.configureDefaultCommands();
+    // Top control starts at its mechanical zero; seed the sensor without moving the motor.
+    shootingSuperstructure.seedTopControlPositionAtZero();
     AutoBuilder.configure(swerve);
     configureBindings();
     autoSelector = new AutoSelector(autoBuilder, DefaultAuto.driveForward(swerve));
@@ -178,17 +198,9 @@ public class RobotContainer {
                     indicator.indicateWithTimeout(IndicatorIO.Patterns.RESET_ODOM, 1)));
 
     // Shooter and hood (fixed angle) — feed only once shooter is up to speed
-    driverController.rightBumper().whileTrue(Commands.parallel(
-        shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.shootRPS.getValue())),
-        hoodSubsystem.runMotionMagic(HoodConfig.HOOD_MAX_ANGLE),
-        Commands.waitUntil(shooterSubsystem::velocityAtGoal)
-            .andThen(hopperSubsystem.feed())
-    ));
+    driverController.rightBumper().whileTrue(shootingSuperstructure.fixedShoot());
     driverController.rightBumper().onFalse(Commands.sequence(
-        Commands.parallel(
-            shooterSubsystem.runVelVolt(() -> edu.wpi.first.units.Units.RotationsPerSecond.of(ShooterParamsNT.idleRPS.getValue())),
-            hoodSubsystem.runMotionMagic(HoodConfig.HOOD_STOW_ANGLE))
-            .withTimeout(0.02),
+        shootingSuperstructure.idle().withTimeout(0.02),
         indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
 
     // Vision pose correction is now continuous via MegaTag2 (seeded by the Start-button heading
@@ -294,12 +306,10 @@ public class RobotContainer {
 
     // --- 2 & 3. Shooting pipeline ---
     // Detect whether the shooter is actively being commanded above idle.
-    double shooterSetpointRPS =
-        shooterSubsystem.getCurrSetpoint().in(edu.wpi.first.units.Units.RotationsPerSecond);
-    boolean shooterActive = shooterSetpointRPS > ShooterParamsNT.idleRPS.getValue() + 1.0;
+    boolean shooterActive = shootingSuperstructure.isShooterActive();
 
     if (shooterActive) {
-      if (shooterSubsystem.velocityAtGoal() && hoodSubsystem.positionAtGoal()) {
+      if (shootingSuperstructure.shooterAtGoal() && hoodSubsystem.positionAtGoal()) {
         // Flywheel at speed + hood on target → ready to feed
         indicator.setPattern(IndicatorIO.Patterns.HOLD_SHOOTING);
       } else {
@@ -369,14 +379,36 @@ public class RobotContainer {
             : new MotorIOSim(HopperConfig.HOPPER_CONFIG));
   }
 
-  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooter() {
+  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterUpper() {
     return new VelocityMotorSubsystem<>(
-        ShooterConfig.SHOOTER_CONFIG,
+        ShooterConfig.SHOOTER_UPPER_CONFIG,
         new MotorInputsAutoLogged(),
         RobotBase.isReal()
-            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_CONFIG)
-            : new MotorIOSim(ShooterConfig.SHOOTER_CONFIG),
-        ShooterParamsNT.asVelocityParamSources());
+            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_UPPER_CONFIG)
+            : new MotorIOSim(ShooterConfig.SHOOTER_UPPER_CONFIG),
+        ShooterUpperParamsNT.asVelocityParamSources());
+  }
+
+  private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterLower() {
+    return new VelocityMotorSubsystem<>(
+        ShooterConfig.SHOOTER_LOWER_CONFIG,
+        new MotorInputsAutoLogged(),
+        RobotBase.isReal()
+            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_LOWER_CONFIG)
+            : new MotorIOSim(ShooterConfig.SHOOTER_LOWER_CONFIG),
+        ShooterLowerParamsNT.asVelocityParamSources());
+  }
+
+  private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildShooterTopControl() {
+    return new PositionMotorSubsystem<>(
+        ShooterConfig.SHOOTER_TOP_CONTROL_CONFIG,
+        new MotorInputsAutoLogged(),
+        RobotBase.isReal()
+            ? new MotorIOTalonFX(ShooterConfig.SHOOTER_TOP_CONTROL_CONFIG)
+            : new MotorIOSim(ShooterConfig.SHOOTER_TOP_CONTROL_CONFIG),
+        ShooterTopControlParamsNT.asPositionParamSources(),
+        ShooterConfig.SHOOTER_TOP_CONTROL_STOW_ANGLE,
+        ShooterConfig.SHOOTER_TOP_CONTROL_ANGLE_PER_ROTATION);
   }
 
   private LimelightSubsystem buildLimelight() {
