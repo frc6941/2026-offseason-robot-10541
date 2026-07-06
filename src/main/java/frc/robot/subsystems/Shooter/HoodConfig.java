@@ -13,7 +13,7 @@ import lib.ntext.NTParameter;
 public class HoodConfig {
     private static final CANBus CANBUS = CANIVORE_CAN_BUS;
 
-    private static final int HOOD_ID = 10;
+    private static final int HOOD_ID = 21;
     private static final double HOOD_GEAR_RATIO = 1.0;
 
     public static final String HOOD_NAME = "Hood";
