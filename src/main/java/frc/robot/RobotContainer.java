@@ -150,17 +150,17 @@ public class RobotContainer {
     // Competition-style hood homing: zero on teleop enable so position control starts from a known reference.
     new Trigger(DriverStation::isTeleopEnabled).onTrue(shootingSuperstructure.zeroHood());
 
-    // Driver-triggered intake pivot homing. Keep manual until the team confirms the mechanism can always
-    // safely drive into its hard stop on enable.
+    // Manual zeroing lives on the D-pad:
+    // Up = hood hard-stop zero, Left = intake pivot hard-stop zero, Right = top-control zero here.
+    driverController.povUp().onTrue(shootingSuperstructure.zeroHood());
     driverController.povLeft().onTrue(intaker.zeroCommand());
+    driverController.povRight().onTrue(shootingSuperstructure.zeroTopControlHere());
 
-    // Intake: right trigger deploys + intakes while held, retracts on release.
+    // Intake: right trigger toggles intake on/off.
     // (Hopper feeds automatically off the intake state machine via its default command.)
-    driverController.rightTrigger().onTrue(intaker.runIntake());
-    driverController.rightTrigger().onFalse(intaker.runRetract());
+    driverController.rightTrigger().toggleOnTrue(intaker.runIntakeContinuous());
     // Outtake/reverse: left trigger deploys + outtakes while held, retracts on release
-    driverController.leftTrigger().onTrue(intaker.runExtendedReverse());
-    driverController.leftTrigger().onFalse(intaker.runRetract());
+    driverController.leftTrigger().whileTrue(intaker.runExtendedReverse());
 
     // Swerve
     // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick means

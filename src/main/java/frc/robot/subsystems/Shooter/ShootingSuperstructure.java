@@ -258,6 +258,11 @@ public class ShootingSuperstructure extends SubsystemBase {
         topControl.setCurrPos(ShooterConfig.SHOOTER_TOP_CONTROL_MIN_ANGLE);
     }
 
+    /** Treat the current top-control position as the zero angle without moving the mechanism. */
+    public Command zeroTopControlHere() {
+        return Commands.runOnce(this::seedTopControlPositionAtZero, topControl);
+    }
+
     public Angle getTopControlAngle() {
         return topControl.getCurrPos();
     }
