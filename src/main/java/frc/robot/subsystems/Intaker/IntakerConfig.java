@@ -23,8 +23,10 @@ public class IntakerConfig {
     private final static double INTAKER_ROLLER_GEAR_RATIO = 20.0 / 35.0;
     private final static double INTAKER_PIVOT_GEAR_RATIO = 1.0 / 12 * 20 / 36 * 20 / 36 * 15 / 36;
 
-    // Accessible angle per mechansim rotation
-    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(360.0 * INTAKER_PIVOT_GEAR_RATIO);
+    // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
+    // SensorToMechanismRatio (see INTAKER_PIVOT_CONFIG), NOT here — a bare 360, or the ratio gets
+    // applied twice and the pivot barely moves. See PositionMotorSubsystem doc ("Pivot: 360").
+    public final static Angle INTAKER_ANGLE_PER_ROTATION = Degrees.of(360.0);
     public final static Angle INTAKER_PIVOT_MIN_ANGLE = Degrees.of(0.0);
     public final static Angle INTAKER_PIVOT_MAX_ANGLE = Degrees.of(135.0);
 
@@ -60,7 +62,9 @@ public class IntakerConfig {
             .mainBus(CANBUS)
             .mainId(INTAKER_PIVOT_ID)
             .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
-            .SensorToMechanismRatio(INTAKER_PIVOT_GEAR_RATIO)
+            // Phoenix wants ROTOR rotations per MECHANISM rotation (the reduction, ~93), which is
+            // 1/INTAKER_PIVOT_GEAR_RATIO — not the ratio itself (~0.0107, the reciprocal).
+            .SensorToMechanismRatio(1.0 / INTAKER_PIVOT_GEAR_RATIO)
             // Normal-operation protection range. zeroCommand() disables these temporarily during homing.
             .reverseSoftLimitDegrees(INTAKER_PIVOT_MIN_ANGLE)
             .forwardSoftLimitDegrees(INTAKER_PIVOT_MAX_ANGLE)

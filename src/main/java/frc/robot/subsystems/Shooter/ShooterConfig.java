@@ -39,7 +39,10 @@ public class ShooterConfig {
     public static final Angle HOOD_MIN_ANGLE = Degrees.of(0.0);
     public static final Angle HOOD_MAX_ANGLE = Degrees.of(20.0);
     public static final Angle HOOD_STOW_ANGLE = HOOD_MIN_ANGLE;
-    public static final Angle HOOD_ANGLE_PER_ROTATION = Degrees.of(360.0 * HOOD_GEAR_RATIO);
+    // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
+    // SensorToMechanismRatio (below), NOT here — so this must be a bare 360, or the ratio gets
+    // applied twice and the hood barely moves. See PositionMotorSubsystem doc ("Pivot: 360").
+    public static final Angle HOOD_ANGLE_PER_ROTATION = Degrees.of(360.0);
     public static final Angle HOOD_ZERO_OFFSET = Degrees.of(0.0);
 
     public static final SubsystemConfig SHOOTER_DRUM_CONFIG = SubsystemConfig.builder()
@@ -87,10 +90,12 @@ public class ShooterConfig {
             .mainId(HOOD_ID)
             .mainBus(CANBUS)
             .motorInvertedValue(InvertedValue.Clockwise_Positive)
-            .SensorToMechanismRatio(HOOD_GEAR_RATIO)
+            // Phoenix wants ROTOR rotations per MECHANISM rotation (the reduction, ~44.3), which is
+            // 1/HOOD_GEAR_RATIO — not HOOD_GEAR_RATIO (~0.023, the reciprocal).
+            .SensorToMechanismRatio(1.0 / HOOD_GEAR_RATIO)
             .simConfig(
                     SubsystemConfig.SimConfig.builder()
-                            .gearRatio(HOOD_GEAR_RATIO)
+                            .gearRatio(1.0 / HOOD_GEAR_RATIO)
                             .build())
             .reverseSoftLimitDegrees(HOOD_MIN_ANGLE)
             .forwardSoftLimitDegrees(HOOD_MAX_ANGLE)
