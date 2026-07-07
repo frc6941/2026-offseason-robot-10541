@@ -57,6 +57,7 @@ public class MotorIOTalonFX implements MotorIO {
     private final TalonFXConfiguration fx;
     private final SubsystemConfig config;
     private boolean connected = false;
+    private NeutralModeValue currentNeutralMode;
 
     public MotorIOTalonFX(SubsystemConfig cfg) {
         this.main = new TalonFX(cfg.mainId, cfg.mainBus);
@@ -67,6 +68,7 @@ public class MotorIOTalonFX implements MotorIO {
         fx.MotorOutput.Inverted = cfg.motorInvertedValue;
         fx.MotorOutput.NeutralMode =
                 cfg.defaultBrake ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+        currentNeutralMode = fx.MotorOutput.NeutralMode;
         if (!Double.isNaN(cfg.statorCurrentLimitAmps)) {
             fx.CurrentLimits.StatorCurrentLimitEnable = true;
             fx.CurrentLimits.StatorCurrentLimit = cfg.statorCurrentLimitAmps;
@@ -244,12 +246,23 @@ public class MotorIOTalonFX implements MotorIO {
 
     @Override
     public void setNeutralMode(boolean wantsBreak) {
-        this.fx.MotorOutput.NeutralMode =
+        NeutralModeValue desired =
                 wantsBreak ? NeutralModeValue.Brake : NeutralModeValue.Coast;
-        main.getConfigurator().apply(this.fx);
-        for (int i = 0; i < followers.length; i++) {
-            followers[i].getConfigurator().apply(this.fx);
+        // Gate on an actual mode change. This is called on every live param edit; brake/coast
+        // almost never changes, so without this guard we'd fire a blocking CAN write every loop.
+        if (desired == currentNeutralMode) {
+            return;
         }
+        this.fx.MotorOutput.NeutralMode = desired;
+        // Apply only the MotorOutput group, not the entire TalonFXConfiguration — same effect
+        // (NeutralMode is all that changed) at a fraction of the CAN cost.
+        PhoenixUtils.tryUntilOk(5, () -> main.getConfigurator().apply(this.fx.MotorOutput));
+        for (int i = 0; i < followers.length; i++) {
+            final int idx = i;
+            PhoenixUtils.tryUntilOk(
+                    5, () -> followers[idx].getConfigurator().apply(this.fx.MotorOutput));
+        }
+        currentNeutralMode = desired;
     }
 
     @Override
@@ -314,10 +327,12 @@ public class MotorIOTalonFX implements MotorIO {
 
     @Override
     public void updateGains(Slot0Configs slot0) {
-        this.fx.Slot0 = slot0;
-        fx.withSlot0(slot0);
         slot0.GravityType = config.gravityType;
         slot0.StaticFeedforwardSign = config.kSValue;
-        main.getConfigurator().apply(this.fx);
+        // Keep the cached full config in sync for any future full apply, but push only the Slot0
+        // slice over CAN. Applying the whole TalonFXConfiguration here (called on every live gain
+        // edit) is the large blocking write that was overrunning the main loop.
+        this.fx.Slot0 = slot0;
+        PhoenixUtils.tryUntilOk(5, () -> main.getConfigurator().apply(slot0));
     }
 }
