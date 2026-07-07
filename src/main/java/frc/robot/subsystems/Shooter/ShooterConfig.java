@@ -145,13 +145,13 @@ public class ShooterConfig {
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.0;
-        public static final double kA = 0.0;
-        public static final double kS = 0.0;
-        public static final double kG = 0.0;
+        public static final double kV = 5.0;
+        public static final double kA = 0.1;
+        public static final double kS = 0.3;
+        public static final double kG = 0.2;
 
-        public static final double motionMagicVelRPS = 4.0;
-        public static final double motionMagicAccelRPS2 = 16.0;
+        public static final double motionMagicVelRPS = 1.0;
+        public static final double motionMagicAccelRPS2 = 4.0;
         public static final double motionMagicJerkRPS3 = 0.0;
         public static final double positionAtGoalToleranceDegrees = 0.5;
 
