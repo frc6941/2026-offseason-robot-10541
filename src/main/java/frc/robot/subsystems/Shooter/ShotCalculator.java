@@ -14,7 +14,7 @@ import lib.ntext.NTParameter;
  *
  * <p>The interpolation breakpoints (distances, in meters) are fixed; the hood angle, flywheel speed,
  * and time-of-flight at each breakpoint are live-tunable over NetworkTables via {@link
- * ShootingParams}. The maps are rebuilt only when a parameter changes.
+ * ShootingParams}. The maps are rebuilt from live NT values on every lookup.
  *
  * <p>{@link InterpolatingDoubleTreeMap#get} clamps to the nearest endpoint for distances outside the
  * tabulated range, so out-of-range lookups are safe.
@@ -35,11 +35,10 @@ public class ShotCalculator {
     private final InterpolatingDoubleTreeMap hoodAngleDeg = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap shooterRps = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap timeOfFlightSec = new InterpolatingDoubleTreeMap();
-    private boolean built = false;
 
     /** Resolve a full shot solution for the given distance to the hub (meters). */
     public ShotSolution solve(double distanceMeters) {
-        rebuildIfNeeded();
+        rebuild();
         return new ShotSolution(
                 Degrees.of(hoodAngleDeg.get(distanceMeters)),
                 RotationsPerSecond.of(shooterRps.get(distanceMeters)));
@@ -47,7 +46,7 @@ public class ShotCalculator {
 
     /** Naive time of flight (s) for a static distance — no velocity compensation. */
     public double timeOfFlightFor(double distanceMeters) {
-        rebuildIfNeeded();
+        rebuild();
         return timeOfFlightSec.get(distanceMeters);
     }
 
@@ -70,7 +69,7 @@ public class ShotCalculator {
      */
     public double effectiveDistance(
             Translation2d shooter, Translation2d target, double vxField, double vyField) {
-        rebuildIfNeeded();
+        rebuild();
         // TODO: add 6328-style linear-drag model to the offset (v*effectiveTOF) once stationary aim is dialed in
         double distance = target.getDistance(shooter);
         for (int i = 0; i < LOOKAHEAD_ITERATIONS; i++) {
@@ -82,10 +81,11 @@ public class ShotCalculator {
         return distance;
     }
 
-    private void rebuildIfNeeded() {
-        if (built && !ShootingParamsNT.isAnyChanged()) {
-            return;
-        }
+    private void rebuild() {
+        // Rebuild unconditionally. Three 5-entry maps are trivial to repopulate, and it avoids
+        // depending on NTParameterWrapper's one-loop hasChanged() edge — which is easy to miss (e.g.
+        // editing a value while not actively aiming), leaving the maps frozen on the last-built
+        // (deployed-default) values. Reading .getValue() every call always reflects live NT edits.
         hoodAngleDeg.clear();
         hoodAngleDeg.put(BREAKPOINTS_M[0], ShootingParamsNT.hoodAngleDeg2m.getValue());
         hoodAngleDeg.put(BREAKPOINTS_M[1], ShootingParamsNT.hoodAngleDeg3m.getValue());
@@ -106,8 +106,6 @@ public class ShotCalculator {
         timeOfFlightSec.put(BREAKPOINTS_M[2], ShootingParamsNT.tofSec4m.getValue());
         timeOfFlightSec.put(BREAKPOINTS_M[3], ShootingParamsNT.tofSec5m.getValue());
         timeOfFlightSec.put(BREAKPOINTS_M[4], ShootingParamsNT.tofSec6m.getValue());
-
-        built = true;
     }
 
     /**
