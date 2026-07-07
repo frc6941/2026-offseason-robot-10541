@@ -414,7 +414,7 @@ public class RobotContainer {
           public double xStdDev() { return 0.7; }
           public double yStdDev() { return 0.7; }
           public double zStdDev() { return 9999.0; }
-          public double angleStdDev() { return 1.0; }
+          public double angleStdDev() { return 999999999.0; }
           public double imuCorrectionReliabilityThreshold() { return 0.9; }
         });
     return new LimelightSubsystem(swerve, io);
