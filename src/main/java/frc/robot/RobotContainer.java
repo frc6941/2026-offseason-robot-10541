@@ -8,8 +8,11 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.commands.AutoAimCommand;
+import frc.robot.commands.AutoTrenchCommand;
 import frc.robot.commands.DefaultAuto;
+import frc.robot.commands.auto.AutoPoints;
 import frc.robot.commands.auto.AutoBuilder;
+import frc.robot.commands.auto.AutoCommands;
 import frc.robot.commands.auto.AutoSelector;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
@@ -117,7 +120,9 @@ public class RobotContainer {
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
     shootingSuperstructure.configureDefaultCommands();
-    // Hood zeroing is manual-only: position the hood at its mechanical zero and press D-pad Up.
+    // Hood zeroing is manual-only: position the hood at its mechanical zero and press D-pad Up
+    // (povUp -> zeroHoodHere). No auto-seed at boot — the TalonFX powers up at 0 rotations, so the
+    // reference is simply the boot position until you zero it deliberately.
     AutoBuilder.configure(swerve);
     configureBindings();
     autoSelector = new AutoSelector(autoBuilder, DefaultAuto.driveForward(swerve));
@@ -138,26 +143,23 @@ public class RobotContainer {
    * joysticks}.
    */
   private void configureBindings() {
-    // LT = intake, RB = human-player dump/outtake.
-    driverController.leftTrigger().whileTrue(intaker.runIntakeContinuous());
-    driverController.rightBumper().whileTrue(intaker.runExtendedReverse());
-
-    // Original manual zeroing bindings.
+    // Manual zeroing lives on the D-pad:
+    // Up = hood zero here, Left = intake pivot hard-stop zero.
     driverController.povUp().onTrue(shootingSuperstructure.zeroHoodHere());
     driverController.povLeft().onTrue(intaker.zeroCommand());
 
-    // Y = hub target, X = left-side pass target.
-    driverController.y().onTrue(Commands.runOnce(
-        () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.HUB)));
-    driverController.x().onTrue(Commands.runOnce(
-        () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.PASS_LEFT)));
+    // Bench tests with NT-tunable setpoints (whileTrue → mechanisms return to default on release):
+    //   D-pad Down  → rotate hood to Params/Hood/testAngleDeg (hood only, no flywheel/feed)
+    //   Left Bumper → spin only the drum at Params/ShooterDrum/testRPS
+    // Tune the setpoints + PID/FF gains live over NetworkTables; no redeploy needed.
+    driverController.povDown().whileTrue(shootingSuperstructure.hoodToTestAngle());
+    driverController.leftBumper().whileTrue(shootingSuperstructure.spinDrumAtTestRPS());
 
-    // B = right-side pass target.
-    driverController.b().onTrue(Commands.runOnce(
-        () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.PASS_RIGHT)));
-    // A = robot-special automatic target mode.
-    driverController.a().onTrue(Commands.runOnce(
-        () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.AUTO)));
+    // Intake: right trigger toggles intake on/off.
+    // (Hopper feeds automatically off the intake state machine via its default command.)
+    driverController.rightTrigger().toggleOnTrue(intaker.runIntakeContinuous());
+    // Outtake/reverse: left trigger deploys + outtakes while held, retracts on release
+    driverController.leftTrigger().whileTrue(intaker.runExtendedReverse());
 
     // Swerve
     // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick means
@@ -194,19 +196,46 @@ public class RobotContainer {
                 .alongWith(
                     indicator.indicateWithTimeout(IndicatorIO.Patterns.RESET_ODOM, 1)));
 
-    // RT = shoot at the currently selected target mode.
-    driverController.rightTrigger().whileTrue(Commands.parallel(
-        new AutoAimCommand(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX(),
-                          shootingSuperstructure::aimHeading,
-                          shootingSuperstructure::aimHeadingRateRadPerSec),
-        shootingSuperstructure.aimAndShoot(),
-        intaker.holdRetractedFeedPosition()
-    ));
-    driverController.rightTrigger().onFalse(Commands.sequence(
+    // Shooter and hood (fixed angle) — feed only once shooter is up to speed
+    driverController.rightBumper().whileTrue(shootingSuperstructure.fixedShoot());
+    driverController.rightBumper().onFalse(Commands.sequence(
         shootingSuperstructure.idle().withTimeout(0.02),
         indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
 
-    // D-pad Down/Right, LB, Back/Menu, and right-stick press are intentionally not bound here.
+    // Vision pose correction is now continuous via MegaTag2 (seeded by the Start-button heading
+    // zero), so the old one-shot resetPoseFromVision bindings (auto-start + driver X) were removed
+    // with the lib-IP-2026 adoption.
+    //
+    // Driver Y is intentionally unbound. The lib dropped the tag-following LimelightAlignToTag, and
+    // its replacement SwerveDriveToAllign is a generic "drive to a known Pose2d" command, not a tag
+    // follower — and the new LimelightSubsystem exposes only the robot field pose (getPose), not the
+    // tag pose. To add a "Y to align" feature, bind SwerveDriveToAllign/SwerveDriveToPose to a KNOWN
+    // field pose (e.g. a shooting pose relative to the hub) and tune SwerveDriveToAllignParamsNT on
+    // the real robot.
+
+    // Test-only auto/pathfinding trigger. In keyboard sim this is typically mapped to X.
+    driverController.b().onTrue(
+        AutoCommands.pathfindToBluePose(
+            AutoPoints.OUTPOST,
+            AutoCommands.TRANSIT_CONSTRAINTS,
+            0.0));
+
+    // Auto-aim: drivetrain rotates to face the hub (yaw), while the shooting superstructure tracks
+    // distance to set hood angle + flywheel speed and feeds once chassis/hood/flywheel are all ready.
+    driverController.a().whileTrue(Commands.parallel(
+        new AutoAimCommand(swerve, () -> -driverController.getLeftY(), () -> -driverController.getLeftX(),
+                          shootingSuperstructure::aimHeading,
+                          shootingSuperstructure::aimHeadingRateRadPerSec),
+        shootingSuperstructure.aimAndShoot()
+    ));
+    driverController.a().onFalse(Commands.sequence(
+        shootingSuperstructure.idle().withTimeout(0.02),
+        indicator.indicateWithTimeout(IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
+
+    // Auto-trench: hold Y to lock lateral (Y) + heading to the nearest trench center, leaving only
+    // the through-trench (forward/back) axis free so the driver can pass the trench squared-up.
+    driverController.y().whileTrue(
+        new AutoTrenchCommand(swerve, () -> -driverController.getLeftY()));
   }
 
   /**
