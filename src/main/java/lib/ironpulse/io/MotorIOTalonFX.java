@@ -6,8 +6,8 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.*;
 import com.ctre.phoenix6.controls.DutyCycleOut;
-import com.ctre.phoenix6.controls.DynamicMotionMagicVoltage;
 import com.ctre.phoenix6.controls.Follower;
+import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityVoltage;
@@ -34,8 +34,14 @@ public class MotorIOTalonFX implements MotorIO {
     private final TalonFX[] followers;
 
     private final PositionVoltage positionCtrl = new PositionVoltage(0.0).withEnableFOC(true);
-    private final DynamicMotionMagicVoltage dynamicMotionMagicCtrl =
-            new DynamicMotionMagicVoltage(0.0, 0.0, 0.0).withEnableFOC(true);
+    // FOC stays enabled (Pro-licensed). We use regular Motion Magic instead of Dynamic Motion
+    // Magic because the latter needs a CANivore timebase, which these RIO-bus mechanisms lack.
+    private final MotionMagicVoltage motionMagicCtrl =
+            new MotionMagicVoltage(0.0).withEnableFOC(true);
+    private final MotionMagicConfigs motionMagicConfigs = new MotionMagicConfigs();
+    private double lastMMVelocity = Double.NaN;
+    private double lastMMAcceleration = Double.NaN;
+    private double lastMMJerk = Double.NaN;
     private final VelocityVoltage velocityCtrl = new VelocityVoltage(0.0).withEnableFOC(true);
     private final VelocityTorqueCurrentFOC velocityTorqueCurrentCtrl =
             new VelocityTorqueCurrentFOC(0.0);
@@ -213,10 +219,22 @@ public class MotorIOTalonFX implements MotorIO {
     @Override
     public void setMotionMagicSetpoint(
             Angle position, double velocity, double acceleration, double jerk) {
-        dynamicMotionMagicCtrl.Velocity = velocity;
-        dynamicMotionMagicCtrl.Acceleration = acceleration;
-        dynamicMotionMagicCtrl.Jerk = jerk;
-        main.setControl(dynamicMotionMagicCtrl.withPosition(position));
+        // Regular Motion Magic reads its profile constraints from the device's MotionMagicConfigs
+        // (only Dynamic Motion Magic takes them per-request). Re-apply only when they change to
+        // avoid a blocking config write every loop; in practice these are constant per subsystem,
+        // so this applies once.
+        if (velocity != lastMMVelocity
+                || acceleration != lastMMAcceleration
+                || jerk != lastMMJerk) {
+            motionMagicConfigs.MotionMagicCruiseVelocity = velocity;
+            motionMagicConfigs.MotionMagicAcceleration = acceleration;
+            motionMagicConfigs.MotionMagicJerk = jerk;
+            PhoenixUtils.tryUntilOk(5, () -> main.getConfigurator().apply(motionMagicConfigs));
+            lastMMVelocity = velocity;
+            lastMMAcceleration = acceleration;
+            lastMMJerk = jerk;
+        }
+        main.setControl(motionMagicCtrl.withPosition(position));
     }
 
     @Override
