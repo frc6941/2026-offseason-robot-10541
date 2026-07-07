@@ -23,20 +23,23 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
         this.intaker = intaker;
     }
 
+    // Pass suppliers, not snapshot values: the default command's sub-commands are built once at
+    // boot (via Commands.select/Map.of), so a captured RotationsPerSecond.of(...) would freeze the
+    // RPS to its startup value and ignore live NT edits. A supplier re-reads every loop.
     public Command idle() {
-        return runVelTC(RotationsPerSecond.of(HopperParamsNT.idleRPS.getValue()));
+        return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.idleRPS.getValue()));
     }
 
     public Command feed() {
-        return runVelTC(RotationsPerSecond.of(HopperParamsNT.feedRPS.getValue()));
+        return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.feedRPS.getValue()));
     }
 
     public Command shoot() {
-        return runVelTC(RotationsPerSecond.of(HopperParamsNT.shootRPS.getValue()));
+        return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.shootRPS.getValue()));
     }
 
     public Command reverse() {
-        return runVelTC(RotationsPerSecond.of(-HopperParamsNT.feedRPS.getValue()));
+        return runVelTC(() -> RotationsPerSecond.of(-HopperParamsNT.feedRPS.getValue()));
     }
 
     public void configureDefaultCommand() {
