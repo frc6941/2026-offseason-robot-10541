@@ -120,8 +120,9 @@ public class RobotContainer {
     intaker.setDefaultCommand();
     hopperSubsystem.configureDefaultCommand();
     shootingSuperstructure.configureDefaultCommands();
-    // Hood starts at its mechanical zero; seed the sensor without moving the motor.
-    shootingSuperstructure.seedHoodPositionAtZero();
+    // Hood zeroing is manual-only: position the hood at its mechanical zero and press D-pad Up
+    // (povUp -> zeroHoodHere). No auto-seed at boot — the TalonFX powers up at 0 rotations, so the
+    // reference is simply the boot position until you zero it deliberately.
     AutoBuilder.configure(swerve);
     configureBindings();
     autoSelector = new AutoSelector(autoBuilder, DefaultAuto.driveForward(swerve));
