@@ -27,7 +27,7 @@ public class ShooterConfig {
 
     private static final double SHOOTER_DRUM_GEAR_RATIO = 20.0 / 27.0;
     private static final double SHOOTER_FEED_GEAR_RATIO = 20.0 / 35.0;
-    private static final double HOOD_GEAR_RATIO = 8.0 / 50.0 * 22.0 / 156.0;
+    private static final double HOOD_GEAR_RATIO = 8.0 / 50.0 * 10.0 / 156.0;
 
     public static final String SHOOTER_DRUM_NAME = "ShooterDrum";
     public static final String SHOOTER_FEED_NAME = "ShooterFeed";
