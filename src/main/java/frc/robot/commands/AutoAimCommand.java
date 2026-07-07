@@ -36,6 +36,24 @@ public class AutoAimCommand extends Command {
     private final Supplier<Rotation2d> targetHeading;
     private final DoubleSupplier targetHeadingRate;
 
+    public enum TargetMode {
+        AUTO,
+        HUB,
+        PASS_LEFT,
+        PASS_RIGHT
+    }
+
+    private static TargetMode targetMode = TargetMode.AUTO;
+
+    public static void setTargetMode(TargetMode mode) {
+        targetMode = mode;
+        Logger.recordOutput("AutoAim/TargetMode", targetMode.name());
+    }
+
+    public static TargetMode getTargetMode() {
+        return targetMode;
+    }
+
     // Heading is motion-profiled: the trapezoid plans deceleration from the remaining angle so the
     // chassis arrives at the target at zero velocity (overshoot-free), while still allowing an
     // aggressive max velocity/accel for a quick lock. Constraints/gains are refreshed live from NT.
@@ -80,7 +98,12 @@ public class AutoAimCommand extends Command {
      * here makes the pass a real pass — the superstructure ranges to the pass point, not the hub.
      */
     public static Translation2d getTarget(Translation2d robotPos) {
-        return inNeutralZone(robotPos) ? getPassTarget(robotPos) : getHubTarget();
+        return switch (targetMode) {
+            case AUTO -> inNeutralZone(robotPos) ? getPassTarget(robotPos) : getHubTarget();
+            case HUB -> getHubTarget();
+            case PASS_LEFT -> getPassTargetLeft();
+            case PASS_RIGHT -> getPassTargetRight();
+        };
     }
 
     /** Robot-agnostic overload — resolves the robot position from the state recorder. */
@@ -109,11 +132,27 @@ public class AutoAimCommand extends Command {
      * goes back down the robot's sideline and the aim never sweeps through the central hub.
      */
     public static Translation2d getPassTarget(Translation2d robotPos) {
-        Translation2d left = AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_LEFT);
-        Translation2d right = AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_RIGHT);
+        Translation2d left = getPassTargetLeft();
+        Translation2d right = getPassTargetRight();
         return Math.abs(left.getY() - robotPos.getY()) <= Math.abs(right.getY() - robotPos.getY())
                 ? left
                 : right;
+    }
+
+    public static Translation2d getPassTargetLeft() {
+        return AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_LEFT);
+    }
+
+    public static Translation2d getPassTargetRight() {
+        return AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_RIGHT);
+    }
+
+    private static boolean isPassingTarget(Translation2d robotPos) {
+        return switch (targetMode) {
+            case AUTO -> inNeutralZone(robotPos);
+            case HUB -> false;
+            case PASS_LEFT, PASS_RIGHT -> true;
+        };
     }
 
     public static double getDistanceToTarget(Translation2d robotPos) {
@@ -137,7 +176,7 @@ public class AutoAimCommand extends Command {
     @Override
     public void execute() {
         var robotPose = swerve.getEstimatedPose().toPose2d();
-        boolean passing = inNeutralZone(robotPose.getTranslation());
+        boolean passing = isPassingTarget(robotPose.getTranslation());
         Translation2d toTarget =
                 getTarget(robotPose.getTranslation()).minus(robotPose.getTranslation()); // aiming vector
 
@@ -192,6 +231,7 @@ public class AutoAimCommand extends Command {
         Logger.recordOutput("AutoAim/Distance", toTarget.getNorm());
         // Passing = aiming at the sideline pass point instead of the hub (robot in neutral zone).
         Logger.recordOutput("AutoAim/Passing", passing);
+        Logger.recordOutput("AutoAim/TargetMode", targetMode.name());
         // Tuning observability — plot these over time to spot oscillation / steady-state error / sign.
         Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
         Logger.recordOutput("AutoAim/withinTolerance", withinTolerance);

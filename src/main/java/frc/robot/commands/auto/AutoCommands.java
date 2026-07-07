@@ -93,18 +93,26 @@ public final class AutoCommands {
         return Commands.runOnce(() -> SmartDashboard.putString("Auto/Step", step));
     }
 
-    private static Command moveShotWindow(ShootingSuperstructure shootingSuperstructure) {
-        return Commands.sequence(
-                shootingSuperstructure.shootWhenReadyForSeconds(
-                        AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_SHOOT_FEED_SECONDS),
-                shootingSuperstructure.idle().withTimeout(0.05));
+    private static Command moveShotWindow(
+            ShootingSuperstructure shootingSuperstructure,
+            IntakerSubsystem intaker) {
+        return Commands.deadline(
+                Commands.sequence(
+                        shootingSuperstructure.shootWhenReadyForSeconds(
+                                AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_SHOOT_FEED_SECONDS),
+                        shootingSuperstructure.idle().withTimeout(0.05)),
+                intaker.holdRetractedFeedPosition());
     }
 
-    private static Command moveShotWindowShort(ShootingSuperstructure shootingSuperstructure) {
-        return Commands.sequence(
-                shootingSuperstructure.shootWhenReadyForSeconds(
-                        AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_MOVE_SHOT_FEED_SECONDS),
-                shootingSuperstructure.idle().withTimeout(0.05));
+    private static Command moveShotWindowShort(
+            ShootingSuperstructure shootingSuperstructure,
+            IntakerSubsystem intaker) {
+        return Commands.deadline(
+                Commands.sequence(
+                        shootingSuperstructure.shootWhenReadyForSeconds(
+                                AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_MOVE_SHOT_FEED_SECONDS),
+                        shootingSuperstructure.idle().withTimeout(0.05)),
+                intaker.holdRetractedFeedPosition());
     }
 
     private static Rotation2d flipBlueHeading(Rotation2d blueHeading) {
@@ -664,9 +672,10 @@ public final class AutoCommands {
 
     public static Command autoAimAndShoot(
             Swerve swerve,
+            IntakerSubsystem intaker,
             ShootingSuperstructure shootingSuperstructure) {
         return Commands.deadline(
-                moveShotWindow(shootingSuperstructure),
+                moveShotWindow(shootingSuperstructure, intaker),
                 new AutoAimCommand(
                         swerve,
                         () -> 0.0,
@@ -677,6 +686,7 @@ public final class AutoCommands {
 
     public static Command driveAndShootToBlueTranslation(
             Swerve swerve,
+            IntakerSubsystem intaker,
             ShootingSuperstructure shootingSuperstructure,
             Translation2d targetTranslation,
             Distance translationTolerance,
@@ -693,7 +703,7 @@ public final class AutoCommands {
                         translationTolerance,
                         rotationTolerance)
                         .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
-                moveShotWindowShort(shootingSuperstructure));
+                moveShotWindowShort(shootingSuperstructure, intaker));
     }
 
     private static Pose2d depotStartPose(AutoSelector.DepotAxis depotAxis) {
@@ -743,6 +753,7 @@ public final class AutoCommands {
                 markStep(stepPrefix + ": move-shot to depot start"),
                 driveAndShootToBlueTranslation(
                         swerve,
+                        intaker,
                         shootingSuperstructure,
                         depotStart.getTranslation(),
                         Units.Meters.of(0.15),
@@ -753,6 +764,7 @@ public final class AutoCommands {
 
     private static Command moveShotToOutpost(
             Swerve swerve,
+            IntakerSubsystem intaker,
             ShootingSuperstructure shootingSuperstructure,
             String stepPrefix) {
         return Commands.sequence(
@@ -766,6 +778,7 @@ public final class AutoCommands {
                 markStep(stepPrefix + ": move-shot to outpost"),
                 driveAndShootToBlueTranslation(
                         swerve,
+                        intaker,
                         shootingSuperstructure,
                         AutoPoints.OUTPOST.getTranslation(),
                         Units.Meters.of(0.15),
@@ -795,7 +808,7 @@ public final class AutoCommands {
         }
 
         if (outpostRound == currentRound) {
-            return moveShotToOutpost(swerve, shootingSuperstructure, "Round " + roundIndex);
+            return moveShotToOutpost(swerve, intaker, shootingSuperstructure, "Round " + roundIndex);
         }
 
         return Commands.sequence(
@@ -803,7 +816,7 @@ public final class AutoCommands {
                 goToBumpLaunchForSweepEnd(swerve, shootPosition)
                         .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
                 markStep("Round " + roundIndex + ": shoot"),
-                autoAimAndShoot(swerve, shootingSuperstructure));
+                autoAimAndShoot(swerve, intaker, shootingSuperstructure));
     }
 
     public static Command goToBumpLaunchForSweepEnd(

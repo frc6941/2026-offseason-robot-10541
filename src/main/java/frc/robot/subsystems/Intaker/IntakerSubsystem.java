@@ -141,6 +141,11 @@ public class IntakerSubsystem extends SubsystemBase{
         );
     }
 
+    public Command holdRetractedFeedPosition(){
+        return pivot.runMotionMagic(
+            () -> Degrees.of(IntakerPivotParamsNT.retractedfeedPosAngle.getValue()));
+    }
+
     public Command runExtendedReverse(){
         return Commands.startEnd(
             () -> currentMode = IntakeMode.EXTENDED_REVERSE,
