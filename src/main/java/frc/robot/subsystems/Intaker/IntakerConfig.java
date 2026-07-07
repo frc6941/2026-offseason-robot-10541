@@ -80,38 +80,38 @@ public class IntakerConfig {
 
     @NTParameter(tableName = "Params/"+INTAKER_ROLLER_NAME)
     public final static class IntakerRollerParams{
-        public final static double kP = 0.0;
+        public final static double kP = 1.5;
         public final static double kI = 0.0;
-        public final static double kD = 0.0;
+        public final static double kD = 0.05;
 
-        public final static double kV = 0.0;
+        public final static double kV = 0.16;
         public final static double kA = 0.0;
-        public final static double kS = 0.0;
+        public final static double kS = 3.0;
 
         // NT integers come back from NetworkTables as Long, which breaks the generated
         // Integer wrapper on refresh() — keep all tunable NT numerics as double.
-        public final static double intakeRPS = 20.0;
+        public final static double intakeRPS = 100.0;
         public final static double outtakeRPS = -15.0;
     }
 
     @NTParameter(tableName = "Params/"+INTAKER_PIVOT_NAME)
     public final static class IntakerPivotParams{
-        public final static double kP = 0.0;
+        public final static double kP = 100.0;
         public final static double kI = 0.0;
-        public final static double kD = 0.0;
+        public final static double kD = 0.010;
 
-        public final static double kV = 0.0;
-        public final static double kA = 0.0;
-        public final static double kS = 0.0;
+        public final static double kV = 6.0;
+        public final static double kA = 0.1;
+        public final static double kS = 0.18;
 
-        public static final double motionMagicVelRPS = 2000.0;
-        public static final double motionMagicAccelRPS2 = 600.0;
+        public static final double motionMagicVelRPS = 1.0;
+        public static final double motionMagicAccelRPS2 = 4.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 0.0;
+        public static final double deployPosAngle = 10.0;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 75.0;
+        public static final double retractedfeedPosAngle = 25.0;
 
     }
 

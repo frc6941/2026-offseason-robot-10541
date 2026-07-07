@@ -113,7 +113,7 @@ public class ShooterConfig {
         public static final double kS = 0.0;
 
         public static final double shootRPS = 80.0;
-        public static final double idleRPS = 20.0;
+        public static final double idleRPS = 5.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
         // Bench-test setpoint: drum (upper) RPS for the isolated spin-up test binding.
@@ -133,7 +133,7 @@ public class ShooterConfig {
         public static final double kS = 0.0;
 
         public static final double shootRPS = 80.0;
-        public static final double idleRPS = 20.0;
+        public static final double idleRPS = 0.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
         private ShooterLowerParams() {}

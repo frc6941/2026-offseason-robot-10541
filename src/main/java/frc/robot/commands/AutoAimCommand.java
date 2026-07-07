@@ -235,8 +235,8 @@ public class AutoAimCommand extends Command {
     public static final class AutoAimParams {
         // Feedback on heading error vs the profiled setpoint. With profiling, kP only trims small
         // tracking error, so it can be fairly stiff for a snappy lock without causing overshoot.
-        public static final double kP = 8.0;
-        public static final double kD = 0.0;
+        public static final double kP = 6.0;
+        public static final double kD = 0.01;
         // Profile limits — these set how fast the lock-on is. Drivetrain caps are 450°/s (7.85 rad/s)
         // and 5000°/s² (~87 rad/s²); start aggressive and back off only if it feels twitchy. The
         // profile guarantees it still decelerates into the target without overshoot.
