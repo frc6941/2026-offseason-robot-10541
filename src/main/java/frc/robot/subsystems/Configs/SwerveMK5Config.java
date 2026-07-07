@@ -123,7 +123,7 @@ public final class SwerveMK5Config {
                     .driveGearRatio(6.03)
                     .steerGearRatio(287.0 / 11.0)
                     .driveMotorKt(0.0182)
-                    .driveMass(Kilograms.of(22))
+                    .driveMass(Kilograms.of(46))
                     .pigeonConfig(pigeonConfig)
                     .defaultSwerveLimit(kDefaultSwerveLimit)
                     .defaultSwerveModuleLimit(kDefaultSwerveModuleLimit)
