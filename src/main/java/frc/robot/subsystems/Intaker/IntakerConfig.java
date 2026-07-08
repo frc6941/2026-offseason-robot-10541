@@ -104,8 +104,8 @@ public class IntakerConfig {
         public final static double kA = 0.1;
         public final static double kS = 0.18;
 
-        public static final double motionMagicVelRPS = 1.0;
-        public static final double motionMagicAccelRPS2 = 4.0;
+        public static final double motionMagicVelRPS = 2.0;
+        public static final double motionMagicAccelRPS2 = 8.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
         public static final double deployPosAngle = 10.0;
