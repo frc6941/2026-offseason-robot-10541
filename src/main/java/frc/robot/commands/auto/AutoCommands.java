@@ -9,7 +9,6 @@ import com.pathplanner.lib.path.RotationTarget;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -25,9 +24,9 @@ import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
-import java.util.function.Supplier;
 
 public final class AutoCommands {
     public static final PathConstraints PRECISE_CONSTRAINTS =
@@ -94,8 +93,7 @@ public final class AutoCommands {
     }
 
     private static Command moveShotWindow(
-            ShootingSuperstructure shootingSuperstructure,
-            IntakerSubsystem intaker) {
+            ShootingSuperstructure shootingSuperstructure, IntakerSubsystem intaker) {
         return Commands.deadline(
                 Commands.sequence(
                         shootingSuperstructure.shootWhenReadyForSeconds(
@@ -105,8 +103,7 @@ public final class AutoCommands {
     }
 
     private static Command moveShotWindowShort(
-            ShootingSuperstructure shootingSuperstructure,
-            IntakerSubsystem intaker) {
+            ShootingSuperstructure shootingSuperstructure, IntakerSubsystem intaker) {
         return Commands.deadline(
                 Commands.sequence(
                         shootingSuperstructure.shootWhenReadyForSeconds(
@@ -157,13 +154,16 @@ public final class AutoCommands {
         return Commands.run(
                         () -> {
                             Rotation2d goalHeading = flipBlueHeading(blueHeading);
-                            Rotation2d currentHeading = swerve.getEstimatedPose().toPose2d().getRotation();
-                            double omega = rotationController.calculate(
-                                    currentHeading.getRadians(), goalHeading.getRadians());
-                            omega = MathUtil.clamp(
-                                    omega,
-                                    -AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec,
-                                    AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec);
+                            Rotation2d currentHeading =
+                                    swerve.getEstimatedPose().toPose2d().getRotation();
+                            double omega =
+                                    rotationController.calculate(
+                                            currentHeading.getRadians(), goalHeading.getRadians());
+                            omega =
+                                    MathUtil.clamp(
+                                            omega,
+                                            -AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec,
+                                            AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec);
                             swerve.runTwist(new ChassisSpeeds(0.0, 0.0, omega));
                         },
                         swerve)
@@ -198,27 +198,31 @@ public final class AutoCommands {
                                     new Translation2d(-translationCommand, translationDirection);
 
                             double omega =
-                                    -rotationController.calculate(targetRobot.getRotation().getRadians(), 0.0);
-                            omega = MathUtil.clamp(
-                                    omega,
-                                    -AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec,
-                                    AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec);
+                                    -rotationController.calculate(
+                                            targetRobot.getRotation().getRadians(), 0.0);
+                            omega =
+                                    MathUtil.clamp(
+                                            omega,
+                                            -AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec,
+                                            AutoAimCommand.AutoAimParams.maxAngularVelRadPerSec);
 
-                            swerve.runTwist(new ChassisSpeeds(
-                                    velocityRobot.getX(),
-                                    velocityRobot.getY(),
-                                    omega));
+                            swerve.runTwist(
+                                    new ChassisSpeeds(
+                                            velocityRobot.getX(), velocityRobot.getY(), omega));
                         },
                         swerve)
-                .beforeStarting(() -> {
-                    translationController.reset();
-                    rotationController.reset();
-                })
-                .until(() -> poseAtGoal(
-                        swerve.getEstimatedPose().toPose2d(),
-                        targetPoseSupplier.get(),
-                        translationTolerance,
-                        rotationTolerance))
+                .beforeStarting(
+                        () -> {
+                            translationController.reset();
+                            rotationController.reset();
+                        })
+                .until(
+                        () ->
+                                poseAtGoal(
+                                        swerve.getEstimatedPose().toPose2d(),
+                                        targetPoseSupplier.get(),
+                                        translationTolerance,
+                                        rotationTolerance))
                 .finallyDo(interrupted -> swerve.runStop());
     }
 
@@ -226,10 +230,10 @@ public final class AutoCommands {
      * Strict pose move for autos:
      *
      * <ul>
-     *   <li>If the robot is already at the target translation but the heading is wrong, first settle
-     *       the heading in place.</li>
-     *   <li>Execute a normal pathfind-to-pose step for the target pose.</li>
-     *   <li>If the heading is still off when the path ends, settle the heading in place.</li>
+     *   <li>If the robot is already at the target translation but the heading is wrong, first
+     *       settle the heading in place.
+     *   <li>Execute a normal pathfind-to-pose step for the target pose.
+     *   <li>If the heading is still off when the path ends, settle the heading in place.
      * </ul>
      *
      * <p>This preserves the intended semantics of each auto step as "go to this pose" without
@@ -242,8 +246,10 @@ public final class AutoCommands {
             double goalEndVelocityMetersPerSecond) {
         return Commands.sequence(
                 settleToBlueHeading(swerve, targetPose.getRotation())
-                        .onlyIf(() -> translationAtBlueGoal(targetPose.getTranslation())
-                                && !headingAtBlueGoal(targetPose.getRotation())),
+                        .onlyIf(
+                                () ->
+                                        translationAtBlueGoal(targetPose.getTranslation())
+                                                && !headingAtBlueGoal(targetPose.getRotation())),
                 pathfindToBluePose(targetPose, constraints, goalEndVelocityMetersPerSecond),
                 settleToBlueHeading(swerve, targetPose.getRotation())
                         .onlyIf(() -> !headingAtBlueGoal(targetPose.getRotation())));
@@ -281,7 +287,8 @@ public final class AutoCommands {
     // --- Auto preview capture ---
     // While a sink is set, every blue-frame pathfind target is recorded so the chooser can draw the
     // selected auto's waypoints (Field2d "AutoPreview") without running it. Build-time only — no
-    // effect on the scheduled command. All blue pathfind variants funnel through pathfindToBluePose.
+    // effect on the scheduled command. All blue pathfind variants funnel through
+    // pathfindToBluePose.
     private static java.util.List<Pose2d> previewSink = null;
 
     public static void startPreviewCapture(java.util.List<Pose2d> sink) {
@@ -322,9 +329,7 @@ public final class AutoCommands {
      * it automatically for the current alliance.
      */
     public static Command pathfindToBluePose(
-            Pose2d targetPose,
-            PathConstraints constraints,
-            double goalEndVelocityMetersPerSecond) {
+            Pose2d targetPose, PathConstraints constraints, double goalEndVelocityMetersPerSecond) {
         capturePreviewTarget(targetPose);
         return AutoBuilder.pathfindToPoseFlipped(
                 targetPose, constraints, goalEndVelocityMetersPerSecond);
@@ -368,9 +373,7 @@ public final class AutoCommands {
      * }</pre>
      */
     public static Command pathfindToPose(
-            Pose2d targetPose,
-            PathConstraints constraints,
-            double goalEndVelocityMetersPerSecond) {
+            Pose2d targetPose, PathConstraints constraints, double goalEndVelocityMetersPerSecond) {
         return AutoBuilder.pathfindToPose(targetPose, constraints, goalEndVelocityMetersPerSecond);
     }
 
@@ -394,9 +397,7 @@ public final class AutoCommands {
      * }</pre>
      */
     public static Command pathfindToPose(
-            Pose2d targetPose,
-            PathConstraints constraints,
-            LinearVelocity goalEndVelocity) {
+            Pose2d targetPose, PathConstraints constraints, LinearVelocity goalEndVelocity) {
         return AutoBuilder.pathfindToPose(targetPose, constraints, goalEndVelocity);
     }
 
@@ -415,64 +416,76 @@ public final class AutoCommands {
     }
 
     private static Translation2d[] neutralSweepPoints(
-            NeutralSweepMode mode,
-            NeutralSweepDirection direction) {
-        Translation2d[] leftToRightPoints = switch (mode) {
-            case CONSERVATIVE -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_CONSERVATIVE,
-                AutoPoints.NeutralZone.RIGHT_CONSERVATIVE
-            };
-            case NEUTRAL -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_CENTER
-            };
-            case FLIGHTLESS -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
-                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS
-            };
-            case FLIGHTLESS_WIDE -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_FLIGHTLESS_WIDE,
-                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS_WIDE
-            };
-            case FLIGHTLESS_WAVE -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
-                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS
-            };
-            case DAVIS -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_DAVIS,
-                AutoPoints.NeutralZone.RIGHT_DAVIS
-            };
-            case DAVIS_FRIENDSHIP -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_DAVIS,
-                AutoPoints.NeutralZone.LEFT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_DAVIS
-            };
-            case CORIOLIS -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_CORIOLIS,
-                AutoPoints.NeutralZone.RIGHT_CORIOLIS
-            };
-            case CENTER_FORWARD -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_CENTER_FORWARD,
-                AutoPoints.NeutralZone.RIGHT_CENTER_FORWARD
-            };
-            case SALESMAN -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_EDGE,
-                AutoPoints.NeutralZone.LEFT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_EDGE
-            };
-            case SALESMAN_TURN -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_SALESMAN_TURN,
-                AutoPoints.NeutralZone.LEFT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_SALESMAN_TURN
-            };
-            case WAVE -> new Translation2d[] {
-                AutoPoints.NeutralZone.LEFT_CENTER,
-                AutoPoints.NeutralZone.RIGHT_CENTER
-            };
-        };
+            NeutralSweepMode mode, NeutralSweepDirection direction) {
+        Translation2d[] leftToRightPoints =
+                switch (mode) {
+                    case CONSERVATIVE ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_CONSERVATIVE,
+                                AutoPoints.NeutralZone.RIGHT_CONSERVATIVE
+                            };
+                    case NEUTRAL ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_CENTER
+                            };
+                    case FLIGHTLESS ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
+                                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS
+                            };
+                    case FLIGHTLESS_WIDE ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_FLIGHTLESS_WIDE,
+                                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS_WIDE
+                            };
+                    case FLIGHTLESS_WAVE ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_FLIGHTLESS,
+                                AutoPoints.NeutralZone.RIGHT_FLIGHTLESS
+                            };
+                    case DAVIS ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_DAVIS,
+                                AutoPoints.NeutralZone.RIGHT_DAVIS
+                            };
+                    case DAVIS_FRIENDSHIP ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_DAVIS,
+                                AutoPoints.NeutralZone.LEFT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_DAVIS
+                            };
+                    case CORIOLIS ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_CORIOLIS,
+                                AutoPoints.NeutralZone.RIGHT_CORIOLIS
+                            };
+                    case CENTER_FORWARD ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_CENTER_FORWARD,
+                                AutoPoints.NeutralZone.RIGHT_CENTER_FORWARD
+                            };
+                    case SALESMAN ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_EDGE,
+                                AutoPoints.NeutralZone.LEFT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_EDGE
+                            };
+                    case SALESMAN_TURN ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_SALESMAN_TURN,
+                                AutoPoints.NeutralZone.LEFT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_SALESMAN_TURN
+                            };
+                    case WAVE ->
+                            new Translation2d[] {
+                                AutoPoints.NeutralZone.LEFT_CENTER,
+                                AutoPoints.NeutralZone.RIGHT_CENTER
+                            };
+                };
 
         return direction == NeutralSweepDirection.LEFT_TO_RIGHT
                 ? leftToRightPoints
@@ -506,10 +519,7 @@ public final class AutoCommands {
     }
 
     private static Rotation2d waveTangentHeading(
-            Translation2d start,
-            Translation2d end,
-            double t,
-            double amplitudeMeters) {
+            Translation2d start, Translation2d end, double t, double amplitudeMeters) {
         Translation2d line = end.minus(start);
         double length = line.getNorm();
         if (length <= 1e-6) {
@@ -541,9 +551,10 @@ public final class AutoCommands {
         List<RotationTarget> rotationTargets = new ArrayList<>(MID_WAVE_SAMPLE_COUNT - 1);
         Translation2d line = end.minus(start);
         double lineLength = line.getNorm();
-        Translation2d unitNormal = lineLength <= 1e-6
-                ? new Translation2d(0.0, 0.0)
-                : new Translation2d(-line.getY() / lineLength, line.getX() / lineLength);
+        Translation2d unitNormal =
+                lineLength <= 1e-6
+                        ? new Translation2d(0.0, 0.0)
+                        : new Translation2d(-line.getY() / lineLength, line.getX() / lineLength);
         for (int i = 0; i < MID_WAVE_SAMPLE_COUNT; i++) {
             double t = endProgress * i / (MID_WAVE_SAMPLE_COUNT - 1);
             Translation2d base = start.interpolate(end, t);
@@ -567,8 +578,7 @@ public final class AutoCommands {
                 INTAKE_MEDIUM_CONSTRAINTS,
                 new IdealStartingState(0.0, startPose.getRotation()),
                 new GoalEndState(
-                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND,
-                        endPose.getRotation()),
+                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND, endPose.getRotation()),
                 false);
     }
 
@@ -592,14 +602,15 @@ public final class AutoCommands {
         Command sweep = AutoBuilder.pathfindThenFollowPath(path, PRECISE_CONSTRAINTS);
         if (kind == MidKind.HALF && !skipHalfHomeLeg) {
             Pose2d endPose = path.getPathPoses().get(path.getPathPoses().size() - 1);
-            sweep = Commands.sequence(
-                    sweep,
-                    pathfindToBlueTranslationWithHeadingStrict(
-                            swerve,
-                            halfSweepHomeTowerPoint(endPose.getTranslation()),
-                            Rotation2d.kPi,
-                            INTAKE_MEDIUM_CONSTRAINTS,
-                            AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+            sweep =
+                    Commands.sequence(
+                            sweep,
+                            pathfindToBlueTranslationWithHeadingStrict(
+                                    swerve,
+                                    halfSweepHomeTowerPoint(endPose.getTranslation()),
+                                    Rotation2d.kPi,
+                                    INTAKE_MEDIUM_CONSTRAINTS,
+                                    AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
         }
         return runWhileIntaking(sweep, intaker);
     }
@@ -649,20 +660,22 @@ public final class AutoCommands {
 
         List<Command> sweepSegments = new ArrayList<>(points.length);
         for (int i = 0; i < points.length; i++) {
-            sweepSegments.add(pathfindToBlueTranslationWithHeadingStrict(
-                    swerve,
-                    points[i],
-                    heading,
-                    i == 0 ? PRECISE_CONSTRAINTS : INTAKE_MEDIUM_CONSTRAINTS,
-                    AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+            sweepSegments.add(
+                    pathfindToBlueTranslationWithHeadingStrict(
+                            swerve,
+                            points[i],
+                            heading,
+                            i == 0 ? PRECISE_CONSTRAINTS : INTAKE_MEDIUM_CONSTRAINTS,
+                            AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
         }
         if (kind == MidKind.HALF && !isFlightlessModeForHalf(mode)) {
-            sweepSegments.add(pathfindToBlueTranslationWithHeadingStrict(
-                    swerve,
-                    halfSweepHomeTowerPoint(points[points.length - 1]),
-                    Rotation2d.kPi,
-                    INTAKE_MEDIUM_CONSTRAINTS,
-                    AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+            sweepSegments.add(
+                    pathfindToBlueTranslationWithHeadingStrict(
+                            swerve,
+                            halfSweepHomeTowerPoint(points[points.length - 1]),
+                            Rotation2d.kPi,
+                            INTAKE_MEDIUM_CONSTRAINTS,
+                            AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
         }
 
         Command sweep = Commands.sequence(sweepSegments.toArray(Command[]::new));
@@ -694,14 +707,17 @@ public final class AutoCommands {
         capturePreviewTarget(new Pose2d(targetTranslation, Rotation2d.kZero));
         return Commands.parallel(
                 driveToDynamicPose(
-                        swerve,
-                        () -> new Pose2d(
-                                AllianceFlipUtil.apply(targetTranslation),
-                                shootingSuperstructure.aimHeading()),
-                        new PIDController(MOVE_SHOT_TRANSLATION_KP, 0.0, MOVE_SHOT_TRANSLATION_KD),
-                        new PIDController(MOVE_SHOT_ROTATION_KP, 0.0, MOVE_SHOT_ROTATION_KD),
-                        translationTolerance,
-                        rotationTolerance)
+                                swerve,
+                                () ->
+                                        new Pose2d(
+                                                AllianceFlipUtil.apply(targetTranslation),
+                                                shootingSuperstructure.aimHeading()),
+                                new PIDController(
+                                        MOVE_SHOT_TRANSLATION_KP, 0.0, MOVE_SHOT_TRANSLATION_KD),
+                                new PIDController(
+                                        MOVE_SHOT_ROTATION_KP, 0.0, MOVE_SHOT_ROTATION_KD),
+                                translationTolerance,
+                                rotationTolerance)
                         .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
                 moveShotWindowShort(shootingSuperstructure, intaker));
     }
@@ -713,32 +729,22 @@ public final class AutoCommands {
     }
 
     private static Command depotCollectFromSelection(
-            Swerve swerve,
-            IntakerSubsystem intaker,
-            AutoSelector.DepotAxis depotAxis) {
+            Swerve swerve, IntakerSubsystem intaker, AutoSelector.DepotAxis depotAxis) {
         return depotAxis == AutoSelector.DepotAxis.X
                 ? depotXCollect(swerve, intaker)
                 : depotYCollect(swerve, intaker);
     }
 
     private static Command depotCollectFromCurrentStartSelection(
-            Swerve swerve,
-            IntakerSubsystem intaker,
-            AutoSelector.DepotAxis depotAxis) {
+            Swerve swerve, IntakerSubsystem intaker, AutoSelector.DepotAxis depotAxis) {
         return depotAxis == AutoSelector.DepotAxis.X
                 ? runWhileIntaking(
                         pathfindToBluePoseStrict(
-                                swerve,
-                                AutoPoints.DEPOT_X_END,
-                                INTAKE_MEDIUM_CONSTRAINTS,
-                                0.0),
+                                swerve, AutoPoints.DEPOT_X_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
                         intaker)
                 : runWhileIntaking(
                         pathfindToBluePoseStrict(
-                                swerve,
-                                AutoPoints.DEPOT_Y_END,
-                                INTAKE_MEDIUM_CONSTRAINTS,
-                                0.0),
+                                swerve, AutoPoints.DEPOT_Y_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
                         intaker);
     }
 
@@ -770,10 +776,10 @@ public final class AutoCommands {
         return Commands.sequence(
                 markStep(stepPrefix + ": outpost approach"),
                 pathfindToBluePoseStrict(
-                        swerve,
-                        AutoPoints.OUTPOST_APPROACH,
-                        TRANSIT_CONSTRAINTS,
-                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
+                                swerve,
+                                AutoPoints.OUTPOST_APPROACH,
+                                TRANSIT_CONSTRAINTS,
+                                AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
                         .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
                 markStep(stepPrefix + ": move-shot to outpost"),
                 driveAndShootToBlueTranslation(
@@ -794,21 +800,26 @@ public final class AutoCommands {
             DepotVisitRound depotRound,
             DepotVisitRound outpostRound,
             int roundIndex) {
-        DepotVisitRound currentRound = roundIndex == 1 ? DepotVisitRound.FIRST : DepotVisitRound.SECOND;
+        DepotVisitRound currentRound =
+                roundIndex == 1 ? DepotVisitRound.FIRST : DepotVisitRound.SECOND;
 
         if (depotRound == currentRound) {
             return Commands.sequence(
                     markStep("Round " + roundIndex + ": launch pose"),
                     goToBumpLaunchForSweepEnd(
-                                    swerve,
-                                    shootPosition,
-                                    AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
+                                    swerve, shootPosition, AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
                             .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
-                    shootThenDepotCollect(swerve, intaker, shootingSuperstructure, depotAxis, "Round " + roundIndex));
+                    shootThenDepotCollect(
+                            swerve,
+                            intaker,
+                            shootingSuperstructure,
+                            depotAxis,
+                            "Round " + roundIndex));
         }
 
         if (outpostRound == currentRound) {
-            return moveShotToOutpost(swerve, intaker, shootingSuperstructure, "Round " + roundIndex);
+            return moveShotToOutpost(
+                    swerve, intaker, shootingSuperstructure, "Round " + roundIndex);
         }
 
         return Commands.sequence(
@@ -820,36 +831,26 @@ public final class AutoCommands {
     }
 
     public static Command goToBumpLaunchForSweepEnd(
-            Swerve swerve,
-            NeutralSweepDirection direction) {
+            Swerve swerve, NeutralSweepDirection direction) {
         return goToBumpLaunchForSweepEnd(swerve, direction, 0.0);
     }
 
     public static Command goToBumpLaunchForSweepEnd(
-            Swerve swerve,
-            AutoSelector.Side shootPosition) {
+            Swerve swerve, AutoSelector.Side shootPosition) {
         return goToBumpLaunchForSweepEnd(swerve, shootPosition, 0.0);
     }
 
     private static Command goToBumpLaunchForSweepEnd(
-            Swerve swerve,
-            NeutralSweepDirection direction,
-            double goalEndVelocityMetersPerSecond) {
+            Swerve swerve, NeutralSweepDirection direction, double goalEndVelocityMetersPerSecond) {
         return direction == NeutralSweepDirection.LEFT_TO_RIGHT
                 ? goToBumpLaunchForSweepEnd(
-                        swerve,
-                        AutoSelector.Side.RIGHT,
-                        goalEndVelocityMetersPerSecond)
+                        swerve, AutoSelector.Side.RIGHT, goalEndVelocityMetersPerSecond)
                 : goToBumpLaunchForSweepEnd(
-                        swerve,
-                        AutoSelector.Side.LEFT,
-                        goalEndVelocityMetersPerSecond);
+                        swerve, AutoSelector.Side.LEFT, goalEndVelocityMetersPerSecond);
     }
 
     private static Command goToBumpLaunchForSweepEnd(
-            Swerve swerve,
-            AutoSelector.Side shootPosition,
-            double goalEndVelocityMetersPerSecond) {
+            Swerve swerve, AutoSelector.Side shootPosition, double goalEndVelocityMetersPerSecond) {
         return shootPosition == AutoSelector.Side.LEFT
                 ? pathfindToBlueTranslationPreserveHeading(
                         AutoPoints.Launch.LEFT_BUMP.getTranslation(),
@@ -883,29 +884,29 @@ public final class AutoCommands {
                                 depotCollectFromSelection(swerve, intaker, depotAxis))
                         : Commands.none();
         return Commands.sequence(
-                startAction,
-                markStep("Mid Two Cycle: first intake"),
-                neutralZoneSweep(swerve, intaker, firstMode, firstDirection, firstKind),
-                handlePostSweepAction(
-                        swerve,
-                        intaker,
-                        shootingSuperstructure,
-                        firstShootPosition,
-                        depotAxis,
-                        depotRound,
-                        outpostRound,
-                        1),
-                markStep("Mid Two Cycle: second intake"),
-                neutralZoneSweep(swerve, intaker, secondMode, secondDirection, secondKind),
-                handlePostSweepAction(
-                        swerve,
-                        intaker,
-                        shootingSuperstructure,
-                        secondShootPosition,
-                        depotAxis,
-                        depotRound,
-                        outpostRound,
-                        2))
+                        startAction,
+                        markStep("Mid Two Cycle: first intake"),
+                        neutralZoneSweep(swerve, intaker, firstMode, firstDirection, firstKind),
+                        handlePostSweepAction(
+                                swerve,
+                                intaker,
+                                shootingSuperstructure,
+                                firstShootPosition,
+                                depotAxis,
+                                depotRound,
+                                outpostRound,
+                                1),
+                        markStep("Mid Two Cycle: second intake"),
+                        neutralZoneSweep(swerve, intaker, secondMode, secondDirection, secondKind),
+                        handlePostSweepAction(
+                                swerve,
+                                intaker,
+                                shootingSuperstructure,
+                                secondShootPosition,
+                                depotAxis,
+                                depotRound,
+                                outpostRound,
+                                2))
                 .withTimeout(AUTO_DURATION_SECONDS);
     }
 
@@ -919,10 +920,7 @@ public final class AutoCommands {
                         AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
                 runWhileIntaking(
                         pathfindToBluePoseStrict(
-                                swerve,
-                                AutoPoints.DEPOT_X_END,
-                                INTAKE_MEDIUM_CONSTRAINTS,
-                                0.0),
+                                swerve, AutoPoints.DEPOT_X_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
                         intaker));
     }
 
@@ -936,10 +934,7 @@ public final class AutoCommands {
                         AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
                 runWhileIntaking(
                         pathfindToBluePoseStrict(
-                                swerve,
-                                AutoPoints.DEPOT_Y_END,
-                                INTAKE_MEDIUM_CONSTRAINTS,
-                                0.0),
+                                swerve, AutoPoints.DEPOT_Y_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
                         intaker));
     }
 
@@ -950,11 +945,7 @@ public final class AutoCommands {
 
     public static Command goToHubCenterStart(Swerve swerve) {
         return pathfindToBlueTranslationWithHeadingStrict(
-                swerve,
-                AutoPoints.Hub.CENTER_START,
-                Rotation2d.kPi,
-                TRANSIT_CONSTRAINTS,
-                0.0);
+                swerve, AutoPoints.Hub.CENTER_START, Rotation2d.kPi, TRANSIT_CONSTRAINTS, 0.0);
     }
 
     public static Command trenchLeftStartToClear(Swerve swerve) {
@@ -1045,36 +1036,32 @@ public final class AutoCommands {
 
     public static Command towerLeftThrough(Swerve swerve) {
         return pathfindToBlueTranslationWithHeadingStrict(
-                swerve,
-                AutoPoints.Tower.LEFT_THROUGH,
-                Rotation2d.kZero,
-                PRECISE_CONSTRAINTS,
-                0.0);
+                swerve, AutoPoints.Tower.LEFT_THROUGH, Rotation2d.kZero, PRECISE_CONSTRAINTS, 0.0);
     }
 
     public static Command towerRightThrough(Swerve swerve) {
         return pathfindToBlueTranslationWithHeadingStrict(
-                swerve,
-                AutoPoints.Tower.RIGHT_THROUGH,
-                Rotation2d.kZero,
-                PRECISE_CONSTRAINTS,
-                0.0);
+                swerve, AutoPoints.Tower.RIGHT_THROUGH, Rotation2d.kZero, PRECISE_CONSTRAINTS, 0.0);
     }
 
     public static Command goToLeftBumpLaunch(Swerve swerve) {
-        return pathfindToBluePoseStrict(swerve, AutoPoints.Launch.LEFT_BUMP, TRANSIT_CONSTRAINTS, 0.0);
+        return pathfindToBluePoseStrict(
+                swerve, AutoPoints.Launch.LEFT_BUMP, TRANSIT_CONSTRAINTS, 0.0);
     }
 
     public static Command goToRightBumpLaunch(Swerve swerve) {
-        return pathfindToBluePoseStrict(swerve, AutoPoints.Launch.RIGHT_BUMP, TRANSIT_CONSTRAINTS, 0.0);
+        return pathfindToBluePoseStrict(
+                swerve, AutoPoints.Launch.RIGHT_BUMP, TRANSIT_CONSTRAINTS, 0.0);
     }
 
     public static Command goToLeftTrenchLaunch(Swerve swerve) {
-        return pathfindToBluePoseStrict(swerve, AutoPoints.Launch.LEFT_TRENCH, TRANSIT_CONSTRAINTS, 0.0);
+        return pathfindToBluePoseStrict(
+                swerve, AutoPoints.Launch.LEFT_TRENCH, TRANSIT_CONSTRAINTS, 0.0);
     }
 
     public static Command goToRightTrenchLaunch(Swerve swerve) {
-        return pathfindToBluePoseStrict(swerve, AutoPoints.Launch.RIGHT_TRENCH, TRANSIT_CONSTRAINTS, 0.0);
+        return pathfindToBluePoseStrict(
+                swerve, AutoPoints.Launch.RIGHT_TRENCH, TRANSIT_CONSTRAINTS, 0.0);
     }
 
     public static Command goToLeftClimb(Swerve swerve) {
@@ -1088,18 +1075,12 @@ public final class AutoCommands {
     /** Sweep the middle line from left to right while facing -90 degrees and intaking. */
     public static Command sweepMidLeftToRight(Swerve swerve, IntakerSubsystem intaker) {
         return neutralZoneSweep(
-                swerve,
-                intaker,
-                NeutralSweepMode.SALESMAN,
-                NeutralSweepDirection.LEFT_TO_RIGHT);
+                swerve, intaker, NeutralSweepMode.SALESMAN, NeutralSweepDirection.LEFT_TO_RIGHT);
     }
 
     /** Sweep the middle line from right to left while facing 90 degrees and intaking. */
     public static Command sweepMidRightToLeft(Swerve swerve, IntakerSubsystem intaker) {
         return neutralZoneSweep(
-                swerve,
-                intaker,
-                NeutralSweepMode.SALESMAN,
-                NeutralSweepDirection.RIGHT_TO_LEFT);
+                swerve, intaker, NeutralSweepMode.SALESMAN, NeutralSweepDirection.RIGHT_TO_LEFT);
     }
 }

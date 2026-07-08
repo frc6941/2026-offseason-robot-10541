@@ -15,17 +15,18 @@ import org.littletonrobotics.junction.Logger;
  * A trimmed {@link TransformRecorder} (transform-tree) for the fixed-shooter offseason robot.
  *
  * <p>Templated on the competition robot's RobotStateRecorder but stripped of the turret/hood shot
- * frame, velocity buffers, ShotFrame, and obstacle zones — this robot has none of those. What's left
- * is the part that earns its keep here: a single canonical place where alliance handling lives.
+ * frame, velocity buffers, ShotFrame, and obstacle zones — this robot has none of those. What's
+ * left is the part that earns its keep here: a single canonical place where alliance handling
+ * lives.
  *
  * <p>Frames:
  *
  * <ul>
  *   <li>{@code World} — the blue-origin field frame. All poses are stored here.
  *   <li>{@code Robot} — dynamic, World->Robot, refreshed every loop from the swerve pose estimator.
- *   <li>{@code DriverStationBlue/Red} — static World->DS transforms (from {@link TransformRecorder}).
- *       Driving relative to the alliance DS frame is how the 180deg flip is applied without any
- *       hand-written {@code shouldFlip()} at the call site.
+ *   <li>{@code DriverStationBlue/Red} — static World->DS transforms (from {@link
+ *       TransformRecorder}). Driving relative to the alliance DS frame is how the 180deg flip is
+ *       applied without any hand-written {@code shouldFlip()} at the call site.
  *   <li>{@code Goal} — static World->Hub (blue reference); read back alliance-flipped via {@link
  *       #getPoseWorldTargetCurrent}.
  * </ul>
@@ -41,8 +42,7 @@ public class RobotStateRecorder extends TransformRecorder {
     private RobotStateRecorder() {
         setBufferDuration(2.0);
         // static: World->DriverStation (per alliance)
-        putTransform(
-                kTransformWorldDriverStationBlue, kFrameWorld, kFrameDriverStationBlue);
+        putTransform(kTransformWorldDriverStationBlue, kFrameWorld, kFrameDriverStationBlue);
         putTransform(kTransformWorldDriverStationRed, kFrameWorld, kFrameDriverStationRed);
         // dynamic: World->Robot, seeded at origin until the first periodic update
         putTransform(new Pose3d(), Seconds.of(0.0), kFrameWorld, kFrameRobot);
@@ -62,8 +62,7 @@ public class RobotStateRecorder extends TransformRecorder {
     }
 
     public static void periodic() {
-        Logger.recordOutput(
-                "RobotStateRecorder/poseWorldRobot", getPoseWorldRobotCurrent());
+        Logger.recordOutput("RobotStateRecorder/poseWorldRobot", getPoseWorldRobotCurrent());
         Logger.recordOutput(
                 "RobotStateRecorder/RobotRotation2d",
                 getPoseWorldRobotCurrent().getRotation().toRotation2d());

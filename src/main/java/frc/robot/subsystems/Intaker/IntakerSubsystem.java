@@ -1,9 +1,7 @@
 package frc.robot.subsystems.Intaker;
 
-import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static edu.wpi.first.units.Units.Degrees;
-
-import org.littletonrobotics.junction.AutoLogOutput;
+import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -15,8 +13,9 @@ import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 import lombok.Getter;
+import org.littletonrobotics.junction.AutoLogOutput;
 
-public class IntakerSubsystem extends SubsystemBase{
+public class IntakerSubsystem extends SubsystemBase {
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller;
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> pivot;
 
@@ -27,133 +26,134 @@ public class IntakerSubsystem extends SubsystemBase{
     @AutoLogOutput(key = "Intaker/fallbackState")
     private IntakeMode fallbackMode = IntakeMode.RETRACTED;
 
-    public IntakerSubsystem(VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller,
-                            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> pivot){
+    public IntakerSubsystem(
+            VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller,
+            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> pivot) {
         this.roller = roller;
         this.pivot = pivot;
-
     }
 
-
-
-    public void setDefaultCommand(){
+    public void setDefaultCommand() {
         roller.setDefaultCommand(
-            Commands.either(roller.runVelTC(() -> 
-                                            RotationsPerSecond.of(
-                                                currentMode == IntakeMode.EXTENDED_REVERSE
-                                                ? IntakerRollerParamsNT.outtakeRPS.getValue()
-                                                : IntakerRollerParamsNT.intakeRPS.getValue()))
-                                    .until(() ->
-                                            currentMode != IntakerConfig.IntakeMode.INTAKING
-                                            && currentMode != IntakeMode.FEEDING
-                                            && currentMode != IntakeMode.EXTENDED_REVERSE
-                                            && currentMode != IntakeMode.RETRACTED_FEEDING), 
-                            roller.runStop()
-                                    .until(() -> 
-                                            currentMode == IntakeMode.INTAKING
-                                            || currentMode == IntakeMode.FEEDING
-                                            || currentMode == IntakeMode.EXTENDED_REVERSE
-                                            || currentMode == IntakeMode.RETRACTED_FEEDING),
-                            () ->
-                                currentMode == IntakeMode.INTAKING
-                                || currentMode == IntakeMode.FEEDING
-                                || currentMode == IntakeMode.EXTENDED_REVERSE
-                                || currentMode == IntakeMode.RETRACTED_FEEDING
-            ).repeatedly()
-                            
-        );
+                Commands.either(
+                                roller.runVelTC(
+                                                () ->
+                                                        RotationsPerSecond.of(
+                                                                currentMode
+                                                                                == IntakeMode
+                                                                                        .EXTENDED_REVERSE
+                                                                        ? IntakerRollerParamsNT
+                                                                                .outtakeRPS
+                                                                                .getValue()
+                                                                        : IntakerRollerParamsNT
+                                                                                .intakeRPS
+                                                                                .getValue()))
+                                        .until(
+                                                () ->
+                                                        currentMode
+                                                                        != IntakerConfig.IntakeMode
+                                                                                .INTAKING
+                                                                && currentMode != IntakeMode.FEEDING
+                                                                && currentMode
+                                                                        != IntakeMode
+                                                                                .EXTENDED_REVERSE
+                                                                && currentMode
+                                                                        != IntakeMode
+                                                                                .RETRACTED_FEEDING),
+                                roller.runStop()
+                                        .until(
+                                                () ->
+                                                        currentMode == IntakeMode.INTAKING
+                                                                || currentMode == IntakeMode.FEEDING
+                                                                || currentMode
+                                                                        == IntakeMode
+                                                                                .EXTENDED_REVERSE
+                                                                || currentMode
+                                                                        == IntakeMode
+                                                                                .RETRACTED_FEEDING),
+                                () ->
+                                        currentMode == IntakeMode.INTAKING
+                                                || currentMode == IntakeMode.FEEDING
+                                                || currentMode == IntakeMode.EXTENDED_REVERSE
+                                                || currentMode == IntakeMode.RETRACTED_FEEDING)
+                        .repeatedly());
 
         pivot.setDefaultCommand(
-            pivot.runMotionMagic(
-                    () -> switch (currentMode){
-                        case INTAKING -> Degrees.of(
-                            IntakerPivotParamsNT.deployPosAngle.getValue()
-                        );
-                        case EXTENDED_IDLE, EXTENDED_REVERSE -> Degrees.of(
-                            IntakerPivotParamsNT.deployPosAngle.getValue()
-                        );
-                        case RETRACTED -> Degrees.of(
-                            IntakerPivotParamsNT.retractPosAngle.getValue()
-                        );
-                        case FEEDING -> Degrees.of(
-                            IntakerPivotParamsNT.feedPosAngle.getValue()
-                        );
-                        case RETRACTED_FEEDING -> Degrees.of(
-                            IntakerPivotParamsNT.retractedfeedPosAngle.getValue()
-                        );
-                        default -> Degrees.of(
-                            IntakerPivotParamsNT.retractPosAngle.getValue()
-                        );
-                    }
-            )
-        );
-            
+                pivot.runMotionMagic(
+                        () ->
+                                switch (currentMode) {
+                                    case INTAKING, EXTENDED_IDLE, EXTENDED_REVERSE ->
+                                            Degrees.of(
+                                                    IntakerPivotParamsNT.deployPosAngle.getValue());
+                                    case RETRACTED ->
+                                            Degrees.of(
+                                                    IntakerPivotParamsNT.retractPosAngle
+                                                            .getValue());
+                                    case FEEDING ->
+                                            Degrees.of(
+                                                    IntakerPivotParamsNT.feedPosAngle.getValue());
+                                    case RETRACTED_FEEDING ->
+                                            Degrees.of(
+                                                    IntakerPivotParamsNT.retractedfeedPosAngle
+                                                            .getValue());
+                                    default ->
+                                            Degrees.of(
+                                                    IntakerPivotParamsNT.retractPosAngle
+                                                            .getValue());
+                                }));
     }
 
     private void setIntakeMode(IntakeMode mode) {
         fallbackMode = mode;
 
-        if(currentMode != IntakeMode.FEEDING
-            && currentMode != IntakeMode.EXTENDED_REVERSE){
+        if (currentMode != IntakeMode.FEEDING && currentMode != IntakeMode.EXTENDED_REVERSE) {
             currentMode = mode;
         }
     }
-    
 
-    public Command runIntake(){
-        return Commands.runOnce(
-            () -> setIntakeMode(IntakeMode.INTAKING)
-        );
+    public Command runIntake() {
+        return Commands.runOnce(() -> setIntakeMode(IntakeMode.INTAKING));
     }
 
-    public Command runIntakeContinuous(){
+    public Command runIntakeContinuous() {
         return Commands.startEnd(
-            () -> setIntakeMode(IntakeMode.INTAKING),
-            () -> setIntakeMode(IntakeMode.RETRACTED),
-            this
-        );
+                () -> setIntakeMode(IntakeMode.INTAKING),
+                () -> setIntakeMode(IntakeMode.RETRACTED),
+                this);
     }
 
-    public Command runRetract(){
+    public Command runRetract() {
+        return Commands.runOnce(() -> setIntakeMode(IntakeMode.RETRACTED));
+    }
+
+    public Command runExtendedIdle() {
         return Commands.runOnce(
-            () -> setIntakeMode(IntakeMode.RETRACTED)
-        );
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+
+                    if (currentMode != IntakeMode.FEEDING
+                            && currentMode != IntakeMode.EXTENDED_REVERSE) {
+                        currentMode = IntakeMode.EXTENDED_IDLE;
+                    }
+                });
     }
 
-    public Command runExtendedIdle(){
-        return Commands.runOnce(
-            () -> {
-                fallbackMode = IntakeMode.EXTENDED_IDLE;
-
-                if(currentMode != IntakeMode.FEEDING 
-                    && currentMode != IntakeMode.EXTENDED_REVERSE){
-                    currentMode = IntakeMode.EXTENDED_IDLE;
-                }
-
-            }
-        );
-    }
-
-    public Command runFeed(){
+    public Command runFeed() {
         return Commands.startEnd(
-            () -> currentMode = IntakeMode.FEEDING,
-            () -> currentMode = fallbackMode
-        );
+                () -> currentMode = IntakeMode.FEEDING, () -> currentMode = fallbackMode);
     }
 
-    public Command holdRetractedFeedPosition(){
+    public Command holdRetractedFeedPosition() {
         return pivot.runMotionMagic(
-            () -> Degrees.of(IntakerPivotParamsNT.retractedfeedPosAngle.getValue()));
+                () -> Degrees.of(IntakerPivotParamsNT.retractedfeedPosAngle.getValue()));
     }
 
-    public Command runExtendedReverse(){
+    public Command runExtendedReverse() {
         return Commands.startEnd(
-            () -> currentMode = IntakeMode.EXTENDED_REVERSE,
-            () -> currentMode = fallbackMode
-        );
+                () -> currentMode = IntakeMode.EXTENDED_REVERSE, () -> currentMode = fallbackMode);
     }
 
-    public Command zeroCommand(){
+    public Command zeroCommand() {
         return pivot.zeroCommand();
     }
 

@@ -165,7 +165,8 @@ public class MotorIOTalonFX implements MotorIO {
                     posSig, velSig, motorVoltSig, supplyVoltSig, statorSig, supplySig
                 };
         // Configure update frequencies and register signals.
-        // NOTE: these mechanisms live on the roboRIO 1 Mbps CAN bus (only swerve is on the CANivore).
+        // NOTE: these mechanisms live on the roboRIO 1 Mbps CAN bus (only swerve is on the
+        // CANivore).
         // 1000 Hz pos/vel per device saturates that shared bus (~11 devices -> 100% utilization,
         // devices dropping offline). The TalonFX closed loop runs internally at 1 kHz regardless of
         // these rates — this only sets how often the RIO reads back for logging/atGoal — so 100 Hz
@@ -246,8 +247,7 @@ public class MotorIOTalonFX implements MotorIO {
 
     @Override
     public void setNeutralMode(boolean wantsBreak) {
-        NeutralModeValue desired =
-                wantsBreak ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+        NeutralModeValue desired = wantsBreak ? NeutralModeValue.Brake : NeutralModeValue.Coast;
         // Gate on an actual mode change. This is called on every live param edit; brake/coast
         // almost never changes, so without this guard we'd fire a blocking CAN write every loop.
         if (desired == currentNeutralMode) {

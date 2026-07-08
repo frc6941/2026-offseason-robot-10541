@@ -1,10 +1,10 @@
 package frc.robot.commands.auto;
 
 import static edu.wpi.first.units.Units.Amps;
-import static edu.wpi.first.units.Units.InchesPerSecond;
 import static edu.wpi.first.units.Units.Inch;
-import static edu.wpi.first.units.Units.Kilograms;
+import static edu.wpi.first.units.Units.InchesPerSecond;
 import static edu.wpi.first.units.Units.KilogramSquareMeters;
+import static edu.wpi.first.units.Units.Kilograms;
 
 import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.PIDConstants;
@@ -54,8 +54,7 @@ public final class AutoBuilder {
                 swerve::getChassisSpeeds,
                 (ChassisSpeeds speeds) -> swerve.runTwist(speeds),
                 new PPHolonomicDriveController(
-                        new PIDConstants(5.0, 0.0, 0.0),
-                        new PIDConstants(5.0, 0.0, 0.0)),
+                        new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
                 createRobotConfig(),
                 AllianceFlipUtil::shouldFlip,
                 swerve);
@@ -71,20 +70,18 @@ public final class AutoBuilder {
             new Translation2d(-SwerveMK5Config.kSwerveHalfLength, -SwerveMK5Config.kSwerveHalfWidth)
         };
 
-        ModuleConfig moduleConfig = new ModuleConfig(
-                Inch.of(4.0).div(2.0),
-                InchesPerSecond.of(5800 / 60.0 / 7.03 * Math.PI * 4.0),
-                1.0,
-                DCMotor.getKrakenX60Foc(1),
-                7.03,
-                Amps.of(65),
-                1);
+        ModuleConfig moduleConfig =
+                new ModuleConfig(
+                        Inch.of(4.0).div(2.0),
+                        InchesPerSecond.of(5800 / 60.0 / 7.03 * Math.PI * 4.0),
+                        1.0,
+                        DCMotor.getKrakenX60Foc(1),
+                        7.03,
+                        Amps.of(65),
+                        1);
 
         return new RobotConfig(
-                Kilograms.of(52),
-                KilogramSquareMeters.of(0.04),
-                moduleConfig,
-                moduleLocations);
+                Kilograms.of(52), KilogramSquareMeters.of(0.04), moduleConfig, moduleLocations);
     }
 
     public Command buildDepotXAuto() {
@@ -112,8 +109,7 @@ public final class AutoBuilder {
     }
 
     public Command buildNeutralSweepAuto(
-            AutoCommands.NeutralSweepMode mode,
-            AutoCommands.NeutralSweepDirection direction) {
+            AutoCommands.NeutralSweepMode mode, AutoCommands.NeutralSweepDirection direction) {
         return AutoCommands.neutralZoneSweep(swerve, intaker, mode, direction);
     }
 

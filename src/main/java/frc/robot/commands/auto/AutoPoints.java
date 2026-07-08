@@ -19,26 +19,26 @@ public final class AutoPoints {
 
     private static Translation2d verticalFlip(Translation2d blueTranslation) {
         return new Translation2d(
-                blueTranslation.getX(),
-                FieldConstants.fieldWidth - blueTranslation.getY());
+                blueTranslation.getX(), FieldConstants.fieldWidth - blueTranslation.getY());
     }
 
     private static Pose2d verticalFlip(Pose2d bluePose) {
         return new Pose2d(
-                verticalFlip(bluePose.getTranslation()),
-                bluePose.getRotation().unaryMinus());
+                verticalFlip(bluePose.getTranslation()), bluePose.getRotation().unaryMinus());
     }
 
     public static class Trench {
         public static final Translation2d LEFT_START =
                 new Translation2d(
-                        FieldConstants.LinesVertical.starting + FieldConstants.RobotFootprint.fullApothemX,
+                        FieldConstants.LinesVertical.starting
+                                + FieldConstants.RobotFootprint.fullApothemX,
                         FieldConstants.LinesHorizontal.leftTrenchMiddle);
         public static final Translation2d RIGHT_START = verticalFlip(LEFT_START);
 
         public static final Translation2d LEFT_START_OFFSET =
                 new Translation2d(
-                        FieldConstants.LinesVertical.starting - FieldConstants.RobotFootprint.fullApothemX,
+                        FieldConstants.LinesVertical.starting
+                                - FieldConstants.RobotFootprint.fullApothemX,
                         FieldConstants.LinesHorizontal.leftTrenchMiddle);
         public static final Translation2d RIGHT_START_OFFSET = verticalFlip(LEFT_START_OFFSET);
 
@@ -47,7 +47,8 @@ public final class AutoPoints {
 
         public static final Translation2d LEFT_BEFORE_BAR =
                 new Translation2d(
-                        (FieldConstants.LinesVertical.allianceZone + FieldConstants.LinesVertical.neutralZoneNear)
+                        (FieldConstants.LinesVertical.allianceZone
+                                                + FieldConstants.LinesVertical.neutralZoneNear)
                                         / 2.0
                                 - Units.inchesToMeters(2.95) / 2.0
                                 - FieldConstants.RobotFootprint.fullApothemX,
@@ -69,13 +70,15 @@ public final class AutoPoints {
     public static class Bump {
         public static final Translation2d LEFT_INNER =
                 new Translation2d(
-                        FieldConstants.LinesVertical.starting - FieldConstants.RobotFootprint.fullApothemX,
+                        FieldConstants.LinesVertical.starting
+                                - FieldConstants.RobotFootprint.fullApothemX,
                         FieldConstants.LinesHorizontal.leftBumpMiddle);
         public static final Translation2d RIGHT_INNER = verticalFlip(LEFT_INNER);
 
         public static final Translation2d LEFT_OUTER =
                 new Translation2d(
-                        FieldConstants.LinesVertical.neutralZoneNear + FieldConstants.RobotFootprint.fullApothemX,
+                        FieldConstants.LinesVertical.neutralZoneNear
+                                + FieldConstants.RobotFootprint.fullApothemX,
                         FieldConstants.LinesHorizontal.leftBumpMiddle);
         public static final Translation2d RIGHT_OUTER = verticalFlip(LEFT_OUTER);
 
@@ -85,7 +88,8 @@ public final class AutoPoints {
     public static class Hub {
         public static final Translation2d CENTER_START =
                 new Translation2d(
-                        FieldConstants.LinesVertical.starting - FieldConstants.RobotFootprint.fullApothemX,
+                        FieldConstants.LinesVertical.starting
+                                - FieldConstants.RobotFootprint.fullApothemX,
                         FieldConstants.LinesHorizontal.center);
 
         private Hub() {}
@@ -124,7 +128,8 @@ public final class AutoPoints {
         public static final Translation2d RIGHT_FLIGHTLESS = verticalFlip(LEFT_FLIGHTLESS);
         public static final Translation2d LEFT_FLIGHTLESS_WIDE =
                 new Translation2d(LEFT_FLIGHTLESS.getX(), LEFT_EDGE.getY());
-        public static final Translation2d RIGHT_FLIGHTLESS_WIDE = verticalFlip(LEFT_FLIGHTLESS_WIDE);
+        public static final Translation2d RIGHT_FLIGHTLESS_WIDE =
+                verticalFlip(LEFT_FLIGHTLESS_WIDE);
 
         public static final Translation2d LEFT_DAVIS =
                 new Translation2d(FieldConstants.fieldCenter.getX() + 0.75, LEFT_EDGE.getY());
@@ -211,18 +216,21 @@ public final class AutoPoints {
         public static final Pose2d RIGHT =
                 new Pose2d(
                         FieldConstants.Tower.rightUpright.plus(
-                                new Translation2d(0.0, -FieldConstants.RobotFootprint.fullApothemX)),
+                                new Translation2d(
+                                        0.0, -FieldConstants.RobotFootprint.fullApothemX)),
                         Rotation2d.kPi);
 
         public static final Pose2d LEFT_OFFSET =
                 new Pose2d(
                         FieldConstants.Tower.leftUpright.plus(
-                                new Translation2d(0.0, FieldConstants.RobotFootprint.fullApothemX + 0.6)),
+                                new Translation2d(
+                                        0.0, FieldConstants.RobotFootprint.fullApothemX + 0.6)),
                         Rotation2d.kZero);
         public static final Pose2d RIGHT_OFFSET =
                 new Pose2d(
                         FieldConstants.Tower.rightUpright.plus(
-                                new Translation2d(0.0, -FieldConstants.RobotFootprint.fullApothemX - 0.6)),
+                                new Translation2d(
+                                        0.0, -FieldConstants.RobotFootprint.fullApothemX - 0.6)),
                         Rotation2d.kPi);
 
         private Climb() {}
@@ -230,9 +238,11 @@ public final class AutoPoints {
 
     public static class Launch {
         public static final Pose2d LEFT_TOWER =
-                FieldConstants.aimedAtBlueHub(Climb.LEFT.getTranslation().plus(new Translation2d(1.5, 0.5)));
+                FieldConstants.aimedAtBlueHub(
+                        Climb.LEFT.getTranslation().plus(new Translation2d(1.5, 0.5)));
         public static final Pose2d RIGHT_TOWER =
-                FieldConstants.aimedAtBlueHub(Climb.RIGHT.getTranslation().plus(new Translation2d(1.5, -0.5)));
+                FieldConstants.aimedAtBlueHub(
+                        Climb.RIGHT.getTranslation().plus(new Translation2d(1.5, -0.5)));
 
         public static final Pose2d LEFT_BUMP =
                 FieldConstants.aimedAtBlueHub(
@@ -247,7 +257,8 @@ public final class AutoPoints {
                                         FieldConstants.LinesVertical.starting
                                                 - Math.hypot(
                                                         FieldConstants.RobotFootprint.fullApothemX,
-                                                        FieldConstants.RobotFootprint.fullApothemY / 2.0),
+                                                        FieldConstants.RobotFootprint.fullApothemY
+                                                                / 2.0),
                                         FieldConstants.LinesHorizontal.leftTrenchMiddle)
                                 .plus(new Translation2d(-0.5, -0.3)));
         public static final Pose2d RIGHT_TRENCH = verticalFlip(LEFT_TRENCH);
@@ -267,7 +278,10 @@ public final class AutoPoints {
                     Rotation2d.kPi);
 
     public static final Pose2d DEPOT_Y_START =
-            new Pose2d(WALL_TO_ROBOT_CENTER_X, Depot.LEFT_THROUGH.getY(), Rotation2d.fromDegrees(-90.0));
+            new Pose2d(
+                    WALL_TO_ROBOT_CENTER_X,
+                    Depot.LEFT_THROUGH.getY(),
+                    Rotation2d.fromDegrees(-90.0));
     public static final Pose2d DEPOT_Y_END =
             new Pose2d(
                     WALL_TO_ROBOT_CENTER_X,
@@ -281,7 +295,10 @@ public final class AutoPoints {
     public static final Translation2d MID_RIGHT = NeutralZone.RIGHT_EDGE;
 
     public static final Pose2d OUTPOST =
-            new Pose2d(WALL_TO_ROBOT_CENTER_X, FieldConstants.Outpost.centerPoint.getY(), Rotation2d.kZero);
+            new Pose2d(
+                    WALL_TO_ROBOT_CENTER_X,
+                    FieldConstants.Outpost.centerPoint.getY(),
+                    Rotation2d.kZero);
 
     public static final Pose2d OUTPOST_APPROACH =
             new Pose2d(OUTPOST.getX() + 1.0, OUTPOST.getY(), Rotation2d.kZero);

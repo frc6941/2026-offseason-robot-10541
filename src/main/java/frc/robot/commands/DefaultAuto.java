@@ -22,12 +22,8 @@ public final class DefaultAuto {
     /** Drive forward (1 m/s for 2 s) from center start — simplest possible auto. */
     public static Command driveForward(Swerve swerve) {
         return Commands.sequence(
-                SwerveCommands.reset(
-                        swerve,
-                        new Pose3d(FieldConstants.StartPositions.BLUE_CENTER)),
-                Commands.run(
-                                () -> swerve.runTwist(new ChassisSpeeds(1.0, 0.0, 0.0)),
-                                swerve)
+                SwerveCommands.reset(swerve, new Pose3d(FieldConstants.StartPositions.BLUE_CENTER)),
+                Commands.run(() -> swerve.runTwist(new ChassisSpeeds(1.0, 0.0, 0.0)), swerve)
                         .withTimeout(2.0)
                         .andThen(Commands.runOnce(swerve::runStop, swerve)));
     }

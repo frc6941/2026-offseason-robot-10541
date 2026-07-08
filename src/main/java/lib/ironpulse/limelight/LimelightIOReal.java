@@ -254,7 +254,8 @@ public class LimelightIOReal implements LimelightIO {
 
     private LimelightHelpers.PoseEstimate getPoseEstimate() {
         String entryName = config.isUseMegaTag2() ? "botpose_orb_wpiblue" : "botpose_wpiblue";
-        double[] poseArray = LimelightHelpers.getLimelightNTDoubleArray(config.getName(), entryName);
+        double[] poseArray =
+                LimelightHelpers.getLimelightNTDoubleArray(config.getName(), entryName);
         latestPoseFrameSignature = poseFrameSignature(poseArray);
         Logger.recordOutput("Limelight/" + config.getName() + "/PoseArrayLength", poseArray.length);
 

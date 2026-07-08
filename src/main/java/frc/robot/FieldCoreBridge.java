@@ -10,10 +10,10 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
-import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Hopper.HopperParamsNT;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
+import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
+import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import lib.ironpulse.io.MotorIO;
@@ -30,7 +30,9 @@ public class FieldCoreBridge extends SubsystemBase {
     private final HopperSubsystem hopper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
-    private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> hood;
+    private final PositionMotorSubsystem<
+                    MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle>
+            hood;
     private final NetworkTable table;
 
     private boolean previousShootCommand = false;
@@ -42,7 +44,9 @@ public class FieldCoreBridge extends SubsystemBase {
             HopperSubsystem hopper,
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower,
-            PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle> hood) {
+            PositionMotorSubsystem<
+                            MotorInputsAutoLogged, MotorIO, edu.wpi.first.units.measure.Angle>
+                    hood) {
         super("FieldCoreBridge");
         this.swerve = swerve;
         this.intaker = intaker;
@@ -122,7 +126,8 @@ public class FieldCoreBridge extends SubsystemBase {
     }
 
     private boolean isFeedActive() {
-        return hopper.getCurrSetpoint().in(RotationsPerSecond) > HopperParamsNT.idleRPS.getValue() + 0.05;
+        return hopper.getCurrSetpoint().in(RotationsPerSecond)
+                > HopperParamsNT.idleRPS.getValue() + 0.05;
     }
 
     private static double[] poseToArray(Pose3d pose) {

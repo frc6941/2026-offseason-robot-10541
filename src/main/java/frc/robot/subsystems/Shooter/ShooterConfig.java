@@ -6,7 +6,6 @@ import static frc.robot.RobotConstants.ROBORIO_CAN_BUS;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
-
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.units.measure.Angle;
 import lib.ironpulse.subsystem.SubsystemConfig;
@@ -33,7 +32,8 @@ public class ShooterConfig {
     public static final String SHOOTER_FEED_NAME = "ShooterFeed";
     public static final String HOOD_NAME = "Hood";
 
-    public static final Translation2d SHOOTER_TRANSLATION_FROM_ROBOT_ORIGIN = new Translation2d(0.0, 0.0); // 257.9 mm
+    public static final Translation2d SHOOTER_TRANSLATION_FROM_ROBOT_ORIGIN =
+            new Translation2d(0.0, 0.0); // 257.9 mm
     public static final Angle SHOOTER_FIRING_YAW_OFFSET = Degrees.of(0.0);
 
     public static final Angle HOOD_MIN_ANGLE = Degrees.of(0.0);
@@ -45,62 +45,74 @@ public class ShooterConfig {
     public static final Angle HOOD_ANGLE_PER_ROTATION = Degrees.of(360.0);
     public static final Angle HOOD_ZERO_OFFSET = Degrees.of(0.0);
 
-    public static final SubsystemConfig SHOOTER_DRUM_CONFIG = SubsystemConfig.builder()
-            .name(SHOOTER_DRUM_NAME)
-            .mainId(SHOOTER_L1_ID)
-            .mainBus(CANBUS)
-            .motorInvertedValue(InvertedValue.Clockwise_Positive)
-            .SensorToMechanismRatio(SHOOTER_DRUM_GEAR_RATIO)
-            .simConfig(SubsystemConfig.SimConfig.builder().gearRatio(SHOOTER_DRUM_GEAR_RATIO).build())
-            .followers(new SubsystemConfig.FollowerConfig[] {
-                    SubsystemConfig.FollowerConfig.builder()
-                            .id(SHOOTER_L2_ID)
-                            .bus(CANBUS)
-                            .build(),
-                    SubsystemConfig.FollowerConfig.builder()
-                            .id(SHOOTER_R1_ID)
-                            .bus(CANBUS)
-                            .opposeMain(MotorAlignmentValue.Opposed)
-                            .build(),
-                    SubsystemConfig.FollowerConfig.builder()
-                            .id(SHOOTER_R2_ID)
-                            .bus(CANBUS)
-                            .opposeMain(MotorAlignmentValue.Opposed)
-                            .build()
-            })
-            .build();
+    public static final SubsystemConfig SHOOTER_DRUM_CONFIG =
+            SubsystemConfig.builder()
+                    .name(SHOOTER_DRUM_NAME)
+                    .mainId(SHOOTER_L1_ID)
+                    .mainBus(CANBUS)
+                    .motorInvertedValue(InvertedValue.Clockwise_Positive)
+                    .SensorToMechanismRatio(SHOOTER_DRUM_GEAR_RATIO)
+                    .simConfig(
+                            SubsystemConfig.SimConfig.builder()
+                                    .gearRatio(SHOOTER_DRUM_GEAR_RATIO)
+                                    .build())
+                    .followers(
+                            new SubsystemConfig.FollowerConfig[] {
+                                SubsystemConfig.FollowerConfig.builder()
+                                        .id(SHOOTER_L2_ID)
+                                        .bus(CANBUS)
+                                        .build(),
+                                SubsystemConfig.FollowerConfig.builder()
+                                        .id(SHOOTER_R1_ID)
+                                        .bus(CANBUS)
+                                        .opposeMain(MotorAlignmentValue.Opposed)
+                                        .build(),
+                                SubsystemConfig.FollowerConfig.builder()
+                                        .id(SHOOTER_R2_ID)
+                                        .bus(CANBUS)
+                                        .opposeMain(MotorAlignmentValue.Opposed)
+                                        .build()
+                            })
+                    .build();
 
-    public static final SubsystemConfig SHOOTER_FEED_CONFIG = SubsystemConfig.builder()
-            .name(SHOOTER_FEED_NAME)
-            .mainId(SHOOTER_R3_ID)
-            .mainBus(CANBUS)
-            .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
-            .SensorToMechanismRatio(SHOOTER_FEED_GEAR_RATIO)
-            .simConfig(SubsystemConfig.SimConfig.builder().gearRatio(SHOOTER_FEED_GEAR_RATIO).build())
-            .followers(new SubsystemConfig.FollowerConfig[] {
-                    SubsystemConfig.FollowerConfig.builder()
-                            .id(SHOOTER_R4_ID)
-                            .bus(CANBUS)
-                            .build()
-            })
-            .build();
+    public static final SubsystemConfig SHOOTER_FEED_CONFIG =
+            SubsystemConfig.builder()
+                    .name(SHOOTER_FEED_NAME)
+                    .mainId(SHOOTER_R3_ID)
+                    .mainBus(CANBUS)
+                    .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
+                    .SensorToMechanismRatio(SHOOTER_FEED_GEAR_RATIO)
+                    .simConfig(
+                            SubsystemConfig.SimConfig.builder()
+                                    .gearRatio(SHOOTER_FEED_GEAR_RATIO)
+                                    .build())
+                    .followers(
+                            new SubsystemConfig.FollowerConfig[] {
+                                SubsystemConfig.FollowerConfig.builder()
+                                        .id(SHOOTER_R4_ID)
+                                        .bus(CANBUS)
+                                        .build()
+                            })
+                    .build();
 
-    public static final SubsystemConfig HOOD_CONFIG = SubsystemConfig.builder()
-            .name(HOOD_NAME)
-            .mainId(HOOD_ID)
-            .mainBus(CANBUS)
-            .motorInvertedValue(InvertedValue.Clockwise_Positive)
-            // Phoenix wants ROTOR rotations per MECHANISM rotation (the reduction, ~44.3), which is
-            // 1/HOOD_GEAR_RATIO — not HOOD_GEAR_RATIO (~0.023, the reciprocal).
-            .SensorToMechanismRatio(1.0 / HOOD_GEAR_RATIO)
-            .simConfig(
-                    SubsystemConfig.SimConfig.builder()
-                            .gearRatio(1.0 / HOOD_GEAR_RATIO)
-                            .build())
-            .reverseSoftLimitDegrees(HOOD_MIN_ANGLE)
-            .forwardSoftLimitDegrees(HOOD_MAX_ANGLE)
-            .zeroOffset(HOOD_ZERO_OFFSET)
-            .build();
+    public static final SubsystemConfig HOOD_CONFIG =
+            SubsystemConfig.builder()
+                    .name(HOOD_NAME)
+                    .mainId(HOOD_ID)
+                    .mainBus(CANBUS)
+                    .motorInvertedValue(InvertedValue.Clockwise_Positive)
+                    // Phoenix wants ROTOR rotations per MECHANISM rotation (the reduction, ~44.3),
+                    // which is
+                    // 1/HOOD_GEAR_RATIO — not HOOD_GEAR_RATIO (~0.023, the reciprocal).
+                    .SensorToMechanismRatio(1.0 / HOOD_GEAR_RATIO)
+                    .simConfig(
+                            SubsystemConfig.SimConfig.builder()
+                                    .gearRatio(1.0 / HOOD_GEAR_RATIO)
+                                    .build())
+                    .reverseSoftLimitDegrees(HOOD_MIN_ANGLE)
+                    .forwardSoftLimitDegrees(HOOD_MAX_ANGLE)
+                    .zeroOffset(HOOD_ZERO_OFFSET)
+                    .build();
 
     @NTParameter(tableName = "Params/" + SHOOTER_DRUM_NAME)
     public static final class ShooterUpperParams {
@@ -155,7 +167,8 @@ public class ShooterConfig {
         public static final double motionMagicJerkRPS3 = 0.0;
         public static final double positionAtGoalToleranceDegrees = 0.5;
 
-        // Bench-test setpoint: target hood angle (deg) for the isolated rotate-to-angle test binding.
+        // Bench-test setpoint: target hood angle (deg) for the isolated rotate-to-angle test
+        // binding.
         // Clamped to [HOOD_MIN_ANGLE, HOOD_MAX_ANGLE] before use.
         public static final double testAngleDeg = 10.0;
 

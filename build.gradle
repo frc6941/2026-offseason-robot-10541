@@ -2,6 +2,7 @@ plugins {
     id "java"
     id "edu.wpi.first.GradleRIO" version "2026.2.1"
     id "com.peterabeles.gversion" version "1.10"
+    id "com.diffplug.spotless"
 }
 
 java {
@@ -60,6 +61,17 @@ sourceSets {
         }
         resources.srcDir 'src/ext/resources'
     }
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        targetExclude 'src/main/java/frc/robot/BuildConstants.java'
+        googleJavaFormat().aosp()
+    }
+}
+tasks.named('build').configure {
+    dependsOn 'spotlessCheck'
 }
 
 dependencies {

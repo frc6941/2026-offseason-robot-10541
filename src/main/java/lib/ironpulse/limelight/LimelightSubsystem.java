@@ -5,7 +5,6 @@ import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N4;
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.HashMap;
@@ -56,7 +55,8 @@ public class LimelightSubsystem extends SubsystemBase {
             LimelightIO io = entry.getKey();
             LimelightIOInputsAutoLogged input = entry.getValue();
             if (MathTools.epsilonEquals(input.reliability, 0)) {
-                Logger.recordOutput("Limelight/" + io.getName() + "/AcceptedVisionMeasurement", false);
+                Logger.recordOutput(
+                        "Limelight/" + io.getName() + "/AcceptedVisionMeasurement", false);
                 continue;
             }
             Logger.recordOutput("Limelight/" + io.getName() + "/AcceptedVisionMeasurement", true);
@@ -140,7 +140,9 @@ public class LimelightSubsystem extends SubsystemBase {
 
     public Pose2d getPose(String id) {
         LimelightIOInputsAutoLogged inputs = ios.get(getIoById(id));
-        return inputs == null || inputs.pose == null || MathTools.epsilonEquals(inputs.reliability, 0)
+        return inputs == null
+                        || inputs.pose == null
+                        || MathTools.epsilonEquals(inputs.reliability, 0)
                 ? new Pose2d()
                 : inputs.pose.toPose2d();
     }

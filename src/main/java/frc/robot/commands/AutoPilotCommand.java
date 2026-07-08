@@ -12,8 +12,6 @@ import com.therekrab.autopilot.APProfile;
 import com.therekrab.autopilot.APTarget;
 import com.therekrab.autopilot.Autopilot;
 import com.therekrab.autopilot.Autopilot.APResult;
-
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -22,7 +20,6 @@ import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.Command;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveLimit;
-
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -35,8 +32,8 @@ import org.littletonrobotics.junction.Logger;
  * profiled PID controller to get omega, then feed the combined field-relative speeds back as a
  * robot-relative twist ({@link Swerve#runTwist}).
  *
- * <p>Autopilot is obstacle-unaware; it drives a straight (or entry-angle "swirly") path, so only use
- * it where the lane is known clear.
+ * <p>Autopilot is obstacle-unaware; it drives a straight (or entry-angle "swirly") path, so only
+ * use it where the lane is known clear.
  */
 public class AutoPilotCommand extends Command {
     private final Swerve swerve;
@@ -63,7 +60,8 @@ public class AutoPilotCommand extends Command {
 
     /**
      * @param swerve the drivetrain to command
-     * @param target where to drive to (pose + optional entry angle / end velocity / rotation radius)
+     * @param target where to drive to (pose + optional entry angle / end velocity / rotation
+     *     radius)
      */
     public AutoPilotCommand(Swerve swerve, APTarget target) {
         this.swerve = swerve;
@@ -100,7 +98,8 @@ public class AutoPilotCommand extends Command {
 
     @Override
     public void initialize() {
-        // Seed the heading profile with the current heading + yaw rate so engaging mid-motion doesn't
+        // Seed the heading profile with the current heading + yaw rate so engaging mid-motion
+        // doesn't
         // command a velocity discontinuity.
         Pose2d pose = swerve.getEstimatedPose().toPose2d();
         headingController.reset(pose.getRotation().getRadians(), swerve.getYawVelocityRadPerSec());
@@ -109,7 +108,8 @@ public class AutoPilotCommand extends Command {
     @Override
     public void execute() {
         Pose2d currentPose = swerve.getEstimatedPose().toPose2d();
-        // Autopilot expects the robot-relative chassis speeds (it rotates them into field frame using
+        // Autopilot expects the robot-relative chassis speeds (it rotates them into field frame
+        // using
         // the current pose internally).
         ChassisSpeeds robotRelativeSpeeds = swerve.getChassisSpeeds();
 

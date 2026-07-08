@@ -20,7 +20,8 @@ public final class FieldPublisher {
 
     /**
      * Publish the Field2d and hook PathPlanner's active-path/target logging. Call once at startup,
-     * before any path runs (the callbacks are global and fire whenever PathPlanner follows/pathfinds).
+     * before any path runs (the callbacks are global and fire whenever PathPlanner
+     * follows/pathfinds).
      */
     public static void init() {
         if (initialized) {

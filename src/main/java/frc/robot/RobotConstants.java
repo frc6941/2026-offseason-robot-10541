@@ -17,18 +17,14 @@ public final class RobotConstants {
     // the roboRIO bus.
     public static final CANBus ROBORIO_CAN_BUS = new CANBus(ROBORIO_CAN_BUS_NAME);
 
-
     // CAN_ID
     public static final int PIGEON_ID = 0;
 
-    
     // Alliance flip
     public static boolean disableHAL = false;
 
     // Robot Periodic
     public static final double LOOPER_DT = 0.02;
-
-    
 
     private RobotConstants() {}
 }
