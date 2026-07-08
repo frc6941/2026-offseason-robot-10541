@@ -16,6 +16,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
@@ -55,34 +56,13 @@ public final class AutoBuilder {
                 (ChassisSpeeds speeds) -> swerve.runTwist(speeds),
                 new PPHolonomicDriveController(
                         new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
-                createRobotConfig(),
+                RobotConstants.AUTO_ROBOT_CONFIG,
                 AllianceFlipUtil::shouldFlip,
                 swerve);
 
         configured = true;
     }
 
-    public static RobotConfig createRobotConfig() {
-        Translation2d[] moduleLocations = {
-            new Translation2d(SwerveMK5Config.kSwerveHalfLength, SwerveMK5Config.kSwerveHalfWidth),
-            new Translation2d(SwerveMK5Config.kSwerveHalfLength, -SwerveMK5Config.kSwerveHalfWidth),
-            new Translation2d(-SwerveMK5Config.kSwerveHalfLength, SwerveMK5Config.kSwerveHalfWidth),
-            new Translation2d(-SwerveMK5Config.kSwerveHalfLength, -SwerveMK5Config.kSwerveHalfWidth)
-        };
-
-        ModuleConfig moduleConfig =
-                new ModuleConfig(
-                        Inch.of(4.0).div(2.0),
-                        InchesPerSecond.of(5800 / 60.0 / 7.03 * Math.PI * 4.0),
-                        1.0,
-                        DCMotor.getKrakenX60Foc(1),
-                        7.03,
-                        Amps.of(65),
-                        1);
-
-        return new RobotConfig(
-                Kilograms.of(52), KilogramSquareMeters.of(0.04), moduleConfig, moduleLocations);
-    }
 
     public Command buildDepotXAuto() {
         return AutoCommands.depotXCollect(swerve, intaker);
