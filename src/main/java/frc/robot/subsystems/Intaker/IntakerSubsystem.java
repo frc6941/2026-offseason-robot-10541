@@ -160,18 +160,13 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command holdRetractedFeedPosition() {
-        return Commands.startEnd(
+        return Commands.runEnd(
                         () -> currentMode = IntakeMode.RETRACTED_FEEDING,
                         () -> {
                             fallbackMode = IntakeMode.EXTENDED_IDLE;
                             currentMode = IntakeMode.EXTENDED_IDLE;
-                        })
-                .alongWith(
-                        runPivotTo(
-                                () ->
-                                        Degrees.of(
-                                                IntakerConfig.IntakerPivotParams
-                                                        .retractedfeedPosAngle)));
+                        },
+                        this);
     }
 
     public Command runExtendedReverse() {
