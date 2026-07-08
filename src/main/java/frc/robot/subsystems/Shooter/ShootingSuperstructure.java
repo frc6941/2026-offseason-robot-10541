@@ -40,6 +40,8 @@ import org.littletonrobotics.junction.Logger;
  * the drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
+    private static final double HOPPER_FEED_DELAY_SECONDS = 0.1;
+
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
@@ -209,9 +211,13 @@ public class ShootingSuperstructure extends SubsystemBase {
                         () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
     }
 
+    private Command feedAfterDelay() {
+        return Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS).andThen(hopper.shoot());
+    }
+
     /**
      * Spin the flywheel to the solution speed and drive the hood to the solution angle — both
-     * tracking distance continuously — then feed once {@link #readyToShoot()}.
+     * tracking distance continuously — then feed shortly after the shooter starts spinning.
      *
      * <p>Requires shooter/hood/floor-roller, NOT swerve; run it in parallel with an {@link
      * AutoAimCommand} which owns chassis yaw.
@@ -220,28 +226,28 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.parallel(
                 runShooterAt(() -> currentSolution().shooterSpeed()),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                Commands.waitUntil(this::readyToShoot).andThen(hopper.feed()));
+                feedAfterDelay());
     }
 
     public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
         Command readyWindow =
                 Commands.sequence(
-                        Commands.waitUntil(this::readyToShoot).withTimeout(readyTimeoutSeconds),
+                        Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS),
                         Commands.waitSeconds(feedSeconds));
 
         return Commands.deadline(
                 readyWindow,
                 runShooterAt(() -> currentSolution().shooterSpeed()),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                Commands.waitUntil(this::readyToShoot).andThen(hopper.feed()));
+                feedAfterDelay());
     }
 
     public Command feedShotForSeconds(double seconds) {
         return Commands.deadline(
-                Commands.waitSeconds(seconds),
+                Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS + seconds),
                 runShooterAt(() -> currentSolution().shooterSpeed()),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                hopper.feed());
+                feedAfterDelay());
     }
 
     public Command fixedShoot() {
@@ -250,8 +256,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                         () -> RotationsPerSecond.of(ShooterUpperParamsNT.shootRPS.getValue()),
                         () -> RotationsPerSecond.of(ShooterLowerParamsNT.shootRPS.getValue())),
                 hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
-                Commands.waitUntil(() -> shooterAtGoal() && hood.positionAtGoal())
-                        .andThen(hopper.feed()));
+                feedAfterDelay());
     }
 
     /**
