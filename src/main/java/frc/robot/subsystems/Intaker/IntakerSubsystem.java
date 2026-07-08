@@ -81,15 +81,14 @@ public class IntakerSubsystem extends SubsystemBase {
                                                 || currentMode == IntakeMode.RETRACTED_FEEDING)
                         .repeatedly());
 
-        pivot.setDefaultCommand(runPivotTo(this::pivotTargetAngle));
+        pivot.setDefaultCommand(
+                pivot.runStop()
+                        .until(() -> pivotZeroed)
+                        .andThen(runPivotTo(this::pivotTargetAngle)));
     }
 
     private Command runPivotTo(java.util.function.Supplier<Angle> target) {
-        return pivot.runMotionMagic(
-            target,
-            IntakerConfig.IntakerPivotParams.motionMagicVelRPS,
-            IntakerConfig.IntakerPivotParams.motionMagicAccelRPS2,
-            IntakerConfig.IntakerPivotParams.motionMagicJerkRPS3);
+        return pivot.runPosition(target);
     }
 
     private Angle pivotTargetAngle() {

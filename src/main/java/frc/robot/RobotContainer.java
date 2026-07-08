@@ -212,6 +212,8 @@ public class RobotContainer {
         driverController.x().whileTrue(autoTrenchCommand());
         driverController.b().whileTrue(autoTrenchCommand());
 
+        driverController.a().onTrue(intaker.runRetract());
+
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
         driverController
                 .rightTrigger()

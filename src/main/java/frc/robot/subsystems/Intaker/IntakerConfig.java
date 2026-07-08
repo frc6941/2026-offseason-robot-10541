@@ -70,7 +70,8 @@ public class IntakerConfig {
                     // 1/INTAKER_PIVOT_GEAR_RATIO — not the ratio itself (~0.0107, the reciprocal).
                     .SensorToMechanismRatio(1.0 / INTAKER_PIVOT_GEAR_RATIO)
                     // Arm-type gravity: torque needed to hold position varies with cos(angle), so
-                    // Slot0 kG is applied as an arm-cosine feedforward (not a constant elevator term).
+                    // Slot0 kG is applied as an arm-cosine feedforward (not a constant elevator
+                    // term).
                     .gravityType(GravityTypeValue.Arm_Cosine)
                     // Normal-operation protection range. zeroCommand() disables these temporarily
                     // during homing.
@@ -112,7 +113,7 @@ public class IntakerConfig {
         public static final double kS = 0.20;
         // Gravity feedforward: arm-cosine scaling applied by Phoenix. Start conservative (0.25V
         // at horizontal); tune upward if the pivot struggles to hold/reach raised angles (20°+).
-        public static final double kG = 0.25;
+        public static final double kG = 0.5;
 
         public static final double motionMagicVelRPS = 10.0;
         public static final double motionMagicAccelRPS2 = 20.0;
