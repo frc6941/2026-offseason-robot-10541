@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.Degrees;
 import static frc.robot.RobotConstants.ROBORIO_CAN_BUS;
 
 import com.ctre.phoenix6.CANBus;
+import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import edu.wpi.first.units.measure.Angle;
 import lib.ironpulse.subsystem.SubsystemConfig;
@@ -68,6 +69,9 @@ public class IntakerConfig {
                     // which is
                     // 1/INTAKER_PIVOT_GEAR_RATIO — not the ratio itself (~0.0107, the reciprocal).
                     .SensorToMechanismRatio(1.0 / INTAKER_PIVOT_GEAR_RATIO)
+                    // Arm-type gravity: torque needed to hold position varies with cos(angle), so
+                    // Slot0 kG is applied as an arm-cosine feedforward (not a constant elevator term).
+                    .gravityType(GravityTypeValue.Arm_Cosine)
                     // Normal-operation protection range. zeroCommand() disables these temporarily
                     // during homing.
                     .reverseSoftLimitDegrees(INTAKER_PIVOT_MIN_ANGLE)
@@ -99,13 +103,16 @@ public class IntakerConfig {
 
     @NTParameter(tableName = "Params/" + INTAKER_PIVOT_NAME)
     public static final class IntakerPivotParams {
-        public static final double kP = 100.0;
+        public static final double kP = 120.0;
         public static final double kI = 0.0;
         public static final double kD = 0.010;
 
         public static final double kV = 6.0;
         public static final double kA = 0.1;
-        public static final double kS = 0.18;
+        public static final double kS = 0.20;
+        // Gravity feedforward: arm-cosine scaling applied by Phoenix. Start conservative (0.25V
+        // at horizontal); tune upward if the pivot struggles to hold/reach raised angles (20°+).
+        public static final double kG = 0.25;
 
         public static final double motionMagicVelRPS = 10.0;
         public static final double motionMagicAccelRPS2 = 20.0;
