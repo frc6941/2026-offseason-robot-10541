@@ -221,7 +221,12 @@ public class RobotContainer {
                                                 IndicatorIO.Patterns.RESET_ODOM, 1)));
 
         // Shooter and hood (fixed angle) — feed only once shooter is up to speed
-        driverController.rightBumper().whileTrue(shootingSuperstructure.fixedShoot());
+        driverController
+                .rightBumper()
+                .whileTrue(
+                        Commands.parallel(
+                                shootingSuperstructure.fixedShoot(),
+                                intaker.holdRetractedFeedPosition()));
         driverController
                 .rightBumper()
                 .onFalse(
@@ -268,7 +273,8 @@ public class RobotContainer {
                                         () -> -driverController.getLeftX(),
                                         shootingSuperstructure::aimHeading,
                                         shootingSuperstructure::aimHeadingRateRadPerSec),
-                                shootingSuperstructure.aimAndShoot()));
+                                shootingSuperstructure.aimAndShoot(),
+                                intaker.holdRetractedFeedPosition()));
         driverController
                 .a()
                 .onFalse(

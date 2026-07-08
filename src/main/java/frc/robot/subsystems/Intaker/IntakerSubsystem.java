@@ -26,6 +26,9 @@ public class IntakerSubsystem extends SubsystemBase {
     @AutoLogOutput(key = "Intaker/fallbackState")
     private IntakeMode fallbackMode = IntakeMode.RETRACTED;
 
+    @AutoLogOutput(key = "Intaker/pivotZeroed")
+    private boolean pivotZeroed = false;
+
     public IntakerSubsystem(
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller,
             PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> pivot) {
@@ -78,29 +81,42 @@ public class IntakerSubsystem extends SubsystemBase {
                                                 || currentMode == IntakeMode.RETRACTED_FEEDING)
                         .repeatedly());
 
-        pivot.setDefaultCommand(
-                pivot.runMotionMagic(
-                        () ->
-                                switch (currentMode) {
-                                    case INTAKING, EXTENDED_IDLE, EXTENDED_REVERSE ->
-                                            Degrees.of(
-                                                    IntakerPivotParamsNT.deployPosAngle.getValue());
-                                    case RETRACTED ->
-                                            Degrees.of(
-                                                    IntakerPivotParamsNT.retractPosAngle
-                                                            .getValue());
-                                    case FEEDING ->
-                                            Degrees.of(
-                                                    IntakerPivotParamsNT.feedPosAngle.getValue());
-                                    case RETRACTED_FEEDING ->
-                                            Degrees.of(
-                                                    IntakerPivotParamsNT.retractedfeedPosAngle
-                                                            .getValue());
-                                    default ->
-                                            Degrees.of(
-                                                    IntakerPivotParamsNT.retractPosAngle
-                                                            .getValue());
-                                }));
+        pivot.setDefaultCommand(runPivotTo(this::pivotTargetAngle));
+    }
+
+    private Command runPivotTo(java.util.function.Supplier<Angle> target) {
+        return pivot.runMotionMagic(
+            target,
+            IntakerConfig.IntakerPivotParams.motionMagicVelRPS,
+            IntakerConfig.IntakerPivotParams.motionMagicAccelRPS2,
+            IntakerConfig.IntakerPivotParams.motionMagicJerkRPS3);
+    }
+
+    private Angle pivotTargetAngle() {
+        if (!pivotZeroed) {
+            return pivot.getCurrPos();
+        }
+
+        return switch (currentMode){
+            case INTAKING -> Degrees.of(
+                IntakerConfig.IntakerPivotParams.deployPosAngle
+            );
+            case EXTENDED_IDLE, EXTENDED_REVERSE -> Degrees.of(
+                IntakerConfig.IntakerPivotParams.deployPosAngle
+            );
+            case RETRACTED -> Degrees.of(
+                IntakerConfig.IntakerPivotParams.retractPosAngle
+            );
+            case FEEDING -> Degrees.of(
+                IntakerConfig.IntakerPivotParams.feedPosAngle
+            );
+            case RETRACTED_FEEDING -> Degrees.of(
+                IntakerConfig.IntakerPivotParams.retractedfeedPosAngle
+            );
+            default -> Degrees.of(
+                IntakerConfig.IntakerPivotParams.retractPosAngle
+            );
+        };
     }
 
     private void setIntakeMode(IntakeMode mode) {
@@ -118,7 +134,7 @@ public class IntakerSubsystem extends SubsystemBase {
     public Command runIntakeContinuous() {
         return Commands.startEnd(
                 () -> setIntakeMode(IntakeMode.INTAKING),
-                () -> setIntakeMode(IntakeMode.RETRACTED),
+                () -> setIntakeMode(IntakeMode.EXTENDED_IDLE),
                 this);
     }
 
@@ -144,8 +160,18 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command holdRetractedFeedPosition() {
-        return pivot.runMotionMagic(
-                () -> Degrees.of(IntakerPivotParamsNT.retractedfeedPosAngle.getValue()));
+        return Commands.startEnd(
+                        () -> currentMode = IntakeMode.RETRACTED_FEEDING,
+                        () -> {
+                            fallbackMode = IntakeMode.EXTENDED_IDLE;
+                            currentMode = IntakeMode.EXTENDED_IDLE;
+                        })
+                .alongWith(
+                        runPivotTo(
+                                () ->
+                                        Degrees.of(
+                                                IntakerConfig.IntakerPivotParams
+                                                        .retractedfeedPosAngle)));
     }
 
     public Command runExtendedReverse() {
@@ -154,7 +180,15 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command zeroCommand() {
-        return pivot.zeroCommand();
+        return pivot.zeroCommand()
+                .andThen(
+                        Commands.runOnce(
+                                () -> {
+                                    pivotZeroed = true;
+                                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                                    currentMode = IntakeMode.EXTENDED_IDLE;
+                                },
+                                this));
     }
 
     /** Live pivot angle, for 3D mechanism visualization / logging. */

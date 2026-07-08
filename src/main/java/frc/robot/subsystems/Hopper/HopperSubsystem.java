@@ -4,7 +4,6 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.WaitCommand;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import lib.ironpulse.io.MotorIO;
@@ -36,7 +35,6 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
     }
 
     public Command shoot() {
-        new WaitCommand(0.3);
         return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.shootRPS.getValue()));
     }
 

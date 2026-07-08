@@ -37,8 +37,8 @@ public class IntakerConfig {
     // Sign must drive the intake pivot toward the zero hard stop.
     public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -1.0;
     // Must be above free-run current and below breaker / unsafe stall current.
-    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 20.0;
-    public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 5;
+    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 10.0;
+    public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
 
     public enum IntakeMode {
         INTAKING, // Roller: Intake, Pivot: Extended
@@ -107,13 +107,13 @@ public class IntakerConfig {
         public static final double kA = 0.1;
         public static final double kS = 0.18;
 
-        public static final double motionMagicVelRPS = 2.0;
-        public static final double motionMagicAccelRPS2 = 8.0;
+        public static final double motionMagicVelRPS = 10.0;
+        public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
         public static final double deployPosAngle = 10.0;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 25.0;
+        public static final double retractedfeedPosAngle = 20.0;
     }
 }
