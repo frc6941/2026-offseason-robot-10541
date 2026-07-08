@@ -186,7 +186,7 @@ public class AutoAimCommand extends Command {
 
     @Override
     public void execute() {
-        var robotPose = swerve.getEstimatedPose().toPose2d();
+        var robotPose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
         boolean passing = isPassingTarget(robotPose.getTranslation());
         Translation2d toTarget =
                 getTarget(robotPose.getTranslation())

@@ -48,6 +48,8 @@ public final class AutoCommands {
     private static final double MOVE_SHOT_ROTATION_KD = 0.2;
     private static final double AUTO_TRANSLATION_TOLERANCE_METERS = 0.10;
     private static final Angle AUTO_ROTATION_TOLERANCE = Units.Degrees.of(3.0);
+    private static final PIDController rotationController =
+            new PIDController(AutoAimCommand.AutoAimParams.kP, 0.0, 0.0);
     private static final int MID_WAVE_SAMPLE_COUNT = 9;
 
     public enum NeutralSweepMode {
@@ -148,8 +150,6 @@ public final class AutoCommands {
     }
 
     private static Command settleToBlueHeading(Swerve swerve, Rotation2d blueHeading) {
-        PIDController rotationController =
-                new PIDController(AutoAimCommand.AutoAimParams.kP, 0.0, 0.0);
         rotationController.enableContinuousInput(-Math.PI, Math.PI);
         return Commands.run(
                         () -> {

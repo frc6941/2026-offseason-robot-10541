@@ -18,6 +18,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotConstants;
+import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import java.util.function.Supplier;
@@ -65,7 +66,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     private Pose2d robotPose() {
-        return swerve.getEstimatedPose().toPose2d();
+        return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
     }
 
     /** Horizontal distance from the robot to the (alliance-flipped) hub, in meters. */

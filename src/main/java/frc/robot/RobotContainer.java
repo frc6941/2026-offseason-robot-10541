@@ -96,6 +96,8 @@ public class RobotContainer {
             new AutoBuilder(intaker, swerve, shootingSuperstructure);
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
     private final IndicatorSubsystem indicator = buildIndicator();
+    
+    @SuppressWarnings("unused")
     private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
 
     @SuppressWarnings("unused")
