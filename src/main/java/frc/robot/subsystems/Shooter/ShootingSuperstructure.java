@@ -47,7 +47,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
     private final HopperSubsystem hopper;
     private final Swerve swerve;
-    private final ShotCalculator calculator = new ShotCalculator();
+    private ShotCalculator calculator = new ShotCalculator(0.0, 80.0);
 
     // TODO: tune kRpsToMuzzleMps until the visualized arc lands in the hub at a known, stationary
     // distance. Visualization only — does NOT affect aim (that comes from the ToF table).
@@ -98,11 +98,10 @@ public class ShootingSuperstructure extends SubsystemBase {
         return calculator.solve(effectiveDistanceToTarget());
     }
 
-    private Rotation2d computeAimHeading() {
+    private Rotation2d computeAimHeading(double tof) {
         ChassisSpeeds fv =
                 ChassisSpeeds.fromRobotRelativeSpeeds(
                         swerve.getChassisSpeedsCmd(), robotPose().getRotation());
-        double tof = calculator.timeOfFlightFor(distanceToTarget());
         Translation2d lookahead =
                 robotPose()
                         .getTranslation()
@@ -307,8 +306,9 @@ public class ShootingSuperstructure extends SubsystemBase {
     public void periodic() {
         double geometric = distanceToTarget();
         double effective = effectiveDistanceToTarget();
-        ShotSolution solution = calculator.solve(effective);
-        Rotation2d heading = computeAimHeading();
+        ShotSolution solution = calculator.solveCached(effective);
+        double tof = calculator.timeOfFlightCached(geometric);
+        Rotation2d heading = computeAimHeading(tof);
         double raw =
                 (lastAimHeading == null)
                         ? 0.0
@@ -336,7 +336,6 @@ public class ShootingSuperstructure extends SubsystemBase {
         ChassisSpeeds fv =
                 ChassisSpeeds.fromRobotRelativeSpeeds(
                         swerve.getChassisSpeedsCmd(), pose.getRotation());
-        double tof = calculator.timeOfFlightFor(geometric);
         // How far the ball drifts downrange from inheriting chassis velocity over its flight.
         Translation2d leadOffset =
                 new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
