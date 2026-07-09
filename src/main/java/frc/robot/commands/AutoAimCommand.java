@@ -208,11 +208,13 @@ public class AutoAimCommand extends Command {
         headingController.setP(kP);
         headingController.setD(kD);
         headingController.setConstraints(new TrapezoidProfile.Constraints(maxVel, maxAccel));
-        // BOTH a position AND a velocity tolerance. atGoal() below gates the park handoff; without a
+        // BOTH a position AND a velocity tolerance. atGoal() below gates the park handoff; without
+        // a
         // velocity tolerance it defaults to infinity, so atGoal() goes true the instant the heading
         // is in the band even while the chassis is still spinning fast — the handoff then discards
         // the kD braking term and the robot coasts through the target on momentum (overshoot +
-        // steady wiggle). Requiring low yaw rate too keeps us in PD (kD brakes) until actually stopped.
+        // steady wiggle). Requiring low yaw rate too keeps us in PD (kD brakes) until actually
+        // stopped.
         headingController.setTolerance(
                 Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue()),
                 Math.toRadians(AutoAimParamsNT.settleRateDegPerSec.getValue()));
@@ -225,9 +227,11 @@ public class AutoAimCommand extends Command {
                 headingController.calculate(
                         headingRad, new TrapezoidProfile.State(target.getRadians(), ffVel));
         double omega = feedback + headingController.getSetpoint().velocity;
-        // Hand off to pure feedforward only once genuinely settled (heading in-band AND yaw rate low,
+        // Hand off to pure feedforward only once genuinely settled (heading in-band AND yaw rate
+        // low,
         // via the velocity tolerance on atGoal()), so residual feedback doesn't jitter the azimuths
-        // in steady state. Crucially, while still rotating through the band atGoal() is false, so we
+        // in steady state. Crucially, while still rotating through the band atGoal() is false, so
+        // we
         // keep the PD feedback whose kD term (−kD·yawRate) brakes the chassis to a stop instead of
         // letting it coast through the target. ffVel is ~0 when stopped → chassis sits still.
         boolean withinTolerance = headingController.atGoal();
@@ -323,8 +327,10 @@ public class AutoAimCommand extends Command {
         // steady-state feedback jitter on the module azimuths).
         public static final double toleranceDeg = 1.0;
         // Yaw-rate tolerance for the "settled" gate. atGoal() requires the chassis to be within
-        // toleranceDeg AND rotating slower than this before parking. Too high → hands off while still
-        // moving and the robot coasts through (overshoot/wiggle); too low → holds PD braking longer.
+        // toleranceDeg AND rotating slower than this before parking. Too high → hands off while
+        // still
+        // moving and the robot coasts through (overshoot/wiggle); too low → holds PD braking
+        // longer.
         public static final double settleRateDegPerSec = 15.0;
         // Chassis omega (rad/s) at or below this magnitude is floored to 0 (once withinTolerance)
         // before commanding the drivetrain. Kills the residual dither that scrubs the modules

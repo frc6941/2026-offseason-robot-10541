@@ -36,32 +36,6 @@ public class ShotCalculator {
     private final InterpolatingDoubleTreeMap shooterRps = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap timeOfFlightSec = new InterpolatingDoubleTreeMap();
 
-    private double DIST_WITH_HUB;
-    private double HUB_HEIGHT = 75;
-    // private double LEFT_ROT;
-    // private double RIGHT_ROT;
-    private double SHOOT_MAX_HEIGHT;
-    private double shootAngle;
-    private double shootMidDistance;
-    private double a;
-
-    public ShotCalculator(double DH, double SMH) { // double LR, double RR,
-        DIST_WITH_HUB = DH;
-        // LEFT_ROT = LR;
-        // RIGHT_ROT = RR;
-        SHOOT_MAX_HEIGHT = SMH;
-    }
-
-    public double CalculateDefaultPos() {
-        this.shootMidDistance =
-                DIST_WITH_HUB / (1.0 - Math.sqrt(1.0 - (HUB_HEIGHT / SHOOT_MAX_HEIGHT)));
-        this.a = -SHOOT_MAX_HEIGHT / Math.pow(this.shootMidDistance, 2);
-        // return this.a * Math.pow(currentDistance - this.shootMidDistance, 2) + SHOOT_MAX_HEIGHT;
-        double initialSlope = -2 * this.a * this.shootMidDistance;
-        shootAngle = Math.toDegrees(Math.atan(initialSlope));
-        return shootAngle;
-    }
-
     /** Resolve a full shot solution for the given distance to the hub (meters). */
     public ShotSolution solve(double distanceMeters) {
         rebuild();
@@ -73,24 +47,6 @@ public class ShotCalculator {
     /** Naive time of flight (s) for a static distance — no velocity compensation. */
     public double timeOfFlightFor(double distanceMeters) {
         rebuild();
-        return timeOfFlightSec.get(distanceMeters);
-    }
-
-    /**
-     * Same as {@link #solve} but reads from already-built maps (does not call {@link #rebuild}).
-     * Use when the caller has already rebuilt the maps once this tick (e.g. periodic loop).
-     */
-    ShotSolution solveCached(double distanceMeters) {
-        return new ShotSolution(
-                Degrees.of(hoodAngleDeg.get(distanceMeters)),
-                RotationsPerSecond.of(shooterRps.get(distanceMeters)));
-    }
-
-    /**
-     * Same as {@link #timeOfFlightFor} but reads from already-built maps (does not call {@link
-     * #rebuild}). Use when the caller has already rebuilt the maps once this tick.
-     */
-    double timeOfFlightCached(double distanceMeters) {
         return timeOfFlightSec.get(distanceMeters);
     }
 
@@ -164,9 +120,9 @@ public class ShotCalculator {
         // TODO: tune hood angle (deg) per distance breakpoint on the real robot
         public static final double hoodAngleDeg2m = 10.0;
         public static final double hoodAngleDeg3m = 18.0;
-        public static final double hoodAngleDeg4m = 20.0;
-        public static final double hoodAngleDeg5m = 20.0;
-        public static final double hoodAngleDeg6m = 20.0;
+        public static final double hoodAngleDeg4m = 24.0;
+        public static final double hoodAngleDeg5m = 28.0;
+        public static final double hoodAngleDeg6m = 30.0;
 
         // TODO: tune flywheel speed (rotations/sec) per distance breakpoint on the real robot
         public static final double shooterRps2m = 55.0;

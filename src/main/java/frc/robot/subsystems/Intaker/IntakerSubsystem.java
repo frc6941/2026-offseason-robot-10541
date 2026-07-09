@@ -96,25 +96,15 @@ public class IntakerSubsystem extends SubsystemBase {
             return pivot.getCurrPos();
         }
 
-        return switch (currentMode){
-            case INTAKING -> Degrees.of(
-                IntakerConfig.IntakerPivotParams.deployPosAngle
-            );
-            case EXTENDED_IDLE, EXTENDED_REVERSE -> Degrees.of(
-                IntakerConfig.IntakerPivotParams.deployPosAngle
-            );
-            case RETRACTED -> Degrees.of(
-                IntakerConfig.IntakerPivotParams.retractPosAngle
-            );
-            case FEEDING -> Degrees.of(
-                IntakerConfig.IntakerPivotParams.feedPosAngle
-            );
-            case RETRACTED_FEEDING -> Degrees.of(
-                IntakerConfig.IntakerPivotParams.retractedfeedPosAngle
-            );
-            default -> Degrees.of(
-                IntakerConfig.IntakerPivotParams.retractPosAngle
-            );
+        return switch (currentMode) {
+            case INTAKING -> Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle);
+            case EXTENDED_IDLE, EXTENDED_REVERSE ->
+                    Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle);
+            case RETRACTED -> Degrees.of(IntakerConfig.IntakerPivotParams.retractPosAngle);
+            case FEEDING -> Degrees.of(IntakerConfig.IntakerPivotParams.feedPosAngle);
+            case RETRACTED_FEEDING ->
+                    Degrees.of(IntakerConfig.IntakerPivotParams.retractedfeedPosAngle);
+            default -> Degrees.of(IntakerConfig.IntakerPivotParams.retractPosAngle);
         };
     }
 
@@ -160,12 +150,12 @@ public class IntakerSubsystem extends SubsystemBase {
 
     public Command holdRetractedFeedPosition() {
         return Commands.runEnd(
-                        () -> currentMode = IntakeMode.RETRACTED_FEEDING,
-                        () -> {
-                            fallbackMode = IntakeMode.EXTENDED_IDLE;
-                            currentMode = IntakeMode.EXTENDED_IDLE;
-                        },
-                        this);
+                () -> currentMode = IntakeMode.RETRACTED_FEEDING,
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                },
+                this);
     }
 
     public Command runExtendedReverse() {

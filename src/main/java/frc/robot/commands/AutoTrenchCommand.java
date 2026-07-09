@@ -143,8 +143,7 @@ public class AutoTrenchCommand extends Command {
                                 new TrapezoidProfile.State(lockedHeading.getRadians(), 0.0))
                         + headingController.getSetpoint().velocity;
         omega = MathUtil.clamp(omega, -HEADING_MAX_VEL, HEADING_MAX_VEL);
-        if (headingController.atGoal()
-                || Math.abs(omega) < HEADING_OUTPUT_DEADBAND_RAD_PER_SEC) {
+        if (headingController.atGoal() || Math.abs(omega) < HEADING_OUTPUT_DEADBAND_RAD_PER_SEC) {
             omega = 0.0;
         }
 
