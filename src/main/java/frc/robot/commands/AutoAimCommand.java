@@ -1,19 +1,13 @@
 package frc.robot.commands;
 
-import static edu.wpi.first.units.Units.MetersPerSecond;
-
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.ProfiledPIDController;
-import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.FieldConstants;
-import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -54,21 +48,12 @@ public class AutoAimCommand extends Command {
         return targetMode;
     }
 
-    // Heading is motion-profiled: the trapezoid plans deceleration from the remaining angle so the
-    // chassis arrives at the target at zero velocity (overshoot-free), while still allowing an
-    // aggressive max velocity/accel for a quick lock. Constraints/gains are refreshed live from NT.
-    private final ProfiledPIDController headingController =
-            new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0.0, 0.0));
-
-    // Hysteresis latch for the terminal park handoff (see execute()). Enters within a tight aimed +
-    // slow window, exits only past a wider error band, so the settle can't chatter at the edge.
-    private boolean settled = false;
-
-    // Low-pass on the Pigeon yaw rate for velocity damping (see execute()). Damping off the gyro's
-    // DIRECT rate — lightly filtered — instead of the finite-difference derivative of the fused
-    // heading (controller kD), which was too noisy to lean on and drove a fast-flip limit cycle.
-    private final LinearFilter yawRateFilter =
-            LinearFilter.singlePoleIIR(0.04, RobotConstants.LOOPER_DT);
+    // Heading control is a plain P + velocity-feedforward + velocity-damping law (à la 6328's
+    // joystickDriveWhileLaunching), NOT a motion profile:
+    //   omega = ffVel + kP*headingError + kD*(ffVel - measuredYawRate)
+    // The kD term is derivative-on-MEASUREMENT (against the direct gyro rate), so it damps cleanly
+    // without the differentiated-heading noise, and there's no trapezoid profile to march ahead of
+    // the chassis and overshoot — the two things that made the old profiled+latched version ring.
 
     public AutoAimCommand(
             Swerve swerve,
@@ -81,19 +66,7 @@ public class AutoAimCommand extends Command {
         this.ySupplier = ySupplier;
         this.targetHeading = targetHeading;
         this.targetHeadingRate = targetHeadingRate;
-        // Heading wraps at ±π, so let the controller take the short way around.
-        headingController.enableContinuousInput(-Math.PI, Math.PI);
         addRequirements(swerve);
-    }
-
-    @Override
-    public void initialize() {
-        // Seed the profile with the robot's CURRENT heading and yaw rate so engaging aim mid-motion
-        // (e.g. while already rotating/translating) doesn't cause a velocity discontinuity / jump.
-        double headingRad = swerve.getEstimatedPose().toPose2d().getRotation().getRadians();
-        headingController.reset(headingRad, swerve.getYawVelocityRadPerSec());
-        settled = false;
-        yawRateFilter.reset();
     }
 
     // Drum shooter mounting relative to robot center, robot frame (+X fwd/intake, +Y left).
@@ -207,68 +180,26 @@ public class AutoAimCommand extends Command {
                         .minus(robotPose.getTranslation()); // aiming vector
 
         Rotation2d target = targetHeading.get();
-        double headingRad = robotPose.getRotation().getRadians();
         double error = target.minus(robotPose.getRotation()).getRadians();
         double ffVel = targetHeadingRate.getAsDouble();
         double measureOmega = swerve.getYawVelocityRadPerSec();
 
-        // Refresh gains + profile constraints live from NT. kP/kD now act on heading error against
-        // the PROFILED setpoint (kD is a real derivative-on-error, no longer the old delayed-omega
-        // feedback that rang). maxVel/maxAccel set how hard the profile drives the lock-on.
         double kP = AutoAimParamsNT.kP.getValue();
         double kD = AutoAimParamsNT.kD.getValue();
         double maxVel = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
-        double maxAccel = AutoAimParamsNT.maxAngularAccelRadPerSec2.getValue();
-        headingController.setP(kP);
-        headingController.setD(kD);
-        headingController.setConstraints(new TrapezoidProfile.Constraints(maxVel, maxAccel));
-        headingController.setTolerance(Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue()));
 
-        // Goal carries the target's angular velocity (ffVel) so the profile tracks a moving aim
-        // point
-        // while you translate. Feedback drives heading→profiled setpoint; add the profile's own
-        // velocity as feedforward so we move at profile speed even at zero position error.
-        double feedback =
-                headingController.calculate(
-                        headingRad, new TrapezoidProfile.State(target.getRadians(), ffVel));
-        // Velocity damping from the filtered gyro rate (opposes chassis rotation). This is the
-        // primary brake into the target: because it uses the Pigeon's direct rate (not a
-        // differentiated heading) it stays clean at high gain, so it can be strong enough to cancel
-        // the arrival overshoot without the fast-flip limit cycle that raising controller kD
-        // caused.
-        double filteredYawRate = yawRateFilter.calculate(measureOmega);
-        double gyroDamping = -AutoAimParamsNT.kDampGyro.getValue() * filteredYawRate;
-        double omega = feedback + headingController.getSetpoint().velocity + gyroDamping;
-
-        // Hysteresis park latch — kills the terminal limit cycle (slight overshoot + steady
-        // wiggle).
-        // ENTER "settled" only when aimed (|error| < toleranceDeg) AND slow (|yawRate| <
-        // settleRateDegPerSec), so the kD braking above first arrests the chassis rather than
-        // parking
-        // mid-coast. Once settled, STAY settled — park on ffVel (~0 when stopped) — until the error
-        // grows past the WIDER settleExitToleranceDeg band. The wider exit band is the whole point:
-        // without it, a bare in-band check flips park↔PD every loop at the tolerance edge (that
-        // chatter IS the wiggle) as drift/backlash/derivative-noise nudges the heading across the
-        // boundary. With it, small disturbances are ignored and friction holds the aim; we only
-        // re-engage the controller on a real change (target moved, got bumped).
-        double toleranceRad = Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue());
-        double settleRateRad = Math.toRadians(AutoAimParamsNT.settleRateDegPerSec.getValue());
-        double exitToleranceRad = Math.toRadians(AutoAimParamsNT.settleExitToleranceDeg.getValue());
-        if (settled) {
-            if (Math.abs(error) > exitToleranceRad) settled = false;
-        } else if (Math.abs(error) < toleranceRad && Math.abs(measureOmega) < settleRateRad) {
-            settled = true;
-        }
-        if (settled) {
-            omega = ffVel;
-        }
+        // 6328-style heading law (joystickDriveWhileLaunching): feedforward the aim point's angular
+        // velocity (shoot-on-move), P on the live heading error, and D on the VELOCITY error
+        // against
+        // the measured yaw rate. That last term is the damping: with a stationary target ffVel≈0 so
+        // it is −kD·yawRate, a clean brake off the direct gyro signal. No profile, no settle latch
+        // —
+        // when aimed and still, all three terms are ~0, so omega falls to 0 on its own.
+        double omega = ffVel + kP * error + kD * (ffVel - measureOmega);
         omega = MathUtil.clamp(omega, -maxVel, maxVel);
-        // When parked, zero tiny residual omega so the modules don't dither on an ill-defined
-        // near-zero tangential azimuth target (the translational-jitter fix). Only when settled — a
-        // genuine mid-approach correction must never be suppressed.
-        if (settled && Math.abs(omega) < AutoAimParamsNT.outputDeadbandRadPerSec.getValue()) {
-            omega = 0.0;
-        }
+
+        boolean onTarget =
+                Math.abs(error) < Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue());
 
         // Joystick translation — same convention as driveWithJoystick
         double maxSpeed = AutoAimParamsNT.maxSpeedMPS.getValue();
@@ -292,16 +223,10 @@ public class AutoAimCommand extends Command {
         // Tuning observability — plot these over time to spot oscillation / steady-state error /
         // sign.
         Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
-        Logger.recordOutput("AutoAim/settled", settled);
+        Logger.recordOutput("AutoAim/onTarget", onTarget);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
-        Logger.recordOutput("AutoAim/gyroDamping", gyroDamping);
         Logger.recordOutput("AutoAim/omegaMeas", measureOmega);
         Logger.recordOutput("AutoAim/ffVel", ffVel);
-        // Profile tracking — setpointPosDeg should lead the heading and converge to target with no
-        // overshoot; setpointVel is the planned (trapezoid) angular velocity.
-        Logger.recordOutput(
-                "AutoAim/setpointPosDeg", Math.toDegrees(headingController.getSetpoint().position));
-        Logger.recordOutput("AutoAim/setpointVel", headingController.getSetpoint().velocity);
         // Reversal diagnosis — compare against the same quantities in teleop driveWithJoystick
         // while
         // pushing the stick straight forward. stickX should be +forward, stickY +left.
@@ -334,41 +259,24 @@ public class AutoAimCommand extends Command {
      */
     @NTParameter(tableName = "Params/AutoAim")
     public static final class AutoAimParams {
-        // tracking error. Tuned on the real robot (2026-07-09): a stiff kP just saturated and rang;
-        // the damping (kD) is what arrests the chassis at the target.
-        public static final double kP = 3.5;
-        public static final double kD = 0.2;
-        // Profile limits — these set how fast the lock-on is. Drivetrain caps are 450°/s (7.85
-        // rad/s)
-        // and 5000°/s² (~87 rad/s²), but the real chassis can't track anywhere near that in yaw —
-        // planning to unachievable accel made the heading lag the profile and overshoot. Tuned down
-        // to what the robot actually follows (2026-07-09).
-        public static final double maxAngularVelRadPerSec = 60;
-        public static final double maxAngularAccelRadPerSec2 = 20;
-        // Enter the parked "settled" state when heading error is within this band AND yaw rate is
-        // below settleRateDegPerSec (see the hysteresis latch in execute()).
-        public static final double toleranceDeg = 2.0;
-        // Velocity damping off the (filtered) measured yaw rate: omega -= kDampGyro * yawRate. This
-        // is the PRIMARY damping — clean gyro rate, so it stays stable at high gain (unlike the
-        // finite-difference controller kD, which fast-flips). Raise to kill arrival overshoot; with
-        // this active, set the controller kD low or to 0.
-        public static final double kDampGyro = 0.83;
-        // Yaw-rate gate for entering "settled": the chassis must be aimed AND rotating slower than
-        // this. Keeps kD braking active until the robot is actually slow, so it doesn't park
-        // mid-coast
-        // and overshoot. With the hysteresis exit below it's safe to keep this fairly loose.
-        public static final double settleRateDegPerSec = 17;
-        // Hysteresis EXIT band: once settled, stay parked until |error| exceeds this. Must be
-        // comfortably larger than toleranceDeg (and larger than any residual overshoot amplitude)
-        // or
-        // the settle chatters back into PD and wiggles. Too large and it's slow to re-aim on a
-        // bump.
-        public static final double settleExitToleranceDeg = 4.0;
-        // Chassis omega (rad/s) at or below this magnitude is floored to 0 (once withinTolerance)
-        // before commanding the drivetrain. Kills the residual dither that scrubs the modules
-        // (translational-feeling jitter) when settled on a stationary target. Raise if the lock
-        // still buzzes; lower if the aim feels like it "sticks" and won't make fine corrections.
-        public static final double outputDeadbandRadPerSec = 0.1;
-        public static final double maxSpeedMPS = 1;
+        // omega = ffVel + kP*headingError + kD*(ffVel - measuredYawRate). Defaults are 6328's
+        // launching-heading gains (their DriveCommands/Launching kP/kD). kP drives to the target;
+        // kD
+        // damps off the measured yaw rate (derivative-on-measurement) and does NOT fast-flip
+        // because
+        // it isn't a differentiated heading. Retune on the real robot if needed.
+        public static final double kP = 8.0;
+        public static final double kD = 0.5;
+        // Hard cap on commanded yaw rate (rad/s). Drivetrain caps are ~7.85 rad/s; keep some
+        // margin.
+        public static final double maxAngularVelRadPerSec = 6.0;
+        // Heading error under which we report onTarget (observability / external "aimed" gate).
+        // Loose
+        // is fine — final precision comes from the flywheel/hood solution and shoot-on-move, à la
+        // 6328's 10° launching tolerance.
+        public static final double toleranceDeg = 3.0;
+        // Driver translation speed cap (m/s) while auto-aiming — slow, controlled aiming instead of
+        // the full drivetrain limit. Kept from the "pid" commit.
+        public static final double maxSpeedMPS = 1.0;
     }
 }
