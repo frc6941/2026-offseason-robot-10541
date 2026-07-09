@@ -274,8 +274,8 @@ public class AutoAimCommand extends Command {
         // damps off the measured yaw rate (derivative-on-measurement) and does NOT fast-flip
         // because
         // it isn't a differentiated heading. Retune on the real robot if needed.
-        public static final double kP = 8.0;
-        public static final double kD = 0.5;
+        public static final double kP = 5.9;
+        public static final double kD = 0.8;
         // Hard cap on commanded yaw rate (rad/s). Drivetrain caps are ~7.85 rad/s; keep some
         // margin.
         public static final double maxAngularVelRadPerSec = 6.0;
