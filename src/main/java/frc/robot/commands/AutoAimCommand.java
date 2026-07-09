@@ -55,6 +55,11 @@ public class AutoAimCommand extends Command {
     // without the differentiated-heading noise, and there's no trapezoid profile to march ahead of
     // the chassis and overshoot — the two things that made the old profiled+latched version ring.
 
+    // Safety cap on the aim-rate feedforward (rad/s). A bad pose/aim-rate glitch could otherwise
+    // yank the chassis; 2910 clamps the same feedforward to ±2 rad/s ("prevent violent reactions").
+    // This is a guard, not a tuning knob — the real limit on lock speed is maxAngularVelRadPerSec.
+    private static final double FF_CLAMP_RAD_PER_SEC = 2.0;
+
     public AutoAimCommand(
             Swerve swerve,
             DoubleSupplier xSupplier,
@@ -181,7 +186,11 @@ public class AutoAimCommand extends Command {
 
         Rotation2d target = targetHeading.get();
         double error = target.minus(robotPose.getRotation()).getRadians();
-        double ffVel = targetHeadingRate.getAsDouble();
+        double ffVel =
+                MathUtil.clamp(
+                        targetHeadingRate.getAsDouble(),
+                        -FF_CLAMP_RAD_PER_SEC,
+                        FF_CLAMP_RAD_PER_SEC);
         double measureOmega = swerve.getYawVelocityRadPerSec();
 
         double kP = AutoAimParamsNT.kP.getValue();
