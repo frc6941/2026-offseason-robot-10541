@@ -225,6 +225,12 @@ public class AutoAimCommand extends Command {
             omega = ffVel;
         }
         omega = MathUtil.clamp(omega, -maxVel, maxVel);
+        // Zero out tiny residual omega once settled so the aim commands exactly no rotation. Unlike
+        // teleop driveWithJoystick, this path feeds swerve.runTwist directly with no deadband — a
+        // small sign-flipping omega (from feedforward/feedback noise) gives the modules an
+        // ill-defined near-zero tangential azimuth target that hunts and 180°-flips, scrubbing the
+        // wheels (reads as translational jitter). Gate on withinTolerance so it never suppresses a
+        // genuine correction during approach.
         if (withinTolerance
                 && Math.abs(omega) < AutoAimParamsNT.outputDeadbandRadPerSec.getValue()) {
             omega = 0.0;
@@ -306,6 +312,10 @@ public class AutoAimCommand extends Command {
         // Within this heading error the profile is "at goal" → hand off to feedforward only (no
         // steady-state feedback jitter on the module azimuths).
         public static final double toleranceDeg = 1.0;
+        // Chassis omega (rad/s) at or below this magnitude is floored to 0 (once withinTolerance)
+        // before commanding the drivetrain. Kills the residual dither that scrubs the modules
+        // (translational-feeling jitter) when settled on a stationary target. Raise if the lock
+        // still buzzes; lower if the aim feels like it "sticks" and won't make fine corrections.
         public static final double outputDeadbandRadPerSec = 0.05;
     }
 }
