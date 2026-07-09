@@ -127,8 +127,7 @@ public class PhoenixSynchronizationThread extends Thread {
                     if (phoenixSignals.length > 0) BaseStatusSignal.refreshAll(phoenixSignals);
                 }
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
+                e.printStackTrace();
             } finally {
                 signalsLock.unlock();
             }

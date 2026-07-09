@@ -6,8 +6,8 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.*;
 import com.ctre.phoenix6.controls.DutyCycleOut;
-import com.ctre.phoenix6.controls.DynamicMotionMagicVoltage;
 import com.ctre.phoenix6.controls.Follower;
+import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityVoltage;
@@ -20,7 +20,6 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Voltage;
-import frc.robot.RobotConstants;
 import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ironpulse.utils.PhoenixUtils;
 
@@ -35,8 +34,14 @@ public class MotorIOTalonFX implements MotorIO {
     private final TalonFX[] followers;
 
     private final PositionVoltage positionCtrl = new PositionVoltage(0.0).withEnableFOC(true);
-    private final DynamicMotionMagicVoltage dynamicMotionMagicCtrl =
-            new DynamicMotionMagicVoltage(0.0, 0.0, 0.0).withEnableFOC(true);
+    // FOC stays enabled (Pro-licensed). We use regular Motion Magic instead of Dynamic Motion
+    // Magic because the latter needs a CANivore timebase, which these RIO-bus mechanisms lack.
+    private final MotionMagicVoltage motionMagicCtrl =
+            new MotionMagicVoltage(0.0).withEnableFOC(true);
+    private final MotionMagicConfigs motionMagicConfigs = new MotionMagicConfigs();
+    private double lastMMVelocity = Double.NaN;
+    private double lastMMAcceleration = Double.NaN;
+    private double lastMMJerk = Double.NaN;
     private final VelocityVoltage velocityCtrl = new VelocityVoltage(0.0).withEnableFOC(true);
     private final VelocityTorqueCurrentFOC velocityTorqueCurrentCtrl =
             new VelocityTorqueCurrentFOC(0.0);
@@ -52,6 +57,7 @@ public class MotorIOTalonFX implements MotorIO {
     private final TalonFXConfiguration fx;
     private final SubsystemConfig config;
     private boolean connected = false;
+    private NeutralModeValue currentNeutralMode;
 
     public MotorIOTalonFX(SubsystemConfig cfg) {
         this.main = new TalonFX(cfg.mainId, cfg.mainBus);
@@ -62,6 +68,7 @@ public class MotorIOTalonFX implements MotorIO {
         fx.MotorOutput.Inverted = cfg.motorInvertedValue;
         fx.MotorOutput.NeutralMode =
                 cfg.defaultBrake ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+        currentNeutralMode = fx.MotorOutput.NeutralMode;
         if (!Double.isNaN(cfg.statorCurrentLimitAmps)) {
             fx.CurrentLimits.StatorCurrentLimitEnable = true;
             fx.CurrentLimits.StatorCurrentLimit = cfg.statorCurrentLimitAmps;
@@ -139,6 +146,10 @@ public class MotorIOTalonFX implements MotorIO {
                                 new ClosedLoopRampsConfigs()
                                         .withVoltageClosedLoopRampPeriod(f.ramp));
             }
+            // We never read followers back through status signals, so silence their default frames
+            // to keep them off the (shared roboRIO) CAN bus. The Follower control request still
+            // drives them; only telemetry publishing is reduced.
+            followers[i].optimizeBusUtilization();
         }
 
         // Signals
@@ -153,28 +164,30 @@ public class MotorIOTalonFX implements MotorIO {
                 new BaseStatusSignal[] {
                     posSig, velSig, motorVoltSig, supplyVoltSig, statorSig, supplySig
                 };
-        // configure update frequencies and register signals
-        posSig.setUpdateFrequency(1000.0);
-        velSig.setUpdateFrequency(1000.0);
-        motorVoltSig.setUpdateFrequency(100.0);
-        supplyVoltSig.setUpdateFrequency(30.0);
-        statorSig.setUpdateFrequency(100.0);
-        supplySig.setUpdateFrequency(100.0);
-        boolean isCanivoreBus = cfg.mainBus == RobotConstants.CANIVORE_CAN_BUS;
-        PhoenixUtils.registerSignals(isCanivoreBus, signals);
+        // Configure update frequencies and register signals.
+        // NOTE: these mechanisms live on the roboRIO 1 Mbps CAN bus (only swerve is on the
+        // CANivore).
+        // 1000 Hz pos/vel per device saturates that shared bus (~11 devices -> 100% utilization,
+        // devices dropping offline). The TalonFX closed loop runs internally at 1 kHz regardless of
+        // these rates — this only sets how often the RIO reads back for logging/atGoal — so 100 Hz
+        // is ample. If a device is ever moved back onto the CANivore, these can be raised again.
+        posSig.setUpdateFrequency(100.0);
+        velSig.setUpdateFrequency(100.0);
+        motorVoltSig.setUpdateFrequency(50.0);
+        supplyVoltSig.setUpdateFrequency(10.0);
+        statorSig.setUpdateFrequency(50.0);
+        supplySig.setUpdateFrequency(20.0);
+        PhoenixUtils.registerSignals(cfg.mainBus, signals);
         main.optimizeBusUtilization();
     }
 
     private void configureCANcoder(SubsystemConfig.RemoteCANcoder rc) {
-        // Create a temporary CANcoder handle to push configuration to the device.
-        // Configuration is persisted in CANcoder hardware — the handle is discarded
-        // because no runtime interaction with the CANcoder is needed after config.
-        try (CANcoder coder = new CANcoder(rc.id, rc.bus)) {
-            CANcoderConfiguration c = new CANcoderConfiguration();
-            c.MagnetSensor.MagnetOffset = rc.magnetOffset;
-            c.MagnetSensor.SensorDirection = rc.sensorDirection;
-            coder.getConfigurator().apply(c);
-        }
+        CANcoder coder = new CANcoder(rc.id, rc.bus);
+        // Build a CANcoderConfiguration from rc fields
+        CANcoderConfiguration c = new CANcoderConfiguration();
+        c.MagnetSensor.MagnetOffset = rc.magnetOffset;
+        c.MagnetSensor.SensorDirection = rc.sensorDirection;
+        coder.getConfigurator().apply(c);
     }
 
     @Override
@@ -209,10 +222,22 @@ public class MotorIOTalonFX implements MotorIO {
     @Override
     public void setMotionMagicSetpoint(
             Angle position, double velocity, double acceleration, double jerk) {
-        dynamicMotionMagicCtrl.Velocity = velocity;
-        dynamicMotionMagicCtrl.Acceleration = acceleration;
-        dynamicMotionMagicCtrl.Jerk = jerk;
-        main.setControl(dynamicMotionMagicCtrl.withPosition(position));
+        // Regular Motion Magic reads its profile constraints from the device's MotionMagicConfigs
+        // (only Dynamic Motion Magic takes them per-request). Re-apply only when they change to
+        // avoid a blocking config write every loop; in practice these are constant per subsystem,
+        // so this applies once.
+        if (velocity != lastMMVelocity
+                || acceleration != lastMMAcceleration
+                || jerk != lastMMJerk) {
+            motionMagicConfigs.MotionMagicCruiseVelocity = velocity;
+            motionMagicConfigs.MotionMagicAcceleration = acceleration;
+            motionMagicConfigs.MotionMagicJerk = jerk;
+            PhoenixUtils.tryUntilOk(5, () -> main.getConfigurator().apply(motionMagicConfigs));
+            lastMMVelocity = velocity;
+            lastMMAcceleration = acceleration;
+            lastMMJerk = jerk;
+        }
+        main.setControl(motionMagicCtrl.withPosition(position));
     }
 
     @Override
@@ -222,12 +247,22 @@ public class MotorIOTalonFX implements MotorIO {
 
     @Override
     public void setNeutralMode(boolean wantsBreak) {
-        this.fx.MotorOutput.NeutralMode =
-                wantsBreak ? NeutralModeValue.Brake : NeutralModeValue.Coast;
-        main.getConfigurator().apply(this.fx);
-        for (int i = 0; i < followers.length; i++) {
-            followers[i].getConfigurator().apply(this.fx);
+        NeutralModeValue desired = wantsBreak ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+        // Gate on an actual mode change. This is called on every live param edit; brake/coast
+        // almost never changes, so without this guard we'd fire a blocking CAN write every loop.
+        if (desired == currentNeutralMode) {
+            return;
         }
+        this.fx.MotorOutput.NeutralMode = desired;
+        // Apply only the MotorOutput group, not the entire TalonFXConfiguration — same effect
+        // (NeutralMode is all that changed) at a fraction of the CAN cost.
+        PhoenixUtils.tryUntilOk(5, () -> main.getConfigurator().apply(this.fx.MotorOutput));
+        for (int i = 0; i < followers.length; i++) {
+            final int idx = i;
+            PhoenixUtils.tryUntilOk(
+                    5, () -> followers[idx].getConfigurator().apply(this.fx.MotorOutput));
+        }
+        currentNeutralMode = desired;
     }
 
     @Override
@@ -292,10 +327,12 @@ public class MotorIOTalonFX implements MotorIO {
 
     @Override
     public void updateGains(Slot0Configs slot0) {
-        this.fx.Slot0 = slot0;
-        fx.withSlot0(slot0);
         slot0.GravityType = config.gravityType;
         slot0.StaticFeedforwardSign = config.kSValue;
-        main.getConfigurator().apply(this.fx);
+        // Keep the cached full config in sync for any future full apply, but push only the Slot0
+        // slice over CAN. Applying the whole TalonFXConfiguration here (called on every live gain
+        // edit) is the large blocking write that was overrunning the main loop.
+        this.fx.Slot0 = slot0;
+        PhoenixUtils.tryUntilOk(5, () -> main.getConfigurator().apply(slot0));
     }
 }

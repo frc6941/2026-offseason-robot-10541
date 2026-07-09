@@ -81,7 +81,7 @@ public class ImuIOPigeon implements ImuIO {
         // Register signals with PhoenixUtils for automatic refresh (same as swerve
         // modules)
         PhoenixUtils.registerSignals(
-                true, yaw, yawVelocity, pitch, pitchVelocity, roll, rollVelocity);
+                config.canivoreCanBus, yaw, yawVelocity, pitch, pitchVelocity, roll, rollVelocity);
 
         // Register yaw signal for odometry queue (same pattern as swerve modules)
         if (syncThread != null) {

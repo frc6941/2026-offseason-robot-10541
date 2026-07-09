@@ -3,14 +3,11 @@ package lib.ironpulse.limelight;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N4;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lib.ironpulse.math.MathTools;
@@ -32,16 +29,21 @@ public class LimelightSubsystem extends SubsystemBase {
         }
     }
 
+    /**
+     * Calculates the standard deviation matrix using weighted reliability scores. For reliability
+     * scores, 1 is the most reliable and 0 the least reliable. The calculated standard deviations
+     * would be, at most, twice the default standard deviation.
+     *
+     * <p>For example, if default standard deviation is 0.7: score=0, final=1.4; score=1, final=0.7.
+     * Note that if score=0, we reject the update in the first place.
+     *
+     * @param reliability The reliability score from limelight input.
+     * @return The standard deviation for localization.
+     */
     private Matrix<N4, N1> getVisionStdDev(LimelightIO io, double reliability) {
         double[] stdDev = io.getVisionStdDevComponents(reliability);
         return VecBuilder.fill(stdDev[0], stdDev[1], stdDev[2], stdDev[3]);
     }
-
-    /**
-     * Reliability threshold above which vision pose is trusted enough for a direct odometry reset
-     * instead of a gradual Kalman-filter correction. Set to 0 to disable auto-reset.
-     */
-    private static final double AUTO_RESET_RELIABILITY_THRESHOLD = 0.95;
 
     private void addVisionMeasurement() {
         if (suppressVisionFrames > 0) {
@@ -53,20 +55,13 @@ public class LimelightSubsystem extends SubsystemBase {
             LimelightIO io = entry.getKey();
             LimelightIOInputsAutoLogged input = entry.getValue();
             if (MathTools.epsilonEquals(input.reliability, 0)) {
+                Logger.recordOutput(
+                        "Limelight/" + io.getName() + "/AcceptedVisionMeasurement", false);
                 continue;
             }
-
-            // When vision is near-certain (multiple well-spaced tags, close range, large area),
-            // directly reset odometry for instant correction instead of waiting for the Kalman
-            // filter to converge. This behaves like an automatic "resetPoseFromVision".
-            if (input.reliability >= AUTO_RESET_RELIABILITY_THRESHOLD && input.tv) {
-                localizationProvider.resetEstimatedPose(input.pose);
-                Logger.recordOutput("Limelight/" + io.getName() + "/autoReset", true);
-            } else {
-                localizationProvider.addVisionMeasurement(
-                        input.pose, input.timestampSeconds, getVisionStdDev(io, input.reliability));
-                Logger.recordOutput("Limelight/" + io.getName() + "/autoReset", false);
-            }
+            Logger.recordOutput("Limelight/" + io.getName() + "/AcceptedVisionMeasurement", true);
+            localizationProvider.addVisionMeasurement(
+                    input.pose, input.timestampSeconds, getVisionStdDev(io, input.reliability));
         }
     }
 
@@ -79,11 +74,6 @@ public class LimelightSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
-        // Tag-derived robot poses for this loop — drawn as a translucent "ghost" in AdvantageScope
-        // alongside the solid Swerve/SwerveEstimatorPose model. Each camera contributes a pose only
-        // while it has a trusted target, so the ghost vanishes when no tags are visible.
-        List<Pose3d> visionGhosts = new ArrayList<>();
-
         for (Map.Entry<LimelightIO, LimelightIOInputsAutoLogged> entry : ios.entrySet()) {
             LimelightIO io = entry.getKey();
             io.setRobotOrientation();
@@ -92,30 +82,23 @@ public class LimelightSubsystem extends SubsystemBase {
             io.updateInputs(inputs);
             Logger.processInputs("Limelight/" + io.getName(), inputs);
 
-            // Per-camera ghost: empty array (hidden) unless this camera produced a trusted pose.
-            // Gate on reliability only — matches the addVisionMeasurement() acceptance condition,
-            // so the ghost appears exactly when a measurement is actually fed to the estimator.
-            if (inputs.reliability > 0 && inputs.pose != null) {
-                Logger.recordOutput(
-                        "Limelight/" + io.getName() + "/VisionPose", new Pose3d[] {inputs.pose});
-                visionGhosts.add(inputs.pose);
-            } else {
-                Logger.recordOutput("Limelight/" + io.getName() + "/VisionPose", new Pose3d[0]);
-            }
+            SmartDashboard.putBoolean(
+                    "Limelight/" + io.getName() + "alive",
+                    Objects.equals(inputs.status, "Connected"));
 
             if (!io.canUseInternalIMU()) {
                 continue;
             }
 
-            Logger.recordOutput("Limelight/IMU/" + io.getName(), io.getIMUYawRobot());
+            // IMU logging and correction
+            // FIXME: For debugging only, remove if not needed
+            Logger.recordOutput("Limelight/IMU/" + io.getName() + "_INT", io.getIMUYawInternal());
+            Logger.recordOutput("Limelight/IMU/" + io.getName() + "_ROBOT", io.getIMUYawRobot());
 
-            SmartDashboard.putBoolean(
-                    "Limelight/" + io.getName() + "alive",
-                    Objects.equals(inputs.status, "Connected"));
+            if (inputs.reliability >= io.getImuCorrectionReliabilityThreshold()) {
+                localizationProvider.setIMUYaw(io.getIMUYawRobot());
+            }
         }
-
-        // Combined ghost across all cameras — bind one translucent robot to this in AdvantageScope.
-        Logger.recordOutput("Limelight/VisionPose", visionGhosts.toArray(new Pose3d[0]));
 
         addVisionMeasurement();
         LoggedTracer.record("Limelight");
@@ -157,28 +140,10 @@ public class LimelightSubsystem extends SubsystemBase {
 
     public Pose2d getPose(String id) {
         LimelightIOInputsAutoLogged inputs = ios.get(getIoById(id));
-        return inputs.pose == null ? new Pose2d() : inputs.pose.toPose2d();
-    }
-
-    /** Returns the auto-logged inputs for the named limelight. Useful for commands that need
-     *  raw targeting data (tx, ty, tid, targetPoseRobotSpace, etc.) without reaching into IO. */
-    public LimelightIOInputsAutoLogged getInputs(String id) {
-        return ios.get(getIoById(id));
-    }
-
-    /**
-     * Explicitly resets the swerve odometry to what this limelight currently sees.
-     * Only applies if the vision estimate is reliable and a valid target exists.
-     *
-     * @param id the limelight name (e.g. "limelight")
-     * @return true if the reset was performed, false if rejected
-     */
-    public boolean resetPoseFromVision(String id) {
-        LimelightIOInputsAutoLogged inputs = ios.get(getIoById(id));
-        if (inputs.pose == null || inputs.reliability < 0.7 || !inputs.tv) {
-            return false;
-        }
-        localizationProvider.resetEstimatedPose(inputs.pose);
-        return true;
+        return inputs == null
+                        || inputs.pose == null
+                        || MathTools.epsilonEquals(inputs.reliability, 0)
+                ? new Pose2d()
+                : inputs.pose.toPose2d();
     }
 }

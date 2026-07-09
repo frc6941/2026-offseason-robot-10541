@@ -8,7 +8,6 @@ import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -18,6 +17,7 @@ import edu.wpi.first.math.numbers.N4;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Time;
 import edu.wpi.first.units.measure.Voltage;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,11 +103,14 @@ public class Swerve extends SubsystemBase implements Localizable {
         // odom
         var swerveModulePositionsWithTime = getSampledModulePositions();
         var rotations = imuIOInputs.odometryRotations;
+        var now = Timer.getTimestamp();
         for (int i = 0; i < swerveModulePositionsWithTime.size(); i++) {
             var positionWithTime = swerveModulePositionsWithTime.get(i);
             poseEstimator.updateWithTime(
-                    positionWithTime.getFirst(), // FPGA-adjusted sample timestamp
-                    rotations[i], // IMU yaw at sample time
+                    now,
+                    rotations[i], // FIXME: there's a discrepancy between Phoenix time and rio time.
+                    // need to find
+                    // the offset. this fix is temporary
                     positionWithTime.getSecond());
         }
         odometryLock.unlock();
@@ -188,7 +191,7 @@ public class Swerve extends SubsystemBase implements Localizable {
     }
 
     // ------- Getters -------
-    private SwerveModuleState[] getModuleStates() {
+    public SwerveModuleState[] getModuleStates() {
         SwerveModuleState[] states = new SwerveModuleState[modules.size()];
         for (int i = 0; i < modules.size(); i++) states[i] = modules.get(i).getSwerveModuleState();
         return states;
@@ -209,8 +212,16 @@ public class Swerve extends SubsystemBase implements Localizable {
         List<SwerveModulePosition[]> samplesByModule =
                 modules.stream().map(SwerveModule::getSampledSwerveModulePositions).toList();
 
-        List<Pair<Double, SwerveModulePosition[]>> result = new ArrayList<>(timestamps.length);
-        for (int sampleIdx = 0; sampleIdx < timestamps.length; sampleIdx++) {
+        // The IMU and per-module sample queues are filled/drained independently by the odometry
+        // thread and can momentarily differ in length. Clamp to the smallest common count so we
+        // never index past a shorter array (was an AIOOBE crash once the sampler runs).
+        // TODO(lib-IP-2026): upstream this guard (or read all queues under one lock).
+        int sampleCount = timestamps.length;
+        for (SwerveModulePosition[] moduleSamples : samplesByModule)
+            sampleCount = Math.min(sampleCount, moduleSamples.length);
+
+        List<Pair<Double, SwerveModulePosition[]>> result = new ArrayList<>(sampleCount);
+        for (int sampleIdx = 0; sampleIdx < sampleCount; sampleIdx++) {
             // build the array of positions at this timestamp
             SwerveModulePosition[] positionsAtTime = new SwerveModulePosition[moduleCount];
             for (int moduleIdx = 0; moduleIdx < moduleCount; moduleIdx++)
@@ -279,6 +290,8 @@ public class Swerve extends SubsystemBase implements Localizable {
             Pose3d visionRobotPoseMeters,
             double timestampSeconds,
             Matrix<N4, N1> visionMeasurementStdDevs) {
+        Logger.recordOutput(config.name + "/VisionCorrectionPose", visionRobotPoseMeters);
+        Logger.recordOutput(config.name + "/VisionCorrectionTimestampSeconds", timestampSeconds);
         poseEstimator.addVisionMeasurement(
                 visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
     }
@@ -315,10 +328,6 @@ public class Swerve extends SubsystemBase implements Localizable {
 
     public SwerveModuleLimit getSwerveModuleLimit() {
         return setpointGenerator.getModuleLimit();
-    }
-
-    public Translation2d[] getModuleLocations() {
-        return config.moduleLocations();
     }
 
     public void setSwerveModuleLimit(SwerveModuleLimit limit) {

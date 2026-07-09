@@ -1,7 +1,9 @@
 package frc.robot;
 
 import com.ctre.phoenix6.CANBus;
+import com.pathplanner.lib.config.RobotConfig;
 import edu.wpi.first.math.geometry.Translation3d;
+import lib.ironpulse.utils.Logging;
 
 public final class RobotConstants {
     // Mechanism geometry (robot frame: +X forward, +Y left, +Z up)
@@ -13,19 +15,28 @@ public final class RobotConstants {
     public static final String ROBORIO_CAN_BUS_NAME = "rio";
     public static final String CANIVORE_CAN_BUS_NAME = "10541Canivore0";
     public static final CANBus CANIVORE_CAN_BUS = new CANBus(CANIVORE_CAN_BUS_NAME);
-
+    // Swerve lives on the CANivore; all other mechanisms (shooter, hood, hopper, intake) are on
+    // the roboRIO bus.
+    public static final CANBus ROBORIO_CAN_BUS = new CANBus(ROBORIO_CAN_BUS_NAME);
 
     // CAN_ID
     public static final int PIGEON_ID = 0;
 
-    
     // Alliance flip
     public static boolean disableHAL = false;
 
+    public static RobotConfig AUTO_ROBOT_CONFIG;
+
+    static {
+        try {
+            AUTO_ROBOT_CONFIG = RobotConfig.fromGUISettings();
+        } catch (Exception e) {
+            Logging.error("Constants", "Failed to load AUTO_ROBOT_CONFIG. %s", e.getMessage());
+        }
+    }
+
     // Robot Periodic
     public static final double LOOPER_DT = 0.02;
-
-    
 
     private RobotConstants() {}
 }

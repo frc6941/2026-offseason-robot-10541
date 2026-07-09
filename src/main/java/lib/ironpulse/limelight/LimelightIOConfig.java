@@ -19,38 +19,9 @@ public class LimelightIOConfig {
     @Builder.Default private final int portToForwardStream = 0;
     @Builder.Default private final int portToForwardPipeline = 0;
 
-    // --- vision standard-deviation defaults ---
-    // These seed the NT entries and also act as fallback values when a Shuffleboard slider has
-    // not been touched yet. They can be set directly in the builder or tuned live via NT.
-    @Builder.Default private final double defaultXStdDev = 0.7;
-    @Builder.Default private final double defaultYStdDev = 0.7;
-    @Builder.Default private final double defaultZStdDev = 9999.0;
-    @Builder.Default private final double defaultAngleStdDev = 1.0;
-    @Builder.Default private final double defaultImuCorrectionReliabilityThreshold = 0.9;
-
     private final MountPosition mountPosition;
 
     private final Limelight4Config limeLight4Config;
-
-    /**
-     * Creates a {@link DeviationParamSources} backed by NetworkTables so standard-deviation
-     * parameters can be tuned live through Shuffleboard / Glass without re-deploying code. The
-     * default values set in this config seed the NT entries and act as fallbacks when a slider
-     * has not been touched yet.
-     *
-     * <p>NT keys: {@code /LimelightDebug/<name>/<param>} (top-level table in Glass)
-     *
-     * @return a tunable {@code DeviationParamSources} (never null)
-     */
-    public DeviationParamSources createDeviationSources() {
-        return new NTDeviationSources(
-                name,
-                defaultXStdDev,
-                defaultYStdDev,
-                defaultZStdDev,
-                defaultAngleStdDev,
-                defaultImuCorrectionReliabilityThreshold);
-    }
 
     public enum MountPosition {
         ON_ROBOT,

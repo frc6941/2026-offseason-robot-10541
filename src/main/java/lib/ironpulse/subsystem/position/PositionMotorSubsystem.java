@@ -12,10 +12,10 @@ import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.units.Measure;
 import edu.wpi.first.units.Unit;
 import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ConditionalCommand;
-import edu.wpi.first.wpilibj.RobotBase;
 import java.util.function.Supplier;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
@@ -137,10 +137,11 @@ public class PositionMotorSubsystem<
     }
 
     public boolean positionAtGoal() {
-        if (mechanismUnitPerRotation instanceof Angle) {
+        try {
             return positionAtGoal((M) Degrees.of(params.positionAtGoalToleranceDegrees()));
+        } catch (ClassCastException e) {
+            return positionAtGoal((M) Meters.of(params.positionAtGoalToleranceMeters()));
         }
-        return positionAtGoal((M) Meters.of(params.positionAtGoalToleranceMeters()));
     }
 
     public Command waitUntilAtGoal(M tolerance) {

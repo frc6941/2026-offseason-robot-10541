@@ -4,16 +4,15 @@
 
 package frc.robot;
 
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import lib.ironpulse.utils.PhoenixUtils;
+import lib.ntext.NTParameterRegistry;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
-
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
-
-import lib.ntext.NTParameterRegistry;
 
 /**
  * The methods in this class are called automatically corresponding to each mode, as described in
@@ -21,105 +20,112 @@ import lib.ntext.NTParameterRegistry;
  * this project, you must also update the Main.java file in the project.
  */
 
-// The default command-based template uses TimedRobot. However, when we are using Advantagekit, we want to use LoggedRobot instead.
+// The default command-based template uses TimedRobot. However, when we are using Advantagekit, we
+// want to use LoggedRobot instead.
 public class Robot extends LoggedRobot {
-  private Command autonomousCommand;
-  private final RobotContainer robotContainer;
+    private Command autonomousCommand;
+    private final RobotContainer robotContainer;
 
-  /**
-   * This function is run when the robot is first started up and should be used for any
-   * initialization code.
-   */
-
-  public Robot() {
-    robotContainer = new RobotContainer();
-  }
-  
-  @Override
-  public void robotInit() {
-    // AdvantageKit logger — sends data to AdvantageScope and writes .wpilog files
-    Logger.addDataReceiver(new NT4Publisher());
-    Logger.addDataReceiver(new WPILOGWriter());
-    Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
-    Logger.start();
-
-    
-  }
-
-  /**
-   * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
-   * that you want ran during disabled, autonomous, teleoperated and test.
-   *
-   * <p>This runs after the mode specific periodic functions, but before LiveWindow and
-   * SmartDashboard integrated updating.
-   */
-  @Override
-  public void robotPeriodic() {
-    // Runs the Scheduler.  This is responsible for polling buttons, adding newly-scheduled
-    // commands, running already-scheduled commands, removing finished or interrupted commands,
-    // and running subsystem periodic() methods.  This must be called from the robot's periodic
-    // block in order for anything in the Command-based framework to work.
-    CommandScheduler.getInstance().run();
-
-    // Pull the latest @NTParameter values from NetworkTables and fire onChange hooks so all
-    // tunables (shooting, swerve PID, intaker, hood, ...) update live from the dashboard.
-    NTParameterRegistry.refresh();
-    robotContainer.updateDashboard();
-  }
-
-  /** This function is called once each time the robot enters Disabled mode. */
-  @Override
-  public void disabledInit() {}
-
-  @Override
-  public void disabledPeriodic() {}
-
-  /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
-  @Override
-  public void autonomousInit() {
-    autonomousCommand = robotContainer.getAutonomousCommand();
-    DriverStation.reportWarning("Selected auto: " + robotContainer.getAutoSelectionSummary(), false);
-
-    // schedule the autonomous command (example)
-    if (autonomousCommand != null) {
-      CommandScheduler.getInstance().schedule(autonomousCommand);
+    /**
+     * This function is run when the robot is first started up and should be used for any
+     * initialization code.
+     */
+    public Robot() {
+        robotContainer = new RobotContainer();
     }
-  }
 
-  /** This function is called periodically during autonomous. */
-  @Override
-  public void autonomousPeriodic() {}
-
-  @Override
-  public void teleopInit() {
-    // This makes sure that the autonomous stops running when
-    // teleop starts running. If you want the autonomous to
-    // continue until interrupted by another command, remove
-    // this line or comment it out.
-    if (autonomousCommand != null) {
-      autonomousCommand.cancel();
+    @Override
+    public void robotInit() {
+        // AdvantageKit logger — sends data to AdvantageScope and writes .wpilog files
+        Logger.addDataReceiver(new NT4Publisher());
+        Logger.addDataReceiver(new WPILOGWriter());
+        Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
+        Logger.start();
     }
-  }
 
-  /** This function is called periodically during operator control. */
-  @Override
-  public void teleopPeriodic() {}
+    /**
+     * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
+     * that you want ran during disabled, autonomous, teleoperated and test.
+     *
+     * <p>This runs after the mode specific periodic functions, but before LiveWindow and
+     * SmartDashboard integrated updating.
+     */
+    @Override
+    public void robotPeriodic() {
+        // Runs the Scheduler.  This is responsible for polling buttons, adding newly-scheduled
+        // commands, running already-scheduled commands, removing finished or interrupted commands,
+        // and running subsystem periodic() methods.  This must be called from the robot's periodic
+        // block in order for anything in the Command-based framework to work.
+        // Refresh all registered Phoenix status signals (swerve modules + Pigeon) at the top of the
+        // loop. The multi-bus lib registers signals but does NOT refresh them itself — without
+        // this,
+        // module/IMU readings stay stale (frozen pose, frozen yaw). See SwerveModuleIOMK5N ctor.
+        PhoenixUtils.refreshAll();
 
-  @Override
-  public void testInit() {
-    // Cancels all running commands at the start of test mode.
-    CommandScheduler.getInstance().cancelAll();
-  }
+        CommandScheduler.getInstance().run();
 
-  /** This function is called periodically during test mode. */
-  @Override
-  public void testPeriodic() {}
+        // Pull the latest @NTParameter values from NetworkTables and fire onChange hooks so all
+        // tunables (shooting, swerve PID, intaker, hood, ...) update live from the dashboard.
+        NTParameterRegistry.refresh();
+        robotContainer.updateDashboard();
+    }
 
-  /** This function is called once when the robot is first started up. */
-  @Override
-  public void simulationInit() {}
+    /** This function is called once each time the robot enters Disabled mode. */
+    @Override
+    public void disabledInit() {}
 
-  /** This function is called periodically whilst in simulation. */
-  @Override
-  public void simulationPeriodic() {}
+    @Override
+    public void disabledPeriodic() {}
+
+    /**
+     * This autonomous runs the autonomous command selected by your {@link RobotContainer} class.
+     */
+    @Override
+    public void autonomousInit() {
+        autonomousCommand = robotContainer.getAutonomousCommand();
+        DriverStation.reportWarning(
+                "Selected auto: " + robotContainer.getAutoSelectionSummary(), false);
+
+        // schedule the autonomous command (example)
+        if (autonomousCommand != null) {
+            CommandScheduler.getInstance().schedule(autonomousCommand);
+        }
+    }
+
+    /** This function is called periodically during autonomous. */
+    @Override
+    public void autonomousPeriodic() {}
+
+    @Override
+    public void teleopInit() {
+        // This makes sure that the autonomous stops running when
+        // teleop starts running. If you want the autonomous to
+        // continue until interrupted by another command, remove
+        // this line or comment it out.
+        if (autonomousCommand != null) {
+            autonomousCommand.cancel();
+        }
+    }
+
+    /** This function is called periodically during operator control. */
+    @Override
+    public void teleopPeriodic() {}
+
+    @Override
+    public void testInit() {
+        // Cancels all running commands at the start of test mode.
+        CommandScheduler.getInstance().cancelAll();
+    }
+
+    /** This function is called periodically during test mode. */
+    @Override
+    public void testPeriodic() {}
+
+    /** This function is called once when the robot is first started up. */
+    @Override
+    public void simulationInit() {}
+
+    /** This function is called periodically whilst in simulation. */
+    @Override
+    public void simulationPeriodic() {}
 }

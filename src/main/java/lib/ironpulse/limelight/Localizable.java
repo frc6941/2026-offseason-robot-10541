@@ -15,10 +15,4 @@ public interface Localizable {
     double getIMUYaw();
 
     void setIMUYaw(double yaw);
-
-    /**
-     * Resets the robot's estimated pose to the given pose.
-     * Implementations should reset both the IMU hardware yaw and the pose estimator.
-     */
-    default void resetEstimatedPose(Pose3d pose) {}
 }

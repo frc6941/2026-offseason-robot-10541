@@ -1,21 +1,13 @@
 package frc.robot.commands.auto;
 
-import static edu.wpi.first.units.Units.Amps;
-import static edu.wpi.first.units.Units.InchesPerSecond;
-import static edu.wpi.first.units.Units.Inch;
-import static edu.wpi.first.units.Units.Kilograms;
-import static edu.wpi.first.units.Units.KilogramSquareMeters;
-
-import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.PIDConstants;
-import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj2.command.Command;
-import frc.robot.subsystems.Configs.SwerveMK5Config;
+import frc.robot.RobotConstants;
+import frc.robot.RobotStateRecorder;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.swerve.Swerve;
@@ -37,6 +29,10 @@ public final class AutoBuilder {
         this.shootingSuperstructure = shootingSuperstructure;
     }
 
+    public Pose2d getCurrentPose() {
+        return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
+    }
+
     public static void configure(Swerve swerve) {
         if (configured) {
             return;
@@ -48,37 +44,12 @@ public final class AutoBuilder {
                 swerve::getChassisSpeeds,
                 (ChassisSpeeds speeds) -> swerve.runTwist(speeds),
                 new PPHolonomicDriveController(
-                        new PIDConstants(5.0, 0.0, 0.0),
-                        new PIDConstants(5.0, 0.0, 0.0)),
-                createRobotConfig(),
+                        new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
+                RobotConstants.AUTO_ROBOT_CONFIG,
                 AllianceFlipUtil::shouldFlip,
                 swerve);
 
         configured = true;
-    }
-
-    public static RobotConfig createRobotConfig() {
-        Translation2d[] moduleLocations = {
-            new Translation2d(SwerveMK5Config.kSwerveHalfLength, SwerveMK5Config.kSwerveHalfWidth),
-            new Translation2d(SwerveMK5Config.kSwerveHalfLength, -SwerveMK5Config.kSwerveHalfWidth),
-            new Translation2d(-SwerveMK5Config.kSwerveHalfLength, SwerveMK5Config.kSwerveHalfWidth),
-            new Translation2d(-SwerveMK5Config.kSwerveHalfLength, -SwerveMK5Config.kSwerveHalfWidth)
-        };
-
-        ModuleConfig moduleConfig = new ModuleConfig(
-                Inch.of(4.0).div(2.0),
-                InchesPerSecond.of(5800 / 60.0 / 7.03 * Math.PI * 4.0),
-                1.0,
-                DCMotor.getKrakenX60Foc(1),
-                7.03,
-                Amps.of(65),
-                1);
-
-        return new RobotConfig(
-                Kilograms.of(52),
-                KilogramSquareMeters.of(0.04),
-                moduleConfig,
-                moduleLocations);
     }
 
     public Command buildDepotXAuto() {
@@ -106,17 +77,29 @@ public final class AutoBuilder {
     }
 
     public Command buildNeutralSweepAuto(
-            AutoCommands.NeutralSweepMode mode,
-            AutoCommands.NeutralSweepDirection direction) {
+            AutoCommands.NeutralSweepMode mode, AutoCommands.NeutralSweepDirection direction) {
         return AutoCommands.neutralZoneSweep(swerve, intaker, mode, direction);
+    }
+
+    public Command buildNeutralSweepAuto(
+            AutoCommands.NeutralSweepMode mode,
+            AutoCommands.NeutralSweepDirection direction,
+            AutoCommands.MidKind kind) {
+        return AutoCommands.neutralZoneSweep(swerve, intaker, mode, direction, kind);
     }
 
     public Command buildMidTwoCycleAuto(
             AutoCommands.NeutralSweepMode firstMode,
             AutoCommands.NeutralSweepMode secondMode,
             AutoCommands.NeutralSweepDirection firstDirection,
+            AutoCommands.NeutralSweepDirection secondDirection,
+            AutoCommands.MidKind firstKind,
+            AutoCommands.MidKind secondKind,
+            AutoSelector.Side firstShootPosition,
+            AutoSelector.Side secondShootPosition,
             AutoSelector.DepotAxis depotAxis,
-            AutoCommands.DepotVisitRound depotRound) {
+            AutoCommands.DepotVisitRound depotRound,
+            AutoCommands.DepotVisitRound outpostRound) {
         return AutoCommands.midTwoCycle(
                 swerve,
                 intaker,
@@ -124,8 +107,14 @@ public final class AutoBuilder {
                 firstMode,
                 secondMode,
                 firstDirection,
+                secondDirection,
+                firstKind,
+                secondKind,
+                firstShootPosition,
+                secondShootPosition,
                 depotAxis,
-                depotRound);
+                depotRound,
+                outpostRound);
     }
 
     public Command buildLeftTrenchClearAuto() {

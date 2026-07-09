@@ -147,9 +147,12 @@ public final class FieldConstants {
         public static final Translation3d openingTopLeft =
                 new Translation3d(LinesVertical.hubCenter, fieldWidth, openingHeight);
         public static final Translation3d openingTopRight =
-                new Translation3d(LinesVertical.hubCenter, fieldWidth - openingWidth, openingHeight);
+                new Translation3d(
+                        LinesVertical.hubCenter, fieldWidth - openingWidth, openingHeight);
         public static final Translation2d center =
-                openingTopLeft.toTranslation2d().interpolate(openingTopRight.toTranslation2d(), 0.5);
+                openingTopLeft
+                        .toTranslation2d()
+                        .interpolate(openingTopRight.toTranslation2d(), 0.5);
 
         private LeftTrench() {}
     }
@@ -166,7 +169,9 @@ public final class FieldConstants {
         public static final Translation3d openingTopRight =
                 new Translation3d(LinesVertical.hubCenter, 0.0, openingHeight);
         public static final Translation2d center =
-                openingTopLeft.toTranslation2d().interpolate(openingTopRight.toTranslation2d(), 0.5);
+                openingTopLeft
+                        .toTranslation2d()
+                        .interpolate(openingTopRight.toTranslation2d(), 0.5);
 
         private RightTrench() {}
     }
@@ -200,11 +205,15 @@ public final class FieldConstants {
         public static final Translation2d leftUpright =
                 new Translation2d(
                         frontFaceX,
-                        AprilTags.BLUE_TOWER_CENTER_Y + innerOpeningWidth / 2.0 + Units.inchesToMeters(0.75));
+                        AprilTags.BLUE_TOWER_CENTER_Y
+                                + innerOpeningWidth / 2.0
+                                + Units.inchesToMeters(0.75));
         public static final Translation2d rightUpright =
                 new Translation2d(
                         frontFaceX,
-                        AprilTags.BLUE_TOWER_CENTER_Y - innerOpeningWidth / 2.0 - Units.inchesToMeters(0.75));
+                        AprilTags.BLUE_TOWER_CENTER_Y
+                                - innerOpeningWidth / 2.0
+                                - Units.inchesToMeters(0.75));
 
         private Tower() {}
     }
@@ -237,9 +246,7 @@ public final class FieldConstants {
     }
 
     public static Pose2d aimedAtBlueHub(Translation2d robotTranslation) {
-        return new Pose2d(
-                robotTranslation,
-                Hub.getTarget2d().minus(robotTranslation).getAngle());
+        return new Pose2d(robotTranslation, Hub.getTarget2d().minus(robotTranslation).getAngle());
     }
 
     // ========================================================================
@@ -247,12 +254,10 @@ public final class FieldConstants {
     // Rotation2d() = facing toward the field (away from driver station)
     // ========================================================================
     public static class StartPositions {
-        public static final Pose2d BLUE_LEFT =
-                new Pose2d(0.76, 6.75, new Rotation2d());
+        public static final Pose2d BLUE_LEFT = new Pose2d(0.76, 6.75, new Rotation2d());
         public static final Pose2d BLUE_CENTER =
                 new Pose2d(0.76, fieldWidth / 2.0, new Rotation2d());
-        public static final Pose2d BLUE_RIGHT =
-                new Pose2d(0.76, 1.30, new Rotation2d());
+        public static final Pose2d BLUE_RIGHT = new Pose2d(0.76, 1.30, new Rotation2d());
     }
 
     // ========================================================================
@@ -261,9 +266,31 @@ public final class FieldConstants {
     public static class NeutralZone {
         /** X coordinate where the blue-side robot enters the neutral zone. */
         public static final double BLUE_X_ENTRY = 4.50;
+
         /** X coordinate where the blue-side robot exits toward the red side. */
         public static final double BLUE_X_EXIT = 5.80;
+
         public static final double CENTER_Y = fieldWidth / 2.0;
+    }
+
+    // ========================================================================
+    // Pass targets — when the robot is in the neutral zone it lobs the ball back
+    // toward its own alliance zone instead of shooting the hub. Two points mirrored
+    // across the field's horizontal centerline sit just off the driver-station wall;
+    // AutoAimCommand aims the shooter at whichever is on the robot's own Y-half, so
+    // the pass stays down its sideline and never crosses through the hub.
+    // Blue-alliance frame — red equivalents come from AllianceFlipUtil at runtime.
+    // ========================================================================
+    public static class PassTargets {
+        /** Distance from the blue wall — near the driver station (≈ LaunchPositions.BLUE_NEAR). */
+        public static final double X = 2.50;
+
+        /** Off-center lateral offset; matches the alliance-zone corners, well clear of the hub. */
+        public static final Translation2d BLUE_LEFT = new Translation2d(X, 6.75);
+
+        public static final Translation2d BLUE_RIGHT = new Translation2d(X, 1.30);
+
+        private PassTargets() {}
     }
 
     // ========================================================================
@@ -274,6 +301,7 @@ public final class FieldConstants {
         /** Shallow launch, close to the starting line. */
         public static final Pose2d BLUE_NEAR =
                 new Pose2d(2.50, fieldWidth / 2.0, Rotation2d.k180deg);
+
         /** Deeper launch, further into the field. */
         public static final Pose2d BLUE_FAR =
                 new Pose2d(4.00, fieldWidth / 2.0, Rotation2d.k180deg);
@@ -284,26 +312,19 @@ public final class FieldConstants {
     // Distances and rotations are approximate — tune against field CAD.
     // ========================================================================
     public static class Reef {
-        public static final Pose2d BLUE_AB =
-                new Pose2d(3.20, 4.20, Rotation2d.k180deg);
-        public static final Pose2d BLUE_CD =
-                new Pose2d(3.20, 3.85, Rotation2d.k180deg);
-        public static final Pose2d BLUE_EF =
-                new Pose2d(3.65, 3.20, Rotation2d.kCCW_Pi_2);
-        public static final Pose2d BLUE_GH =
-                new Pose2d(4.35, 3.20, Rotation2d.kCCW_Pi_2);
-        public static final Pose2d BLUE_IJ =
-                new Pose2d(4.80, 3.85, new Rotation2d());
-        public static final Pose2d BLUE_KL =
-                new Pose2d(4.80, 4.20, new Rotation2d());
+        public static final Pose2d BLUE_AB = new Pose2d(3.20, 4.20, Rotation2d.k180deg);
+        public static final Pose2d BLUE_CD = new Pose2d(3.20, 3.85, Rotation2d.k180deg);
+        public static final Pose2d BLUE_EF = new Pose2d(3.65, 3.20, Rotation2d.kCCW_Pi_2);
+        public static final Pose2d BLUE_GH = new Pose2d(4.35, 3.20, Rotation2d.kCCW_Pi_2);
+        public static final Pose2d BLUE_IJ = new Pose2d(4.80, 3.85, new Rotation2d());
+        public static final Pose2d BLUE_KL = new Pose2d(4.80, 4.20, new Rotation2d());
     }
 
     // ========================================================================
     // Coral station approach poses
     // ========================================================================
     public static class CoralStation {
-        public static final Pose2d BLUE_LEFT =
-                new Pose2d(0.76, 7.30, Rotation2d.fromDegrees(54.0));
+        public static final Pose2d BLUE_LEFT = new Pose2d(0.76, 7.30, Rotation2d.fromDegrees(54.0));
         public static final Pose2d BLUE_RIGHT =
                 new Pose2d(0.76, 0.75, Rotation2d.fromDegrees(-54.0));
     }

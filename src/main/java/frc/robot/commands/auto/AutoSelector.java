@@ -1,9 +1,13 @@
 package frc.robot.commands.auto;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.FieldPublisher;
+import lib.ironpulse.utils.AllianceFlipUtil;
 
 public class AutoSelector {
     private final AutoBuilder autoBuilder;
@@ -11,10 +15,24 @@ public class AutoSelector {
 
     private final SendableChooser<Routine> routineChooser = new SendableChooser<>();
     private final SendableChooser<DepotAxis> depotAxisChooser = new SendableChooser<>();
-    private final SendableChooser<AutoCommands.DepotVisitRound> depotRoundChooser = new SendableChooser<>();
-    private final SendableChooser<AutoCommands.NeutralSweepMode> firstMidModeChooser = new SendableChooser<>();
-    private final SendableChooser<AutoCommands.NeutralSweepMode> secondMidModeChooser = new SendableChooser<>();
-    private final SendableChooser<AutoCommands.NeutralSweepDirection> midDirectionChooser = new SendableChooser<>();
+    private final SendableChooser<AutoCommands.DepotVisitRound> depotRoundChooser =
+            new SendableChooser<>();
+    private final SendableChooser<AutoCommands.DepotVisitRound> outpostRoundChooser =
+            new SendableChooser<>();
+    private final SendableChooser<AutoCommands.NeutralSweepMode> firstMidModeChooser =
+            new SendableChooser<>();
+    private final SendableChooser<AutoCommands.NeutralSweepMode> secondMidModeChooser =
+            new SendableChooser<>();
+    private final SendableChooser<AutoCommands.MidKind> firstMidKindChooser =
+            new SendableChooser<>();
+    private final SendableChooser<AutoCommands.MidKind> secondMidKindChooser =
+            new SendableChooser<>();
+    private final SendableChooser<AutoCommands.NeutralSweepDirection> firstMidDirectionChooser =
+            new SendableChooser<>();
+    private final SendableChooser<AutoCommands.NeutralSweepDirection> secondMidDirectionChooser =
+            new SendableChooser<>();
+    private final SendableChooser<Side> firstShootPositionChooser = new SendableChooser<>();
+    private final SendableChooser<Side> secondShootPositionChooser = new SendableChooser<>();
     private final SendableChooser<Side> sideChooser = new SendableChooser<>();
     private final SendableChooser<TargetPoint> targetChooser = new SendableChooser<>();
 
@@ -27,10 +45,10 @@ public class AutoSelector {
     }
 
     private void configureChoosers() {
-        routineChooser.setDefaultOption("Do Nothing", Routine.DO_NOTHING);
+        routineChooser.setDefaultOption("Mid Sweep", Routine.MID_TWO_CYCLE);
+        routineChooser.addOption("Do Nothing", Routine.DO_NOTHING);
         routineChooser.addOption("Drive Forward", Routine.DRIVE_FORWARD);
         routineChooser.addOption("Depot Collect", Routine.DEPOT_COLLECT);
-        routineChooser.addOption("Mid Sweep", Routine.MID_TWO_CYCLE);
         routineChooser.addOption("Mid Step Only", Routine.MID_STEP_ONLY);
         routineChooser.addOption("Go To Target", Routine.GO_TO_TARGET);
         routineChooser.addOption("Trench Clear", Routine.TRENCH_CLEAR);
@@ -45,11 +63,22 @@ public class AutoSelector {
         depotRoundChooser.addOption("Depot Round 1", AutoCommands.DepotVisitRound.FIRST);
         depotRoundChooser.addOption("Depot Round 2", AutoCommands.DepotVisitRound.SECOND);
 
+        outpostRoundChooser.setDefaultOption("No Outpost", AutoCommands.DepotVisitRound.NONE);
+        outpostRoundChooser.addOption("Outpost Round 1", AutoCommands.DepotVisitRound.FIRST);
+        outpostRoundChooser.addOption("Outpost Round 2", AutoCommands.DepotVisitRound.SECOND);
+
         configureMidModeChooser(firstMidModeChooser);
         configureMidModeChooser(secondMidModeChooser);
+        configureMidKindChooser(firstMidKindChooser);
+        configureMidKindChooser(secondMidKindChooser);
 
-        midDirectionChooser.setDefaultOption("Left To Right", AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT);
-        midDirectionChooser.addOption("Right To Left", AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT);
+        configureMidDirectionChooser(
+                firstMidDirectionChooser, AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT);
+        configureMidDirectionChooser(
+                secondMidDirectionChooser, AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT);
+
+        configureShootPositionChooser(firstShootPositionChooser, Side.RIGHT);
+        configureShootPositionChooser(secondShootPositionChooser, Side.LEFT);
 
         sideChooser.setDefaultOption("Left", Side.LEFT);
         sideChooser.addOption("Right", Side.RIGHT);
@@ -70,9 +99,15 @@ public class AutoSelector {
         SmartDashboard.putData("Auto/Routine", routineChooser);
         SmartDashboard.putData("Auto/Depot Axis", depotAxisChooser);
         SmartDashboard.putData("Auto/Depot Round", depotRoundChooser);
+        SmartDashboard.putData("Auto/Outpost Round", outpostRoundChooser);
         SmartDashboard.putData("Auto/First Mid Mode", firstMidModeChooser);
         SmartDashboard.putData("Auto/Second Mid Mode", secondMidModeChooser);
-        SmartDashboard.putData("Auto/Mid Direction", midDirectionChooser);
+        SmartDashboard.putData("Auto/First Mid Kind", firstMidKindChooser);
+        SmartDashboard.putData("Auto/Second Mid Kind", secondMidKindChooser);
+        SmartDashboard.putData("Auto/First Mid Direction", firstMidDirectionChooser);
+        SmartDashboard.putData("Auto/Second Mid Direction", secondMidDirectionChooser);
+        SmartDashboard.putData("Auto/First Shoot Position", firstShootPositionChooser);
+        SmartDashboard.putData("Auto/Second Shoot Position", secondShootPositionChooser);
         SmartDashboard.putData("Auto/Side", sideChooser);
         SmartDashboard.putData("Auto/Target", targetChooser);
     }
@@ -80,48 +115,164 @@ public class AutoSelector {
     public Command getCommand() {
         String selectionSummary = getSelectionSummary();
         SmartDashboard.putString("Auto/Selected", selectionSummary);
-
-        Command command = switch (selectedRoutine()) {
-            case DO_NOTHING -> Commands.none();
-            case DRIVE_FORWARD -> driveForwardCommand;
-            case DEPOT_COLLECT -> selectedDepotAxis() == DepotAxis.X
-                    ? autoBuilder.buildDepotXAuto()
-                    : autoBuilder.buildDepotYAuto();
-            case MID_STEP_ONLY -> autoBuilder.buildNeutralSweepAuto(selectedFirstMidMode(), selectedMidDirection());
-            case MID_TWO_CYCLE -> autoBuilder.buildMidTwoCycleAuto(
-                    selectedFirstMidMode(),
-                    selectedSecondMidMode(),
-                    selectedMidDirection(),
-                    selectedDepotAxis(),
-                    selectedDepotRound());
-            case GO_TO_TARGET -> buildTargetCommand(selectedTarget());
-            case TRENCH_CLEAR -> selectedSide() == Side.LEFT
-                    ? autoBuilder.buildLeftTrenchClearAuto()
-                    : autoBuilder.buildRightTrenchClearAuto();
-            case BUMP_CROSS -> selectedSide() == Side.LEFT
-                    ? autoBuilder.buildLeftBumpCrossAuto()
-                    : autoBuilder.buildRightBumpCrossAuto();
-            case DEPOT_THROUGH -> selectedSide() == Side.LEFT
-                    ? autoBuilder.buildDepotLeftThroughAuto()
-                    : autoBuilder.buildDepotRightThroughAuto();
-        };
-
-        return command.withName(selectionSummary);
+        return buildSelectedCommand().withName(selectionSummary);
     }
 
+    /** Builds the command for the current selection (no withName) — reused for preview capture. */
+    private Command buildSelectedCommand() {
+        return switch (selectedRoutine()) {
+            case DO_NOTHING -> Commands.none();
+            case DRIVE_FORWARD -> driveForwardCommand;
+            case DEPOT_COLLECT ->
+                    selectedDepotAxis() == DepotAxis.X
+                            ? autoBuilder.buildDepotXAuto()
+                            : autoBuilder.buildDepotYAuto();
+            case MID_STEP_ONLY ->
+                    autoBuilder.buildNeutralSweepAuto(
+                            selectedFirstMidMode(),
+                            selectedFirstMidDirection(),
+                            selectedFirstMidKind());
+            case MID_TWO_CYCLE ->
+                    autoBuilder.buildMidTwoCycleAuto(
+                            selectedFirstMidMode(),
+                            selectedSecondMidMode(),
+                            selectedFirstMidDirection(),
+                            selectedSecondMidDirection(),
+                            selectedFirstMidKind(),
+                            selectedSecondMidKind(),
+                            selectedFirstShootPosition(),
+                            selectedSecondShootPosition(),
+                            selectedDepotAxis(),
+                            selectedDepotRound(),
+                            selectedOutpostRound());
+            case GO_TO_TARGET -> buildTargetCommand(selectedTarget());
+            case TRENCH_CLEAR ->
+                    selectedSide() == Side.LEFT
+                            ? autoBuilder.buildLeftTrenchClearAuto()
+                            : autoBuilder.buildRightTrenchClearAuto();
+            case BUMP_CROSS ->
+                    selectedSide() == Side.LEFT
+                            ? autoBuilder.buildLeftBumpCrossAuto()
+                            : autoBuilder.buildRightBumpCrossAuto();
+            case DEPOT_THROUGH ->
+                    selectedSide() == Side.LEFT
+                            ? autoBuilder.buildDepotLeftThroughAuto()
+                            : autoBuilder.buildDepotRightThroughAuto();
+        };
+    }
+
+    private String lastPreviewKey = "";
+
     public void updateDashboard() {
-        SmartDashboard.putString("Auto/Selected", getSelectionSummary());
+        String summary = getSelectionSummary();
+        SmartDashboard.putString("Auto/Selected", summary);
+        Pose2d startPose = autoBuilder.getCurrentPose();
+        SmartDashboard.putString("Auto/Start Pose", formatPose(startPose));
+        FieldPublisher.setAutoStartPose(startPose);
+
+        // Publish the selected auto's target waypoints to the Field2d for an Elastic preview.
+        // Re-capture only when the selection or alliance changes (each capture builds a throwaway
+        // command to record its pathfind targets).
+        String previewKey =
+                summary + "|" + AllianceFlipUtil.shouldFlip() + "|" + disabledStartPoseKey();
+        if (!previewKey.equals(lastPreviewKey)) {
+            lastPreviewKey = previewKey;
+            FieldPublisher.setPreview(captureSelectedPreview());
+        }
+    }
+
+    /**
+     * Builds the selected command under preview capture and returns its alliance-applied preview.
+     */
+    private java.util.List<Pose2d> captureSelectedPreview() {
+        Pose2d startPose = autoStartPose();
+        java.util.List<Pose2d> blue = new java.util.ArrayList<>();
+        AutoCommands.startPreviewCapture(blue);
+        try {
+            buildSelectedCommand(); // build-only; records pathfind targets, then discarded
+        } catch (RuntimeException e) {
+            // best-effort preview — ignore any build hiccup
+        } finally {
+            AutoCommands.stopPreviewCapture();
+        }
+        java.util.List<Pose2d> out = new java.util.ArrayList<>(blue.size());
+        for (Pose2d p : blue) {
+            out.add(AllianceFlipUtil.apply(p));
+        }
+        if (!out.isEmpty()) {
+            out.add(0, startPose);
+        }
+        return out;
+    }
+
+    private String disabledStartPoseKey() {
+        if (!DriverStation.isDisabled()) {
+            return "enabled";
+        }
+        Pose2d pose = autoStartPose();
+        return Math.round(pose.getX() * 4.0)
+                + ":"
+                + Math.round(pose.getY() * 4.0)
+                + ":"
+                + Math.round(pose.getRotation().getDegrees() / 15.0);
+    }
+
+    private Pose2d autoStartPose() {
+        return autoBuilder.getCurrentPose();
+    }
+
+    private String formatPose(Pose2d pose) {
+        return String.format(
+                "x=%.2f m, y=%.2f m, heading=%.1f deg",
+                pose.getX(), pose.getY(), pose.getRotation().getDegrees());
     }
 
     public String getSelectionSummary() {
-        return "Routine=" + selectedRoutine()
-                + ", DepotAxis=" + selectedDepotAxis()
-                + ", DepotRound=" + selectedDepotRound()
-                + ", FirstMidMode=" + selectedFirstMidMode()
-                + ", SecondMidMode=" + selectedSecondMidMode()
-                + ", MidDirection=" + selectedMidDirection()
-                + ", Side=" + selectedSide()
-                + ", Target=" + selectedTarget();
+        return "Routine="
+                + selectedRoutine()
+                + ", DepotAxis="
+                + selectedDepotAxis()
+                + ", DepotRound="
+                + selectedDepotRound()
+                + ", OutpostRound="
+                + selectedOutpostRound()
+                + ", FirstMidMode="
+                + midModeLabel(selectedFirstMidMode())
+                + ", SecondMidMode="
+                + midModeLabel(selectedSecondMidMode())
+                + ", FirstMidKind="
+                + selectedFirstMidKind()
+                + ", SecondMidKind="
+                + selectedSecondMidKind()
+                + ", FirstMidDirection="
+                + selectedFirstMidDirection()
+                + ", SecondMidDirection="
+                + selectedSecondMidDirection()
+                + ", FirstShootPosition="
+                + selectedFirstShootPosition()
+                + ", SecondShootPosition="
+                + selectedSecondShootPosition()
+                + ", Side="
+                + selectedSide()
+                + ", Target="
+                + selectedTarget();
+    }
+
+    private String midModeLabel(AutoCommands.NeutralSweepMode mode) {
+        return switch (mode) {
+            case CONSERVATIVE -> "Safe Inner Sweep";
+            case NEUTRAL -> "Center Line Sweep";
+            case FLIGHTLESS -> "Near Tower Sweep";
+            case FLIGHTLESS_WIDE -> "Near Tower Wide Sweep";
+            case FLIGHTLESS_WAVE -> "Near Tower Wave Sweep";
+            case DAVIS -> "Far Edge Sweep";
+            case DAVIS_FRIENDSHIP -> "Far Edge + Center Sweep";
+            case CORIOLIS -> "Back Center Sweep";
+            case CENTER_FORWARD -> "Mid-Back Center Sweep";
+            case SALESMAN -> "Full Pool Sweep";
+            case SALESMAN_TURN -> "Full Pool Turn-In Sweep";
+            case WAVE -> "Center Wave Sweep";
+        };
     }
 
     private Command buildTargetCommand(TargetPoint target) {
@@ -150,14 +301,49 @@ public class AutoSelector {
     }
 
     private void configureMidModeChooser(SendableChooser<AutoCommands.NeutralSweepMode> chooser) {
-        chooser.setDefaultOption("Salesman", AutoCommands.NeutralSweepMode.SALESMAN);
-        chooser.addOption("Conservative", AutoCommands.NeutralSweepMode.CONSERVATIVE);
-        chooser.addOption("Neutral", AutoCommands.NeutralSweepMode.NEUTRAL);
-        chooser.addOption("Flightless", AutoCommands.NeutralSweepMode.FLIGHTLESS);
-        chooser.addOption("Davis", AutoCommands.NeutralSweepMode.DAVIS);
-        chooser.addOption("Davis Friendship", AutoCommands.NeutralSweepMode.DAVIS_FRIENDSHIP);
-        chooser.addOption("Coriolis", AutoCommands.NeutralSweepMode.CORIOLIS);
-        chooser.addOption("Salesman Turn", AutoCommands.NeutralSweepMode.SALESMAN_TURN);
+        chooser.setDefaultOption("Full Pool Sweep", AutoCommands.NeutralSweepMode.SALESMAN);
+        chooser.addOption("Safe Inner Sweep", AutoCommands.NeutralSweepMode.CONSERVATIVE);
+        chooser.addOption("Center Line Sweep", AutoCommands.NeutralSweepMode.NEUTRAL);
+        chooser.addOption("Near Tower Sweep", AutoCommands.NeutralSweepMode.FLIGHTLESS);
+        chooser.addOption("Near Tower Wide Sweep", AutoCommands.NeutralSweepMode.FLIGHTLESS_WIDE);
+        chooser.addOption("Near Tower Wave Sweep", AutoCommands.NeutralSweepMode.FLIGHTLESS_WAVE);
+        chooser.addOption("Far Edge Sweep", AutoCommands.NeutralSweepMode.DAVIS);
+        chooser.addOption(
+                "Far Edge + Center Sweep", AutoCommands.NeutralSweepMode.DAVIS_FRIENDSHIP);
+        chooser.addOption("Back Center Sweep", AutoCommands.NeutralSweepMode.CORIOLIS);
+        chooser.addOption("Mid-Back Center Sweep", AutoCommands.NeutralSweepMode.CENTER_FORWARD);
+        chooser.addOption("Full Pool Turn-In Sweep", AutoCommands.NeutralSweepMode.SALESMAN_TURN);
+        chooser.addOption("Center Wave Sweep", AutoCommands.NeutralSweepMode.WAVE);
+    }
+
+    private void configureMidKindChooser(SendableChooser<AutoCommands.MidKind> chooser) {
+        chooser.setDefaultOption("Full", AutoCommands.MidKind.FULL);
+        chooser.addOption("Half", AutoCommands.MidKind.HALF);
+    }
+
+    private void configureMidDirectionChooser(
+            SendableChooser<AutoCommands.NeutralSweepDirection> chooser,
+            AutoCommands.NeutralSweepDirection defaultDirection) {
+        if (defaultDirection == AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT) {
+            chooser.setDefaultOption(
+                    "Left To Right", AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT);
+            chooser.addOption("Right To Left", AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT);
+        } else {
+            chooser.setDefaultOption(
+                    "Right To Left", AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT);
+            chooser.addOption("Left To Right", AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT);
+        }
+    }
+
+    private void configureShootPositionChooser(
+            SendableChooser<Side> chooser, Side defaultPosition) {
+        if (defaultPosition == Side.LEFT) {
+            chooser.setDefaultOption("Left", Side.LEFT);
+            chooser.addOption("Right", Side.RIGHT);
+        } else {
+            chooser.setDefaultOption("Right", Side.RIGHT);
+            chooser.addOption("Left", Side.LEFT);
+        }
     }
 
     private AutoCommands.NeutralSweepMode selectedFirstMidMode() {
@@ -170,6 +356,16 @@ public class AutoSelector {
         return selected == null ? AutoCommands.NeutralSweepMode.SALESMAN : selected;
     }
 
+    private AutoCommands.MidKind selectedFirstMidKind() {
+        AutoCommands.MidKind selected = firstMidKindChooser.getSelected();
+        return selected == null ? AutoCommands.MidKind.FULL : selected;
+    }
+
+    private AutoCommands.MidKind selectedSecondMidKind() {
+        AutoCommands.MidKind selected = secondMidKindChooser.getSelected();
+        return selected == null ? AutoCommands.MidKind.FULL : selected;
+    }
+
     private AutoCommands.DepotVisitRound selectedDepotRound() {
         AutoCommands.DepotVisitRound selected = depotRoundChooser.getSelected();
         if (selected == null) {
@@ -178,9 +374,35 @@ public class AutoSelector {
         return selected;
     }
 
-    private AutoCommands.NeutralSweepDirection selectedMidDirection() {
-        AutoCommands.NeutralSweepDirection selected = midDirectionChooser.getSelected();
+    private AutoCommands.DepotVisitRound selectedOutpostRound() {
+        AutoCommands.DepotVisitRound selected = outpostRoundChooser.getSelected();
+        if (selected == null || selected == AutoCommands.DepotVisitRound.START) {
+            selected = AutoCommands.DepotVisitRound.NONE;
+        }
+        AutoCommands.DepotVisitRound depotRound = selectedDepotRound();
+        return selected == depotRound && selected != AutoCommands.DepotVisitRound.NONE
+                ? AutoCommands.DepotVisitRound.NONE
+                : selected;
+    }
+
+    private AutoCommands.NeutralSweepDirection selectedFirstMidDirection() {
+        AutoCommands.NeutralSweepDirection selected = firstMidDirectionChooser.getSelected();
         return selected == null ? AutoCommands.NeutralSweepDirection.LEFT_TO_RIGHT : selected;
+    }
+
+    private AutoCommands.NeutralSweepDirection selectedSecondMidDirection() {
+        AutoCommands.NeutralSweepDirection selected = secondMidDirectionChooser.getSelected();
+        return selected == null ? AutoCommands.NeutralSweepDirection.RIGHT_TO_LEFT : selected;
+    }
+
+    private Side selectedFirstShootPosition() {
+        Side selected = firstShootPositionChooser.getSelected();
+        return selected == null ? Side.RIGHT : selected;
+    }
+
+    private Side selectedSecondShootPosition() {
+        Side selected = secondShootPositionChooser.getSelected();
+        return selected == null ? Side.LEFT : selected;
     }
 
     private Side selectedSide() {
