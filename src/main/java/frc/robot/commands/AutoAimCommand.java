@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.MetersPerSecond;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ProfiledPIDController;
+import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -12,6 +13,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.FieldConstants;
+import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -62,6 +64,12 @@ public class AutoAimCommand extends Command {
     // slow window, exits only past a wider error band, so the settle can't chatter at the edge.
     private boolean settled = false;
 
+    // Low-pass on the Pigeon yaw rate for velocity damping (see execute()). Damping off the gyro's
+    // DIRECT rate — lightly filtered — instead of the finite-difference derivative of the fused
+    // heading (controller kD), which was too noisy to lean on and drove a fast-flip limit cycle.
+    private final LinearFilter yawRateFilter =
+            LinearFilter.singlePoleIIR(0.04, RobotConstants.LOOPER_DT);
+
     public AutoAimCommand(
             Swerve swerve,
             DoubleSupplier xSupplier,
@@ -85,6 +93,7 @@ public class AutoAimCommand extends Command {
         double headingRad = swerve.getEstimatedPose().toPose2d().getRotation().getRadians();
         headingController.reset(headingRad, swerve.getYawVelocityRadPerSec());
         settled = false;
+        yawRateFilter.reset();
     }
 
     // Drum shooter mounting relative to robot center, robot frame (+X fwd/intake, +Y left).
@@ -222,7 +231,14 @@ public class AutoAimCommand extends Command {
         double feedback =
                 headingController.calculate(
                         headingRad, new TrapezoidProfile.State(target.getRadians(), ffVel));
-        double omega = feedback + headingController.getSetpoint().velocity;
+        // Velocity damping from the filtered gyro rate (opposes chassis rotation). This is the
+        // primary brake into the target: because it uses the Pigeon's direct rate (not a
+        // differentiated heading) it stays clean at high gain, so it can be strong enough to cancel
+        // the arrival overshoot without the fast-flip limit cycle that raising controller kD
+        // caused.
+        double filteredYawRate = yawRateFilter.calculate(measureOmega);
+        double gyroDamping = -AutoAimParamsNT.kDampGyro.getValue() * filteredYawRate;
+        double omega = feedback + headingController.getSetpoint().velocity + gyroDamping;
 
         // Hysteresis park latch — kills the terminal limit cycle (slight overshoot + steady
         // wiggle).
@@ -278,6 +294,7 @@ public class AutoAimCommand extends Command {
         Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
         Logger.recordOutput("AutoAim/settled", settled);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
+        Logger.recordOutput("AutoAim/gyroDamping", gyroDamping);
         Logger.recordOutput("AutoAim/omegaMeas", measureOmega);
         Logger.recordOutput("AutoAim/ffVel", ffVel);
         // Profile tracking — setpointPosDeg should lead the heading and converge to target with no
@@ -331,6 +348,11 @@ public class AutoAimCommand extends Command {
         // Enter the parked "settled" state when heading error is within this band AND yaw rate is
         // below settleRateDegPerSec (see the hysteresis latch in execute()).
         public static final double toleranceDeg = 2.0;
+        // Velocity damping off the (filtered) measured yaw rate: omega -= kDampGyro * yawRate. This
+        // is the PRIMARY damping — clean gyro rate, so it stays stable at high gain (unlike the
+        // finite-difference controller kD, which fast-flips). Raise to kill arrival overshoot; with
+        // this active, set the controller kD low or to 0.
+        public static final double kDampGyro = 0.4;
         // Yaw-rate gate for entering "settled": the chassis must be aimed AND rotating slower than
         // this. Keeps kD braking active until the robot is actually slow, so it doesn't park
         // mid-coast
