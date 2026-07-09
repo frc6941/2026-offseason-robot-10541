@@ -2,7 +2,6 @@ package frc.robot;
 
 import com.ctre.phoenix6.CANBus;
 import com.pathplanner.lib.config.RobotConfig;
-
 import edu.wpi.first.math.geometry.Translation3d;
 import lib.ironpulse.utils.Logging;
 

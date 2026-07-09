@@ -52,7 +52,6 @@ public final class AutoBuilder {
         configured = true;
     }
 
-
     public Command buildDepotXAuto() {
         return AutoCommands.depotXCollect(swerve, intaker);
     }

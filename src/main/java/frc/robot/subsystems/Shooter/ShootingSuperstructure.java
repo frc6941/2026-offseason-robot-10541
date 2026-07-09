@@ -112,6 +112,12 @@ public class ShootingSuperstructure extends SubsystemBase {
                 new Pose2d(lookahead, robotPose().getRotation()));
     }
 
+    // Below this magnitude the aim-heading rate is treated as zero. A stationary robot aimed at a
+    // stationary hub has a true rate of 0; anything left after the moving-average filter is just
+    // differentiated pose (vision) noise. Feeding that residual to AutoAim's omega feedforward makes
+    // the chassis dither and scrubs the modules (reads as translational jitter), so we floor it here.
+    private static final double AIM_RATE_DEADBAND_RAD_S = 0.05;
+
     private Rotation2d cachedAimHeading;
     private Rotation2d lastAimHeading;
     private double aimRate;
@@ -313,7 +319,9 @@ public class ShootingSuperstructure extends SubsystemBase {
                 (lastAimHeading == null)
                         ? 0.0
                         : heading.minus(lastAimHeading).getRadians() / RobotConstants.LOOPER_DT;
-        aimRate = aimRateFilter.calculate(raw);
+        double filtered = aimRateFilter.calculate(raw);
+        // Floor sub-threshold residual to 0 so a stationary aim commands exactly zero feedforward.
+        aimRate = Math.abs(filtered) < AIM_RATE_DEADBAND_RAD_S ? 0.0 : filtered;
         lastAimHeading = heading;
         cachedAimHeading = heading;
 
