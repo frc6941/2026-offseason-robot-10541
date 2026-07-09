@@ -1,6 +1,7 @@
 package frc.robot.commands;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -48,17 +49,11 @@ public class AutoAimCommand extends Command {
         return targetMode;
     }
 
-    // Heading control is a plain P + velocity-feedforward + velocity-damping law (à la 6328's
-    // joystickDriveWhileLaunching), NOT a motion profile:
-    //   omega = ffVel + kP*headingError + kD*(ffVel - measuredYawRate)
-    // The kD term is derivative-on-MEASUREMENT (against the direct gyro rate), so it damps cleanly
-    // without the differentiated-heading noise, and there's no trapezoid profile to march ahead of
-    // the chassis and overshoot — the two things that made the old profiled+latched version ring.
-
-    // Safety cap on the aim-rate feedforward (rad/s). A bad pose/aim-rate glitch could otherwise
-    // yank the chassis; 2910 clamps the same feedforward to ±2 rad/s ("prevent violent reactions").
-    // This is a guard, not a tuning knob — the real limit on lock speed is maxAngularVelRadPerSec.
-    private static final double FF_CLAMP_RAD_PER_SEC = 2.0;
+    // Heading control is a plain PIDController on heading error (no profile, no feedforward
+    // supplier — always aims straight at the Hub). O-lock (6328 stopWithO) picks up where the PID
+    // leaves off: once settled, X-lock the wheels instead of commanding sub-stiction omegas the
+    // drivetrain can't execute, which is what causes the terminal wiggle.
+    private final PIDController headingController = new PIDController(2.0, 0.0, 0.05);
 
     // O-lock hysteresis: once settled and X-locked, only unlock when the commanded speed/omega
     // exceed the lock thresholds by this factor, so the wheels don't flip X<->drive at the edge.
@@ -67,6 +62,10 @@ public class AutoAimCommand extends Command {
     // True while the chassis is X-locked in the settled state (see execute()). Reset on each start.
     private boolean oLocked = false;
 
+    // targetHeading/targetHeadingRate are accepted for constructor-signature compatibility with
+    // existing call sites but are currently UNUSED — execute() aims straight at the Hub instead
+    // (see FieldConstants.Hub.OPP_TARGET below). This drops shoot-on-move and the pass-target /
+    // shooter-offset correction that ShootingSuperstructure used to drive through this supplier.
     public AutoAimCommand(
             Swerve swerve,
             DoubleSupplier xSupplier,
@@ -79,6 +78,8 @@ public class AutoAimCommand extends Command {
         this.targetHeading = targetHeading;
         this.targetHeadingRate = targetHeadingRate;
         addRequirements(swerve);
+        headingController.enableContinuousInput(-Math.PI, Math.PI);
+        headingController.setTolerance(Math.toRadians(5));
     }
 
     @Override
@@ -192,29 +193,19 @@ public class AutoAimCommand extends Command {
     public void execute() {
         var robotPose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
 
-        // ---- 1. Aim state ----
-        Rotation2d target = targetHeading.get();
-        double error = target.minus(robotPose.getRotation()).getRadians();
-        // Aim-point angular velocity (shoot-on-move), clamped so a glitch can't yank the chassis.
-        double ffVel =
-                MathUtil.clamp(
-                        targetHeadingRate.getAsDouble(),
-                        -FF_CLAMP_RAD_PER_SEC,
-                        FF_CLAMP_RAD_PER_SEC);
-        double measureOmega = swerve.getYawVelocityRadPerSec();
-
-        // ---- 2. 6328 heading law (joystickDriveWhileLaunching) ----
-        // omega = aim-rate feedforward + P on heading error + D on the VELOCITY error vs the
-        // measured yaw rate. The D term damps off the direct gyro signal
-        // (derivative-on-measurement),
-        // so it stays clean at high gain — no differentiated-heading noise, no trapezoid profile.
-        double kP = AutoAimParamsNT.kP.getValue();
-        double kD = AutoAimParamsNT.kD.getValue();
+        // ---- 1. Aim state — always the Hub, no pass-target/shooter-offset correction. ----
+        Rotation2d target =
+                FieldConstants.Hub.OPP_TARGET
+                        .toTranslation2d()
+                        .minus(robotPose.getTranslation())
+                        .getAngle()
+                        .plus(Rotation2d.k180deg);
+        headingController.setSetpoint(target.getRadians());
+        double omega = headingController.calculate(robotPose.getRotation().getRadians());
         double maxVel = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
-        double omega = ffVel + kP * error + kD * (ffVel - measureOmega);
         omega = MathUtil.clamp(omega, -maxVel, maxVel);
 
-        // ---- 3. Driver translation (capped, driver-relative) ----
+        // ---- 2. Driver translation (capped, driver-relative) ----
         double maxSpeed = AutoAimParamsNT.maxSpeedMPS.getValue();
         double x = MathUtil.applyDeadband(xSupplier.getAsDouble(), 0.1);
         double y = MathUtil.applyDeadband(ySupplier.getAsDouble(), 0.1);
@@ -224,12 +215,11 @@ public class AutoAimCommand extends Command {
         Rotation2d driverHeading =
                 RobotStateRecorder.getPoseDriverRobotCurrent().getRotation().toRotation2d();
 
-        // ---- 4. O-lock settle (6328 stopWithO) ----
+        // ---- 3. O-lock settle (6328 stopWithO) ----
         // When the driver isn't translating AND the aim is settled (both commanded speeds tiny),
         // X-lock the wheels to rigidly hold heading instead of dithering sub-stiction omegas the
         // drivetrain can't execute — that dither is the terminal wiggle. Hysteresis on exit keeps
-        // the
-        // wheels from flipping X<->drive at the boundary. It never engages while translating
+        // the wheels from flipping X<->drive at the boundary. It never engages while translating
         // (shoot-on-move) — then it just drives.
         double lockLin = AutoAimParamsNT.lockLinearMetersPerSec.getValue();
         double lockOmega = AutoAimParamsNT.lockOmegaRadPerSec.getValue();
@@ -246,21 +236,13 @@ public class AutoAimCommand extends Command {
             swerve.runStopAndLock();
         } else {
             swerve.runTwist(
-                    ChassisSpeeds.fromFieldRelativeSpeeds(
-                            v.getX(), v.getY(), omega, driverHeading));
+                    ChassisSpeeds.fromFieldRelativeSpeeds(v.getX(), v.getY(), omega, driverHeading));
         }
 
-        // ---- 5. Logging ----
-        boolean onTarget =
-                Math.abs(error) < Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue());
-        Logger.recordOutput("AutoAim/TargetMode", targetMode.name());
-        Logger.recordOutput("AutoAim/Passing", isPassingTarget(robotPose.getTranslation()));
-        Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
-        Logger.recordOutput("AutoAim/onTarget", onTarget);
+        // ---- 4. Logging ----
+        Logger.recordOutput("AutoAim/onTarget", headingController.atSetpoint());
         Logger.recordOutput("AutoAim/oLocked", oLocked);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
-        Logger.recordOutput("AutoAim/omegaMeas", measureOmega);
-        Logger.recordOutput("AutoAim/ffVel", ffVel);
     }
 
     @Override
@@ -282,23 +264,14 @@ public class AutoAimCommand extends Command {
      */
     @NTParameter(tableName = "Params/AutoAim")
     public static final class AutoAimParams {
-        // omega = ffVel + kP*headingError + kD*(ffVel - measuredYawRate). kP drives to the target;
-        // kD
-        // damps off the measured yaw rate (derivative-on-measurement) and does NOT fast-flip
-        // because
-        // it isn't a differentiated heading. Defaults are the on-robot values (kP=3, kD=0.2) that
-        // gave a clean approach; the terminal wiggle those left is handled by the O-lock below, not
-        // by cranking kD. Retune on the real robot.
-        public static final double kP = 3.0;
+        // Plain PIDController on heading error (no feedforward). On-robot values that gave a clean
+        // approach; the terminal wiggle those left is handled by the O-lock below, not by cranking
+        // kD. Retune on the real robot.
+        public static final double kP = 2.5;
         public static final double kD = 0.2;
         // Hard cap on commanded yaw rate (rad/s). Drivetrain caps are ~7.85 rad/s; keep some
         // margin.
         public static final double maxAngularVelRadPerSec = 6.0;
-        // Heading error under which we report onTarget (observability / external "aimed" gate).
-        // Loose
-        // is fine — final precision comes from the flywheel/hood solution and shoot-on-move, à la
-        // 6328's 10° launching tolerance.
-        public static final double toleranceDeg = 3.0;
         // Driver translation speed cap (m/s) while auto-aiming — slow, controlled aiming instead of
         // the full drivetrain limit.
         public static final double maxSpeedMPS = 1.0;
