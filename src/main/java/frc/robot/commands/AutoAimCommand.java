@@ -271,7 +271,7 @@ public class AutoAimCommand extends Command {
         }
 
         // Joystick translation — same convention as driveWithJoystick
-        double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
+        double maxSpeed = AutoAimParamsNT.maxSpeedMPS.getValue();
         double x = MathUtil.applyDeadband(xSupplier.getAsDouble(), 0.1);
         double y = MathUtil.applyDeadband(ySupplier.getAsDouble(), 0.1);
         double vNorm = Math.hypot(x, y) * maxSpeed;
@@ -336,15 +336,15 @@ public class AutoAimCommand extends Command {
     public static final class AutoAimParams {
         // tracking error. Tuned on the real robot (2026-07-09): a stiff kP just saturated and rang;
         // the damping (kD) is what arrests the chassis at the target.
-        public static final double kP = 3.0;
-        public static final double kD = 0.6;
+        public static final double kP = 3.5;
+        public static final double kD = 0.2;
         // Profile limits — these set how fast the lock-on is. Drivetrain caps are 450°/s (7.85
         // rad/s)
         // and 5000°/s² (~87 rad/s²), but the real chassis can't track anywhere near that in yaw —
         // planning to unachievable accel made the heading lag the profile and overshoot. Tuned down
         // to what the robot actually follows (2026-07-09).
-        public static final double maxAngularVelRadPerSec = 3.5;
-        public static final double maxAngularAccelRadPerSec2 = 15.0;
+        public static final double maxAngularVelRadPerSec = 60;
+        public static final double maxAngularAccelRadPerSec2 = 20;
         // Enter the parked "settled" state when heading error is within this band AND yaw rate is
         // below settleRateDegPerSec (see the hysteresis latch in execute()).
         public static final double toleranceDeg = 2.0;
@@ -352,12 +352,12 @@ public class AutoAimCommand extends Command {
         // is the PRIMARY damping — clean gyro rate, so it stays stable at high gain (unlike the
         // finite-difference controller kD, which fast-flips). Raise to kill arrival overshoot; with
         // this active, set the controller kD low or to 0.
-        public static final double kDampGyro = 0.4;
+        public static final double kDampGyro = 0.83;
         // Yaw-rate gate for entering "settled": the chassis must be aimed AND rotating slower than
         // this. Keeps kD braking active until the robot is actually slow, so it doesn't park
         // mid-coast
         // and overshoot. With the hysteresis exit below it's safe to keep this fairly loose.
-        public static final double settleRateDegPerSec = 15.0;
+        public static final double settleRateDegPerSec = 17;
         // Hysteresis EXIT band: once settled, stay parked until |error| exceeds this. Must be
         // comfortably larger than toleranceDeg (and larger than any residual overshoot amplitude)
         // or
@@ -369,5 +369,6 @@ public class AutoAimCommand extends Command {
         // (translational-feeling jitter) when settled on a stationary target. Raise if the lock
         // still buzzes; lower if the aim feels like it "sticks" and won't make fine corrections.
         public static final double outputDeadbandRadPerSec = 0.1;
+        public static final double maxSpeedMPS = 1;
     }
 }

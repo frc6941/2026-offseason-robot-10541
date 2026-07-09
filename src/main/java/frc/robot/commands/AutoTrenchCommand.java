@@ -48,8 +48,8 @@ public class AutoTrenchCommand extends Command {
     private static final double LATERAL_KP = 4.2;
     private static final double LATERAL_KD = 0.0;
     private static final double LATERAL_MAX_VEL =
-            4.0; // m/s — deliberately gentle for the soft snap
-    private static final double LATERAL_MAX_ACCEL = 8.0; // m/s^2
+            3.5; // m/s — deliberately gentle for the soft snap
+    private static final double LATERAL_MAX_ACCEL = 7.5; // m/s^2
     private static final double LATERAL_TOLERANCE_METERS = 0.03;
     private static final double LATERAL_VELOCITY_TOLERANCE_METERS_PER_SEC = 0.05;
     private static final double LATERAL_OUTPUT_DEADBAND_METERS_PER_SEC = 0.03;
