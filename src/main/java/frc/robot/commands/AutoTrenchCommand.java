@@ -50,6 +50,9 @@ public class AutoTrenchCommand extends Command {
     private static final double LATERAL_MAX_VEL =
             2.0; // m/s — deliberately gentle for the soft snap
     private static final double LATERAL_MAX_ACCEL = 6.0; // m/s^2
+    private static final double LATERAL_TOLERANCE_METERS = 0.03;
+    private static final double LATERAL_VELOCITY_TOLERANCE_METERS_PER_SEC = 0.05;
+    private static final double LATERAL_OUTPUT_DEADBAND_METERS_PER_SEC = 0.03;
     private final ProfiledPIDController yController =
             new ProfiledPIDController(
                     LATERAL_KP,
@@ -62,6 +65,9 @@ public class AutoTrenchCommand extends Command {
     private static final double HEADING_KD = 0.0;
     private static final double HEADING_MAX_VEL = 7.0; // rad/s
     private static final double HEADING_MAX_ACCEL = 60.0; // rad/s^2
+    private static final double HEADING_TOLERANCE_RAD = Math.toRadians(1.0);
+    private static final double HEADING_VELOCITY_TOLERANCE_RAD_PER_SEC = 0.05;
+    private static final double HEADING_OUTPUT_DEADBAND_RAD_PER_SEC = 0.05;
     private final ProfiledPIDController headingController =
             new ProfiledPIDController(
                     HEADING_KP,
@@ -76,6 +82,10 @@ public class AutoTrenchCommand extends Command {
     public AutoTrenchCommand(Swerve swerve, DoubleSupplier xSupplier) {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
+        yController.setTolerance(
+                LATERAL_TOLERANCE_METERS, LATERAL_VELOCITY_TOLERANCE_METERS_PER_SEC);
+        headingController.setTolerance(
+                HEADING_TOLERANCE_RAD, HEADING_VELOCITY_TOLERANCE_RAD_PER_SEC);
         headingController.enableContinuousInput(-Math.PI, Math.PI);
         addRequirements(swerve);
     }
@@ -122,6 +132,9 @@ public class AutoTrenchCommand extends Command {
                 yController.calculate(pose.getY(), new TrapezoidProfile.State(lockedTrenchY, 0.0))
                         + yController.getSetpoint().velocity;
         vy = MathUtil.clamp(vy, -LATERAL_MAX_VEL, LATERAL_MAX_VEL);
+        if (yController.atGoal() || Math.abs(vy) < LATERAL_OUTPUT_DEADBAND_METERS_PER_SEC) {
+            vy = 0.0;
+        }
 
         // Heading: profiled PID holds the latched square heading.
         double omega =
@@ -130,6 +143,10 @@ public class AutoTrenchCommand extends Command {
                                 new TrapezoidProfile.State(lockedHeading.getRadians(), 0.0))
                         + headingController.getSetpoint().velocity;
         omega = MathUtil.clamp(omega, -HEADING_MAX_VEL, HEADING_MAX_VEL);
+        if (headingController.atGoal()
+                || Math.abs(omega) < HEADING_OUTPUT_DEADBAND_RAD_PER_SEC) {
+            omega = 0.0;
+        }
 
         // worldVx / vy / omega are all world-frame; convert to a robot-relative twist.
         ChassisSpeeds speeds =

@@ -225,6 +225,10 @@ public class AutoAimCommand extends Command {
             omega = ffVel;
         }
         omega = MathUtil.clamp(omega, -maxVel, maxVel);
+        if (withinTolerance
+                && Math.abs(omega) < AutoAimParamsNT.outputDeadbandRadPerSec.getValue()) {
+            omega = 0.0;
+        }
 
         // Joystick translation — same convention as driveWithJoystick
         double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
@@ -302,5 +306,6 @@ public class AutoAimCommand extends Command {
         // Within this heading error the profile is "at goal" → hand off to feedforward only (no
         // steady-state feedback jitter on the module azimuths).
         public static final double toleranceDeg = 1.0;
+        public static final double outputDeadbandRadPerSec = 0.05;
     }
 }
