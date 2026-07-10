@@ -19,11 +19,11 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import frc.robot.auto.AutoActions;
+import frc.robot.auto.AutoFile;
+import frc.robot.auto.AutoRoutines;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.AutoTrenchCommand;
-import frc.robot.commands.DefaultAuto;
-import frc.robot.commands.auto.AutoBuilder;
-import frc.robot.commands.auto.AutoSelector;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
@@ -87,8 +87,6 @@ public class RobotContainer {
                     hoodSubsystem,
                     hopperSubsystem,
                     swerve);
-    private final AutoBuilder autoBuilder =
-            new AutoBuilder(intaker, swerve, shootingSuperstructure);
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
     private final IndicatorSubsystem indicator = buildIndicator();
 
@@ -110,7 +108,6 @@ public class RobotContainer {
     // Replace with CommandPS4Controller or CommandJoystick if needed
     private final CommandXboxController driverController = new CommandXboxController(0);
 
-    private final AutoSelector autoSelector;
     private int hubTargetModeRequests = 0;
     private AutoAimCommand.TargetMode targetModeBeforeHubRequests = AutoAimCommand.TargetMode.AUTO;
 
@@ -128,9 +125,11 @@ public class RobotContainer {
         hopperSubsystem.configureDefaultCommand();
         shootingSuperstructure.configureDefaultCommands();
         // Intake zeroing stays manual-only on D-pad Left.
-        AutoBuilder.configure(swerve);
         configureBindings();
-        autoSelector = new AutoSelector(autoBuilder, DefaultAuto.driveForward(swerve));
+        // Autonomous: PathPlanner path-following routines (see frc.robot.auto).
+        AutoActions.init(swerve, shootingSuperstructure, intaker);
+        AutoRoutines.init(swerve, shootingSuperstructure, intaker);
+        AutoFile.init();
         new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
 
         // Publish the Field2d ("Field") for Elastic + hook PathPlanner active-path logging
@@ -266,7 +265,7 @@ public class RobotContainer {
      * @return the command to run in autonomous
      */
     public Command getAutonomousCommand() {
-        return autoSelector.getCommand();
+        return AutoFile.buildAuto();
     }
 
     public void updateDashboard() {
@@ -280,8 +279,6 @@ public class RobotContainer {
                         TransformRecorder.kFrameWorld,
                         TransformRecorder.kFrameRobot);
         RobotStateRecorder.periodic();
-
-        autoSelector.updateDashboard();
 
         // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's
         // callbacks).
@@ -299,7 +296,7 @@ public class RobotContainer {
     }
 
     public String getAutoSelectionSummary() {
-        return autoSelector.getSelectionSummary();
+        return AutoFile.selectionSummary();
     }
 
     /**
