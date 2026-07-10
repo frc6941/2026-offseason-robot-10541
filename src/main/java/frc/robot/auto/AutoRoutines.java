@@ -94,10 +94,16 @@ public class AutoRoutines {
         return switch (endBehaviour) {
             case NONE -> Commands.none();
             case MIDDLE -> Commands.deadline(followPathFile("RightEndtoMiddle", isLeft), intake());
-            case DEPOT -> Commands.deadline(followPathFile("LeftDriveDepot", false), intake());
+                // Depot options: drive/collect the depot, then aim at the hub and empty the hopper.
+            case DEPOT ->
+                    Commands.sequence(
+                            Commands.deadline(followPathFile("LeftDriveDepot", false), intake()),
+                            aimAndShootAtHub());
             case DEPOT_DRIVE_THROUGH ->
-                    Commands.deadline(
-                            followPathFile("LeftDriveDepotDriveThrough", false), intake());
+                    Commands.sequence(
+                            Commands.deadline(
+                                    followPathFile("LeftDriveDepotDriveThrough", false), intake()),
+                            aimAndShootAtHub());
         };
     }
 }
