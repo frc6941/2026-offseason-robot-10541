@@ -1,19 +1,12 @@
 package frc.robot;
 
-import lib.ntext.NTParameter;
-
 /**
- * NT-tunable swerve module PID/FF gains. The {@code @NTParameter} processor generates {@code
- * frc.robot.SwerveModuleParamsNT} (nested {@code Drive}/{@code Steer} with per-group {@code
- * isAnyChanged()}), which {@code lib.ironpulse.swerve.SwerveModule} consumes.
+ * Fixed swerve module PID/FF gains.
  *
- * <p>This MUST live in package {@code frc.robot} because the vendored lib imports {@code
- * frc.robot.SwerveModuleParamsNT} directly. Keep it here (not in a sub-package) so future lib
- * copies stay drop-in.
+ * <p>{@link SwerveModuleParamsNT} is a read-only compatibility facade for the vendored swerve code.
  *
  * <p>TODO: tune drive + steer gains on the real robot.
  */
-@NTParameter(tableName = "Params/SwerveModule")
 public final class SwerveModuleParams {
     public static final class Drive {
         public static final double kP = 6.0;

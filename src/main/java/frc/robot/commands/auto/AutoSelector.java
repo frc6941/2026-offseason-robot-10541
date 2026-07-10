@@ -162,13 +162,23 @@ public class AutoSelector {
     }
 
     private String lastPreviewKey = "";
+    private String lastPublishedSummary = "";
+    private String lastPublishedStartPose = "";
 
     public void updateDashboard() {
         String summary = getSelectionSummary();
-        SmartDashboard.putString("Auto/Selected", summary);
+        if (!summary.equals(lastPublishedSummary)) {
+            lastPublishedSummary = summary;
+            SmartDashboard.putString("Auto/Selected", summary);
+        }
+
         Pose2d startPose = autoBuilder.getCurrentPose();
-        SmartDashboard.putString("Auto/Start Pose", formatPose(startPose));
-        FieldPublisher.setAutoStartPose(startPose);
+        String formattedStartPose = formatPose(startPose);
+        if (!formattedStartPose.equals(lastPublishedStartPose)) {
+            lastPublishedStartPose = formattedStartPose;
+            SmartDashboard.putString("Auto/Start Pose", formattedStartPose);
+            FieldPublisher.setAutoStartPose(startPose);
+        }
 
         // Publish the selected auto's target waypoints to the Field2d for an Elastic preview.
         // Re-capture only when the selection or alliance changes (each capture builds a throwaway

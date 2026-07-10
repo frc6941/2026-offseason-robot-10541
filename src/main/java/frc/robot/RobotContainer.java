@@ -28,10 +28,7 @@ import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
-import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
-import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
-import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
@@ -380,7 +377,7 @@ public class RobotContainer {
                 isReal
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
-                IntakerRollerParamsNT.asVelocityParamSources());
+                IntakerConfig.IntakerRollerParams.asVelocityParamSources());
     }
 
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildIntakerPivot() {
@@ -390,7 +387,7 @@ public class RobotContainer {
                 isReal
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_PIVOT_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_PIVOT_CONFIG),
-                IntakerPivotParamsNT.asPositionParamSources(),
+                IntakerConfig.IntakerPivotParams.asPositionParamSources(),
                 Degrees.of(0),
                 IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
     }
@@ -412,7 +409,7 @@ public class RobotContainer {
                 RobotBase.isReal()
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_DRUM_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_DRUM_CONFIG),
-                ShooterUpperParamsNT.asVelocityParamSources());
+                ShooterConfig.ShooterUpperParams.asVelocityParamSources());
     }
 
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterFeed() {
@@ -422,7 +419,7 @@ public class RobotContainer {
                 RobotBase.isReal()
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_FEED_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_FEED_CONFIG),
-                ShooterLowerParamsNT.asVelocityParamSources());
+                ShooterConfig.ShooterLowerParams.asVelocityParamSources());
     }
 
     private LimelightSubsystem buildLimelight() {
@@ -478,7 +475,7 @@ public class RobotContainer {
                 RobotBase.isReal()
                         ? new MotorIOTalonFX(ShooterConfig.HOOD_CONFIG)
                         : new MotorIOSim(ShooterConfig.HOOD_CONFIG),
-                HoodParamsNT.asPositionParamSources(),
+                ShooterConfig.HoodParams.asPositionParamSources(),
                 ShooterConfig.HOOD_STOW_ANGLE,
                 ShooterConfig.HOOD_ANGLE_PER_ROTATION);
     }

@@ -14,6 +14,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -123,6 +124,7 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     private Rotation2d cachedAimHeading;
     private Rotation2d lastAimHeading;
+    private double lastAimTimestampSec = Double.NaN;
     private double aimRate;
     private LinearFilter aimRateFilter =
             LinearFilter.movingAverage((int) (0.1 / RobotConstants.LOOPER_DT));
@@ -143,12 +145,12 @@ public class ShootingSuperstructure extends SubsystemBase {
                         ShooterConfig.HOOD_MAX_ANGLE.in(Degrees)));
     }
 
-    /** True when the SHOOTER is pointed at the hub within the (NT-tunable) heading tolerance. */
+    /** True when the shooter is pointed at the hub within the configured heading tolerance. */
     public boolean headingAtGoal() {
         Pose2d pose = robotPose();
         Rotation2d aimHeading = aimHeading();
         double errorDeg = Math.abs(pose.getRotation().minus(aimHeading).getDegrees());
-        return errorDeg <= ShootingParamsNT.headingToleranceDeg.getValue();
+        return errorDeg <= ShotCalculator.ShootingParams.headingToleranceDeg;
     }
 
     /** All three shot DOFs satisfied: chassis aimed, hood at angle, flywheel up to speed. */
@@ -166,9 +168,9 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public boolean isShooterActive() {
         return shooterUpper.getCurrSetpoint().in(RotationsPerSecond)
-                        > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
+                        > ShooterConfig.ShooterUpperParams.idleRPS + 1.0
                 || shooterLower.getCurrSetpoint().in(RotationsPerSecond)
-                        > ShooterLowerParamsNT.idleRPS.getValue() + 1.0;
+                        > ShooterConfig.ShooterLowerParams.idleRPS + 1.0;
     }
 
     public double getUpperSetpointRPS() {
@@ -182,10 +184,10 @@ public class ShootingSuperstructure extends SubsystemBase {
     public void configureDefaultCommands() {
         shooterUpper.setDefaultCommand(
                 shooterUpper.runVelVolt(
-                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())));
+                        RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.idleRPS)));
         shooterLower.setDefaultCommand(
                 shooterLower.runVelVolt(
-                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
+                        RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
         hood.setDefaultCommand(hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE));
     }
 
@@ -196,7 +198,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     private AngularVelocity lowerSpeedFor(AngularVelocity upperSpeed) {
         return RotationsPerSecond.of(
                 upperSpeed.in(RotationsPerSecond)
-                        * ShootingParamsNT.lowerShooterSpeedScale.getValue());
+                        * ShotCalculator.ShootingParams.lowerShooterSpeedScale);
     }
 
     private Command runShooterAt(Supplier<AngularVelocity> upperSpeedSupplier) {
@@ -214,9 +216,9 @@ public class ShootingSuperstructure extends SubsystemBase {
     private Command runShooterPrespin() {
         return Commands.parallel(
                 shooterUpper.runVelVolt(
-                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())),
+                        RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.idleRPS)),
                 shooterLower.runVelVolt(
-                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
+                        RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
     }
 
     private Command feedAfterDelay() {
@@ -261,32 +263,28 @@ public class ShootingSuperstructure extends SubsystemBase {
     public Command fixedShoot() {
         return Commands.parallel(
                 runShooterAt(
-                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.shootRPS.getValue()),
-                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.shootRPS.getValue())),
+                        () -> RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.shootRPS),
+                        () -> RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.shootRPS)),
                 hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
                 feedAfterDelay());
     }
 
     /**
-     * Bench test: rotate the hood to the NT-tunable test angle ({@code Params/Hood/testAngleDeg}),
-     * clamped to the hood limits. Flywheel/feed untouched. Bind {@code whileTrue} so the hood
-     * returns to stow on release. Requires kP (and likely kG) tuned in {@code Params/Hood} or it
-     * won't move.
+     * Bench test: rotate the hood to the configured test angle, clamped to the hood limits.
+     * Flywheel/feed untouched. Bind {@code whileTrue} so the hood returns to stow on release.
      */
     public Command hoodToTestAngle() {
         return hood.runMotionMagic(
-                () -> clampHoodAngle(Degrees.of(HoodParamsNT.testAngleDeg.getValue())));
+                () -> clampHoodAngle(Degrees.of(ShooterConfig.HoodParams.testAngleDeg)));
     }
 
     /**
-     * Bench test: spin ONLY the shooter drum (upper) at the NT-tunable test RPS ({@code
-     * Params/ShooterDrum/testRPS}); the feed roller stays on its idle default. Bind {@code
-     * whileTrue} so the drum drops back to idle on release. Requires kV/kP tuned in {@code
-     * Params/ShooterDrum} or it won't reach speed.
+     * Bench test: spin only the shooter drum (upper) at the configured test RPS; the feed roller
+     * stays on its idle default. Bind {@code whileTrue} so the drum drops back to idle on release.
      */
     public Command spinDrumAtTestRPS() {
         return shooterUpper.runVelVolt(
-                () -> RotationsPerSecond.of(ShooterUpperParamsNT.testRPS.getValue()));
+                RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.testRPS));
     }
 
     public void seedHoodPositionAtZero() {
@@ -317,14 +315,17 @@ public class ShootingSuperstructure extends SubsystemBase {
         double effective = effectiveDistanceToTarget();
         ShotSolution solution = calculator.solve(effective);
         Rotation2d heading = computeAimHeading();
+        double timestampSec = Timer.getFPGATimestamp();
+        double dtSec = timestampSec - lastAimTimestampSec;
         double raw =
-                (lastAimHeading == null)
+                lastAimHeading == null || dtSec <= 0.0 || dtSec > 0.25
                         ? 0.0
-                        : heading.minus(lastAimHeading).getRadians() / RobotConstants.LOOPER_DT;
+                        : heading.minus(lastAimHeading).getRadians() / dtSec;
         double filtered = aimRateFilter.calculate(raw);
         // Floor sub-threshold residual to 0 so a stationary aim commands exactly zero feedforward.
         aimRate = Math.abs(filtered) < AIM_RATE_DEADBAND_RAD_S ? 0.0 : filtered;
         lastAimHeading = heading;
+        lastAimTimestampSec = timestampSec;
         cachedAimHeading = heading;
 
         Logger.recordOutput("Shooting/distanceMeters", geometric);

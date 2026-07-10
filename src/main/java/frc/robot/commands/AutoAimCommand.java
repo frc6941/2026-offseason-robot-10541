@@ -1,7 +1,6 @@
 package frc.robot.commands;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -14,7 +13,6 @@ import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
-import lib.ntext.NTParameter;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -23,8 +21,6 @@ import org.littletonrobotics.junction.Logger;
  * angle simultaneously.
  */
 public class AutoAimCommand extends Command {
-    // Heading-control gains are NT-tunable (Params/AutoAim) — see AutoAimParams at the bottom.
-
     private final Swerve swerve;
     private final DoubleSupplier xSupplier;
     private final DoubleSupplier ySupplier;
@@ -49,11 +45,9 @@ public class AutoAimCommand extends Command {
         return targetMode;
     }
 
-    // Heading control is a plain PIDController on heading error (no profile, no feedforward
-    // supplier — always aims straight at the Hub). O-lock (6328 stopWithO) picks up where the PID
-    // leaves off: once settled, X-lock the wheels instead of commanding sub-stiction omegas the
-    // drivetrain can't execute, which is what causes the terminal wiggle.
-    private final PIDController headingController = new PIDController(2.0, 0.0, 0.05);
+    // Clamp shoot-on-move feedforward so a bad pose/rate sample cannot yank the chassis. Heading
+    // damping uses the direct gyro rate rather than a loop-time-dependent numerical derivative.
+    private static final double FF_CLAMP_RAD_PER_SEC = 2.0;
 
     // O-lock hysteresis: once settled and X-locked, only unlock when the commanded speed/omega
     // exceed the lock thresholds by this factor, so the wheels don't flip X<->drive at the edge.
@@ -62,10 +56,6 @@ public class AutoAimCommand extends Command {
     // True while the chassis is X-locked in the settled state (see execute()). Reset on each start.
     private boolean oLocked = false;
 
-    // targetHeading/targetHeadingRate are accepted for constructor-signature compatibility with
-    // existing call sites but are currently UNUSED — execute() aims straight at the Hub instead
-    // (see FieldConstants.Hub.OPP_TARGET below). This drops shoot-on-move and the pass-target /
-    // shooter-offset correction that ShootingSuperstructure used to drive through this supplier.
     public AutoAimCommand(
             Swerve swerve,
             DoubleSupplier xSupplier,
@@ -78,8 +68,6 @@ public class AutoAimCommand extends Command {
         this.targetHeading = targetHeading;
         this.targetHeadingRate = targetHeadingRate;
         addRequirements(swerve);
-        headingController.enableContinuousInput(-Math.PI, Math.PI);
-        headingController.setTolerance(Math.toRadians(5));
     }
 
     @Override
@@ -193,20 +181,25 @@ public class AutoAimCommand extends Command {
     public void execute() {
         var robotPose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
 
-        // ---- 1. Aim state — always the Hub, no pass-target/shooter-offset correction. ----
-        Rotation2d target =
-                FieldConstants.Hub.OPP_TARGET
-                        .toTranslation2d()
-                        .minus(robotPose.getTranslation())
-                        .getAngle()
-                        .plus(Rotation2d.k180deg);
-        headingController.setSetpoint(target.getRadians());
-        double omega = headingController.calculate(robotPose.getRotation().getRadians());
-        double maxVel = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
+        // ---- 1. Alliance-aware target and shoot-on-move state ----
+        Rotation2d target = targetHeading.get();
+        double error = target.minus(robotPose.getRotation()).getRadians();
+        double ffVel =
+                MathUtil.clamp(
+                        targetHeadingRate.getAsDouble(),
+                        -FF_CLAMP_RAD_PER_SEC,
+                        FF_CLAMP_RAD_PER_SEC);
+        double measuredOmega = swerve.getYawVelocityRadPerSec();
+
+        // Direct gyro-rate damping is independent of PIDController's assumed 20 ms derivative
+        // period, so occasional scheduler overruns do not amplify the derivative term.
+        double omega =
+                ffVel + AutoAimParams.kP * error + AutoAimParams.kD * (ffVel - measuredOmega);
+        double maxVel = AutoAimParams.maxAngularVelRadPerSec;
         omega = MathUtil.clamp(omega, -maxVel, maxVel);
 
         // ---- 2. Driver translation (capped, driver-relative) ----
-        double maxSpeed = AutoAimParamsNT.maxSpeedMPS.getValue();
+        double maxSpeed = AutoAimParams.maxSpeedMPS;
         double x = MathUtil.applyDeadband(xSupplier.getAsDouble(), 0.1);
         double y = MathUtil.applyDeadband(ySupplier.getAsDouble(), 0.1);
         double vNorm = Math.hypot(x, y) * maxSpeed;
@@ -221,8 +214,8 @@ public class AutoAimCommand extends Command {
         // drivetrain can't execute — that dither is the terminal wiggle. Hysteresis on exit keeps
         // the wheels from flipping X<->drive at the boundary. It never engages while translating
         // (shoot-on-move) — then it just drives.
-        double lockLin = AutoAimParamsNT.lockLinearMetersPerSec.getValue();
-        double lockOmega = AutoAimParamsNT.lockOmegaRadPerSec.getValue();
+        double lockLin = AutoAimParams.lockLinearMetersPerSec;
+        double lockOmega = AutoAimParams.lockOmegaRadPerSec;
         if (oLocked) {
             if (vNorm > lockLin * LOCK_EXIT_FACTOR
                     || Math.abs(omega) > lockOmega * LOCK_EXIT_FACTOR) {
@@ -236,13 +229,18 @@ public class AutoAimCommand extends Command {
             swerve.runStopAndLock();
         } else {
             swerve.runTwist(
-                    ChassisSpeeds.fromFieldRelativeSpeeds(v.getX(), v.getY(), omega, driverHeading));
+                    ChassisSpeeds.fromFieldRelativeSpeeds(
+                            v.getX(), v.getY(), omega, driverHeading));
         }
 
         // ---- 4. Logging ----
-        Logger.recordOutput("AutoAim/onTarget", headingController.atSetpoint());
+        Logger.recordOutput("AutoAim/targetHeadingDeg", target.getDegrees());
+        Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
+        Logger.recordOutput(
+                "AutoAim/onTarget", Math.abs(error) <= Math.toRadians(AutoAimParams.toleranceDeg));
         Logger.recordOutput("AutoAim/oLocked", oLocked);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
+        Logger.recordOutput("AutoAim/omegaMeasured", measuredOmega);
     }
 
     @Override
@@ -256,22 +254,17 @@ public class AutoAimCommand extends Command {
     }
 
     /**
-     * NT-tunable heading-control gains for live tuning (sim or real) without recompiling. Generates
-     * AutoAimParamsNT; adjust under Params/AutoAim in AdvantageScope while holding aim.
-     *
-     * <p>TODO: sim gives only a ballpark (idealized SimpleSim rotational dynamics) — retune kP/kD
-     * on the real robot.
+     * Fixed heading-control gains. Simulation gives only a ballpark; retune on the real robot and
+     * commit the resulting values here.
      */
-    @NTParameter(tableName = "Params/AutoAim")
     public static final class AutoAimParams {
-        // Plain PIDController on heading error (no feedforward). On-robot values that gave a clean
-        // approach; the terminal wiggle those left is handled by the O-lock below, not by cranking
-        // kD. Retune on the real robot.
+        // omega = targetRate + kP * headingError + kD * (targetRate - measuredYawRate)
         public static final double kP = 2.5;
         public static final double kD = 0.2;
         // Hard cap on commanded yaw rate (rad/s). Drivetrain caps are ~7.85 rad/s; keep some
         // margin.
         public static final double maxAngularVelRadPerSec = 6.0;
+        public static final double toleranceDeg = 3.0;
         // Driver translation speed cap (m/s) while auto-aiming — slow, controlled aiming instead of
         // the full drivetrain limit.
         public static final double maxSpeedMPS = 1.0;

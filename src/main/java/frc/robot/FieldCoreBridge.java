@@ -10,12 +10,11 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.subsystems.Hopper.HopperParamsNT;
+import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
-import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
-import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
+import frc.robot.subsystems.Shooter.ShooterConfig;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -120,14 +119,14 @@ public class FieldCoreBridge extends SubsystemBase {
 
     private boolean isShooterActive() {
         return shooterUpper.getCurrSetpoint().in(RotationsPerSecond)
-                        > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
+                        > ShooterConfig.ShooterUpperParams.idleRPS + 1.0
                 || shooterLower.getCurrSetpoint().in(RotationsPerSecond)
-                        > ShooterLowerParamsNT.idleRPS.getValue() + 1.0;
+                        > ShooterConfig.ShooterLowerParams.idleRPS + 1.0;
     }
 
     private boolean isFeedActive() {
         return hopper.getCurrSetpoint().in(RotationsPerSecond)
-                > HopperParamsNT.idleRPS.getValue() + 0.05;
+                > HopperConfig.HopperParams.idleRPS + 0.05;
     }
 
     private static double[] poseToArray(Pose3d pose) {

@@ -6,7 +6,7 @@ import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import lib.ironpulse.subsystem.SubsystemConfig;
-import lib.ntext.NTParameter;
+import lib.ironpulse.subsystem.velocity.VelocityParamSources;
 
 public class HopperConfig {
     private static final CANBus CANBUS = ROBORIO_CAN_BUS;
@@ -35,7 +35,6 @@ public class HopperConfig {
                             })
                     .build();
 
-    @NTParameter(tableName = "Params/" + HOPPER_NAME)
     public static final class HopperParams {
         public static final double kP = 2;
         public static final double kI = 0.01;
@@ -48,6 +47,34 @@ public class HopperConfig {
         public static final double feedRPS = 20;
         public static final double shootRPS = 40;
         public static final double idleRPS = 0;
+
+        public static VelocityParamSources asVelocityParamSources() {
+            return new VelocityParamSources() {
+                public double kP() {
+                    return kP;
+                }
+
+                public double kI() {
+                    return kI;
+                }
+
+                public double kD() {
+                    return kD;
+                }
+
+                public double kV() {
+                    return kV;
+                }
+
+                public double kA() {
+                    return kA;
+                }
+
+                public double kS() {
+                    return kS;
+                }
+            };
+        }
 
         private HopperParams() {}
     }

@@ -1,11 +1,18 @@
 package frc.robot.subsystems.Intaker;
 
+import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
+import static edu.wpi.first.units.Units.Volts;
 
+import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.FunctionalCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import lib.ironpulse.io.MotorIO;
@@ -45,12 +52,12 @@ public class IntakerSubsystem extends SubsystemBase {
                                                                 currentMode
                                                                                 == IntakeMode
                                                                                         .EXTENDED_REVERSE
-                                                                        ? IntakerRollerParamsNT
+                                                                        ? IntakerConfig
+                                                                                .IntakerRollerParams
                                                                                 .outtakeRPS
-                                                                                .getValue()
-                                                                        : IntakerRollerParamsNT
-                                                                                .intakeRPS
-                                                                                .getValue()))
+                                                                        : IntakerConfig
+                                                                                .IntakerRollerParams
+                                                                                .intakeRPS))
                                         .until(
                                                 () ->
                                                         currentMode
@@ -164,15 +171,61 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command zeroCommand() {
-        return pivot.zeroCommand()
-                .andThen(
-                        Commands.runOnce(
-                                () -> {
-                                    pivotZeroed = true;
-                                    fallbackMode = IntakeMode.EXTENDED_IDLE;
-                                    currentMode = IntakeMode.EXTENDED_IDLE;
-                                },
-                                this));
+        Command simZero = pivot.zeroCommand().andThen(Commands.runOnce(this::finishPivotZeroing));
+        return Commands.either(buildRealPivotZeroCommand(), simZero, RobotBase::isReal);
+    }
+
+    private Command buildRealPivotZeroCommand() {
+        Timer zeroingTimer = new Timer();
+        LinearFilter currentFilter =
+                LinearFilter.movingAverage(IntakerConfig.INTAKER_PIVOT_ZEROING_FILTER_SIZE);
+        boolean[] hardStopDetected = {false};
+
+        return new FunctionalCommand(
+                () -> {
+                    pivotZeroed = false;
+                    hardStopDetected[0] = false;
+                    currentFilter.reset();
+                    zeroingTimer.restart();
+                    pivot.setEnableSoftLimits(false, false);
+                },
+                () -> {
+                    pivot.setVoltage(Volts.of(IntakerConfig.INTAKER_PIVOT_ZEROING_VOLTAGE));
+                    double filteredCurrent =
+                            currentFilter.calculate(pivot.getStatorCurrent().in(Amps));
+                    hardStopDetected[0] =
+                            zeroingTimer.hasElapsed(
+                                            IntakerConfig.INTAKER_PIVOT_ZEROING_MIN_TIME_SECONDS)
+                                    && filteredCurrent
+                                            > IntakerConfig
+                                                    .INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS;
+                },
+                interrupted -> {
+                    pivot.setVoltage(Volts.zero());
+                    zeroingTimer.stop();
+
+                    if (!interrupted && hardStopDetected[0]) {
+                        pivot.setCurrPos(IntakerConfig.INTAKER_PIVOT_ZERO_OFFSET);
+                        finishPivotZeroing();
+                    } else if (!interrupted) {
+                        DriverStation.reportWarning(
+                                "Intaker pivot zeroing timed out; zero position was not changed.",
+                                false);
+                    }
+
+                    pivot.setEnableSoftLimits(true, true);
+                },
+                () ->
+                        hardStopDetected[0]
+                                || zeroingTimer.hasElapsed(
+                                        IntakerConfig.INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS),
+                pivot);
+    }
+
+    private void finishPivotZeroing() {
+        pivotZeroed = true;
+        fallbackMode = IntakeMode.EXTENDED_IDLE;
+        currentMode = IntakeMode.EXTENDED_IDLE;
     }
 
     /** Live pivot angle, for 3D mechanism visualization / logging. */

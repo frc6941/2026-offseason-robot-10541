@@ -8,7 +8,8 @@ import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import edu.wpi.first.units.measure.Angle;
 import lib.ironpulse.subsystem.SubsystemConfig;
-import lib.ntext.NTParameter;
+import lib.ironpulse.subsystem.position.PositionParamSources;
+import lib.ironpulse.subsystem.velocity.VelocityParamSources;
 
 public class IntakerConfig {
 
@@ -40,6 +41,8 @@ public class IntakerConfig {
     // Must be above free-run current and below breaker / unsafe stall current.
     public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 10.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
+    public static final double INTAKER_PIVOT_ZEROING_MIN_TIME_SECONDS = 0.25;
+    public static final double INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS = 4.0;
 
     public enum IntakeMode {
         INTAKING, // Roller: Intake, Pivot: Extended
@@ -86,7 +89,6 @@ public class IntakerConfig {
                                     .build())
                     .build();
 
-    @NTParameter(tableName = "Params/" + INTAKER_ROLLER_NAME)
     public static final class IntakerRollerParams {
         public static final double kP = 1.5;
         public static final double kI = 0.0;
@@ -96,13 +98,38 @@ public class IntakerConfig {
         public static final double kA = 0.0;
         public static final double kS = 3.0;
 
-        // NT integers come back from NetworkTables as Long, which breaks the generated
-        // Integer wrapper on refresh() — keep all tunable NT numerics as double.
         public static final double intakeRPS = 100.0;
         public static final double outtakeRPS = -15.0;
+
+        public static VelocityParamSources asVelocityParamSources() {
+            return new VelocityParamSources() {
+                public double kP() {
+                    return kP;
+                }
+
+                public double kI() {
+                    return kI;
+                }
+
+                public double kD() {
+                    return kD;
+                }
+
+                public double kV() {
+                    return kV;
+                }
+
+                public double kA() {
+                    return kA;
+                }
+
+                public double kS() {
+                    return kS;
+                }
+            };
+        }
     }
 
-    @NTParameter(tableName = "Params/" + INTAKER_PIVOT_NAME)
     public static final class IntakerPivotParams {
         public static final double kP = 120.0;
         public static final double kI = 0.0;
@@ -123,5 +150,49 @@ public class IntakerConfig {
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
         public static final double retractedfeedPosAngle = 20.0;
+
+        public static PositionParamSources asPositionParamSources() {
+            return new PositionParamSources() {
+                public double kP() {
+                    return kP;
+                }
+
+                public double kI() {
+                    return kI;
+                }
+
+                public double kD() {
+                    return kD;
+                }
+
+                public double kV() {
+                    return kV;
+                }
+
+                public double kA() {
+                    return kA;
+                }
+
+                public double kS() {
+                    return kS;
+                }
+
+                public double kG() {
+                    return kG;
+                }
+
+                public double motionMagicVelRPS() {
+                    return motionMagicVelRPS;
+                }
+
+                public double motionMagicAccelRPS2() {
+                    return motionMagicAccelRPS2;
+                }
+
+                public double motionMagicJerkRPS3() {
+                    return motionMagicJerkRPS3;
+                }
+            };
+        }
     }
 }
