@@ -1,6 +1,7 @@
 package frc.robot.commands;
 
 import static edu.wpi.first.units.Units.MetersPerSecond;
+import static edu.wpi.first.units.Units.RadiansPerSecond;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ProfiledPIDController;
@@ -10,6 +11,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.FieldConstants;
+import frc.robot.RobotStateRecorder;
 import java.util.function.DoubleSupplier;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
@@ -43,37 +45,11 @@ public class AutoTrenchCommand extends Command {
     private static final double LEFT_TRENCH_Y = FieldConstants.LeftTrench.center.getY();
     private static final double RIGHT_TRENCH_Y = FieldConstants.RightTrench.center.getY();
 
-    // --- Lateral (Y) hold. Profiled so an off-center engage snaps in smoothly and arrives at rest.
-    // ---
-    private static final double LATERAL_KP = 4.2;
-    private static final double LATERAL_KD = 0.0;
-    private static final double LATERAL_MAX_VEL =
-            3.5; // m/s — deliberately gentle for the soft snap
-    private static final double LATERAL_MAX_ACCEL = 7.5; // m/s^2
-    private static final double LATERAL_TOLERANCE_METERS = 0.03;
-    private static final double LATERAL_VELOCITY_TOLERANCE_METERS_PER_SEC = 0.05;
-    private static final double LATERAL_OUTPUT_DEADBAND_METERS_PER_SEC = 0.03;
-    private final ProfiledPIDController yController =
-            new ProfiledPIDController(
-                    LATERAL_KP,
-                    0.0,
-                    LATERAL_KD,
-                    new TrapezoidProfile.Constraints(LATERAL_MAX_VEL, LATERAL_MAX_ACCEL));
-
-    // --- Heading hold (latched to 0 or π), same profiled approach as AutoAimCommand. ---
-    private static final double HEADING_KP = 6.0;
-    private static final double HEADING_KD = 0.0;
-    private static final double HEADING_MAX_VEL = 7.0; // rad/s
-    private static final double HEADING_MAX_ACCEL = 60.0; // rad/s^2
-    private static final double HEADING_TOLERANCE_RAD = Math.toRadians(1.0);
-    private static final double HEADING_VELOCITY_TOLERANCE_RAD_PER_SEC = 0.05;
-    private static final double HEADING_OUTPUT_DEADBAND_RAD_PER_SEC = 0.05;
-    private final ProfiledPIDController headingController =
-            new ProfiledPIDController(
-                    HEADING_KP,
-                    0.0,
-                    HEADING_KD,
-                    new TrapezoidProfile.Constraints(HEADING_MAX_VEL, HEADING_MAX_ACCEL));
+    // Lateral (Y) hold and heading hold are profiled PIDs. All gains/limits/tolerances are
+    // NT-tunable under Params/AutoTrench (see AutoTrenchParams at the bottom); the controllers are
+    // built from those params in the constructor.
+    private final ProfiledPIDController yController;
+    private final ProfiledPIDController headingController;
 
     // Latched at initialize() so the target can't flip while the robot is mid-trench.
     private double lockedTrenchY;
@@ -82,17 +58,36 @@ public class AutoTrenchCommand extends Command {
     public AutoTrenchCommand(Swerve swerve, DoubleSupplier xSupplier) {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
+
+        yController =
+                new ProfiledPIDController(
+                        AutoTrenchParams.lateralKP,
+                        0.0,
+                        AutoTrenchParams.lateralKD,
+                        new TrapezoidProfile.Constraints(
+                                AutoTrenchParams.lateralMaxVel, AutoTrenchParams.lateralMaxAccel));
         yController.setTolerance(
-                LATERAL_TOLERANCE_METERS, LATERAL_VELOCITY_TOLERANCE_METERS_PER_SEC);
+                AutoTrenchParams.lateralToleranceMeters,
+                AutoTrenchParams.lateralVelocityToleranceMetersPerSec);
+
+        headingController =
+                new ProfiledPIDController(
+                        AutoTrenchParams.headingKP,
+                        0.0,
+                        AutoTrenchParams.headingKD,
+                        new TrapezoidProfile.Constraints(
+                                AutoTrenchParams.headingMaxVel, AutoTrenchParams.headingMaxAccel));
         headingController.setTolerance(
-                HEADING_TOLERANCE_RAD, HEADING_VELOCITY_TOLERANCE_RAD_PER_SEC);
+                Math.toRadians(AutoTrenchParams.headingToleranceDeg),
+                AutoTrenchParams.headingVelocityToleranceRadPerSec);
         headingController.enableContinuousInput(-Math.PI, Math.PI);
+
         addRequirements(swerve);
     }
 
     @Override
     public void initialize() {
-        Pose2d pose = swerve.getEstimatedPose().toPose2d();
+        Pose2d pose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
 
         // Snap to whichever trench center is nearer in Y, and to the nearer square heading (0 vs
         // π).
@@ -108,16 +103,15 @@ public class AutoTrenchCommand extends Command {
 
         // Seed both profiles with the current state (field-frame lateral velocity + yaw rate) so
         // engaging mid-motion doesn't command a velocity discontinuity.
-        ChassisSpeeds fieldVel =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeeds(), pose.getRotation());
-        yController.reset(pose.getY(), fieldVel.vyMetersPerSecond);
-        headingController.reset(headingRad, swerve.getYawVelocityRadPerSec());
+        Pose2d fieldVel = RobotStateRecorder.getVelocityWorldRobotCurrent();
+        yController.reset(pose.getY(), fieldVel.getY());
+        headingController.reset(
+                headingRad, RobotStateRecorder.getOmegaRobotCurrent().in(RadiansPerSecond));
     }
 
     @Override
     public void execute() {
-        Pose2d pose = swerve.getEstimatedPose().toPose2d();
+        Pose2d pose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
         double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
 
         // Driver keeps only the through-trench axis. Forward on the stick is driver-station
@@ -131,8 +125,10 @@ public class AutoTrenchCommand extends Command {
         double vy =
                 yController.calculate(pose.getY(), new TrapezoidProfile.State(lockedTrenchY, 0.0))
                         + yController.getSetpoint().velocity;
-        vy = MathUtil.clamp(vy, -LATERAL_MAX_VEL, LATERAL_MAX_VEL);
-        if (yController.atGoal() || Math.abs(vy) < LATERAL_OUTPUT_DEADBAND_METERS_PER_SEC) {
+        double lateralMaxVel = AutoTrenchParams.lateralMaxVel;
+        vy = MathUtil.clamp(vy, -lateralMaxVel, lateralMaxVel);
+        if (yController.atGoal()
+                || Math.abs(vy) < AutoTrenchParams.lateralOutputDeadbandMetersPerSec) {
             vy = 0.0;
         }
 
@@ -142,8 +138,10 @@ public class AutoTrenchCommand extends Command {
                                 pose.getRotation().getRadians(),
                                 new TrapezoidProfile.State(lockedHeading.getRadians(), 0.0))
                         + headingController.getSetpoint().velocity;
-        omega = MathUtil.clamp(omega, -HEADING_MAX_VEL, HEADING_MAX_VEL);
-        if (headingController.atGoal() || Math.abs(omega) < HEADING_OUTPUT_DEADBAND_RAD_PER_SEC) {
+        double headingMaxVel = AutoTrenchParams.headingMaxVel;
+        omega = MathUtil.clamp(omega, -headingMaxVel, headingMaxVel);
+        if (headingController.atGoal()
+                || Math.abs(omega) < AutoTrenchParams.headingOutputDeadbandRadPerSec) {
             omega = 0.0;
         }
 
@@ -171,5 +169,27 @@ public class AutoTrenchCommand extends Command {
     public boolean isFinished() {
         // Hold-to-run: the whileTrue binding ends it on button release.
         return false;
+    }
+
+    public static final class AutoTrenchParams {
+        // --- Lateral (Y) hold. Profiled so an off-center engage snaps in smoothly and arrives at
+        // rest. ---
+        public static final double lateralKP = 4.2;
+        public static final double lateralKD = 0.0;
+        // m/s — deliberately gentle for the soft snap.
+        public static final double lateralMaxVel = 3.5;
+        public static final double lateralMaxAccel = 7.5; // m/s^2
+        public static final double lateralToleranceMeters = 0.03;
+        public static final double lateralVelocityToleranceMetersPerSec = 0.05;
+        public static final double lateralOutputDeadbandMetersPerSec = 0.03;
+
+        // --- Heading hold (latched to 0 or π), same profiled approach as AutoAimCommand. ---
+        public static final double headingKP = 6.0;
+        public static final double headingKD = 0.0;
+        public static final double headingMaxVel = 7.0; // rad/s
+        public static final double headingMaxAccel = 60.0; // rad/s^2
+        public static final double headingToleranceDeg = 1.0;
+        public static final double headingVelocityToleranceRadPerSec = 0.05;
+        public static final double headingOutputDeadbandRadPerSec = 0.05;
     }
 }

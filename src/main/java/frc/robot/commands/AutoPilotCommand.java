@@ -18,6 +18,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.RobotStateRecorder;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveLimit;
 import org.littletonrobotics.junction.Logger;
@@ -44,20 +45,6 @@ public class AutoPilotCommand extends Command {
     // deceleration so the chassis arrives at the target heading at zero angular velocity.
     private final ProfiledPIDController headingController;
 
-    // Heading-control gains for the rotational axis. Autopilot owns translation; this only steers
-    // yaw toward the target angle. Tune on the real robot.
-    private static final double HEADING_KP = 5.0;
-    private static final double HEADING_KD = 0.0;
-
-    // Profile tolerances / end behavior for the translational path (see APProfile).
-    private static final double ERROR_XY_METERS = 0.03;
-    private static final double ERROR_THETA_DEGREES = 2.0;
-    // Under this distance Autopilot drives straight at the target and stops respecting entry angle,
-    // so a small overshoot doesn't send it arcing all the way back around.
-    private static final double BEELINE_RADIUS_METERS = 0.30;
-    // End-of-path deceleration aggressiveness (m/s^3). Higher = later, harder braking.
-    private static final double JERK = 8.0;
-
     /**
      * @param swerve the drivetrain to command
      * @param target where to drive to (pose + optional entry angle / end velocity / rotation
@@ -73,25 +60,25 @@ public class AutoPilotCommand extends Command {
                 new APConstraints(
                         limit.maxLinearVelocity().in(MetersPerSecond),
                         limit.maxSkidAcceleration().in(MetersPerSecondPerSecond),
-                        JERK);
+                        AutoPilotParams.jerk);
         APProfile profile =
                 new APProfile(constraints)
-                        .withErrorXY(Meters.of(ERROR_XY_METERS))
-                        .withErrorTheta(Degrees.of(ERROR_THETA_DEGREES))
-                        .withBeelineRadius(Meters.of(BEELINE_RADIUS_METERS));
+                        .withErrorXY(Meters.of(AutoPilotParams.errorXYMeters))
+                        .withErrorTheta(Degrees.of(AutoPilotParams.errorThetaDegrees))
+                        .withBeelineRadius(Meters.of(AutoPilotParams.beelineRadiusMeters));
         this.autopilot = new Autopilot(profile);
 
         // Rotational constraints come from the swerve angular limits.
         headingController =
                 new ProfiledPIDController(
-                        HEADING_KP,
-                        0.0,
-                        HEADING_KD,
+                        AutoPilotParams.headingKP,
+                        AutoPilotParams.headingKI,
+                        AutoPilotParams.headingKD,
                         new TrapezoidProfile.Constraints(
                                 limit.maxAngularVelocity().in(RadiansPerSecond),
                                 limit.maxAngularAcceleration().in(RadiansPerSecondPerSecond)));
         headingController.enableContinuousInput(-Math.PI, Math.PI);
-        headingController.setTolerance(Math.toRadians(ERROR_THETA_DEGREES));
+        headingController.setTolerance(Math.toRadians(AutoPilotParams.errorThetaDegrees));
 
         addRequirements(swerve);
     }
@@ -101,17 +88,19 @@ public class AutoPilotCommand extends Command {
         // Seed the heading profile with the current heading + yaw rate so engaging mid-motion
         // doesn't
         // command a velocity discontinuity.
-        Pose2d pose = swerve.getEstimatedPose().toPose2d();
-        headingController.reset(pose.getRotation().getRadians(), swerve.getYawVelocityRadPerSec());
+        Pose2d pose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
+        headingController.reset(
+                pose.getRotation().getRadians(),
+                RobotStateRecorder.getOmegaRobotCurrent().in(RadiansPerSecond));
     }
 
     @Override
     public void execute() {
-        Pose2d currentPose = swerve.getEstimatedPose().toPose2d();
+        Pose2d currentPose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
         // Autopilot expects the robot-relative chassis speeds (it rotates them into field frame
         // using
         // the current pose internally).
-        ChassisSpeeds robotRelativeSpeeds = swerve.getChassisSpeeds();
+        ChassisSpeeds robotRelativeSpeeds = RobotStateRecorder.getChassisSpeeds();
 
         APResult result = autopilot.calculate(currentPose, robotRelativeSpeeds, target);
 
@@ -151,6 +140,25 @@ public class AutoPilotCommand extends Command {
     @Override
     public boolean isFinished() {
         // Done once Autopilot reports the pose within the profile's XY + theta tolerances.
-        return autopilot.atTarget(swerve.getEstimatedPose().toPose2d(), target);
+        return autopilot.atTarget(RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(), target);
+    }
+
+    public static final class AutoPilotParams {
+        // Heading-control gains for the rotational axis. Autopilot owns translation; this only
+        // steers
+        // yaw toward the target angle. Tune on the real robot.
+        public static final double headingKP = 5.0;
+        public static final double headingKI = 0.0;
+        public static final double headingKD = 0.0;
+
+        // Profile tolerances / end behavior for the translational path (see APProfile).
+        public static final double errorXYMeters = 0.03;
+        public static final double errorThetaDegrees = 2.0;
+        // Under this distance Autopilot drives straight at the target and stops respecting entry
+        // angle,
+        // so a small overshoot doesn't send it arcing all the way back around.
+        public static final double beelineRadiusMeters = 0.30;
+        // End-of-path deceleration aggressiveness (m/s^3). Higher = later, harder braking.
+        public static final double jerk = 8.0;
     }
 }
