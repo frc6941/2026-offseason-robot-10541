@@ -7,6 +7,7 @@ package frc.robot;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
+import static edu.wpi.first.units.Units.RadiansPerSecond;
 import static edu.wpi.first.units.Units.Seconds;
 
 import edu.wpi.first.math.geometry.Pose2d;
@@ -273,12 +274,12 @@ public class RobotContainer {
         // Feed the swerve pose into the transform tree (World->Robot). This is the single place the
         // robot's world pose enters RobotStateRecorder; everything alliance-aware (driver-relative
         // driving, flipped targets) derives from here. Runs every loop incl. disabled.
-        RobotStateRecorder.getInstance()
-                .putTransform(
-                        swerve.getEstimatedPose(),
-                        Seconds.of(Timer.getTimestamp()),
-                        TransformRecorder.kFrameWorld,
-                        TransformRecorder.kFrameRobot);
+        RobotStateRecorder.putRobotState(
+                Seconds.of(Timer.getTimestamp()),
+                swerve.getEstimatedPose(),
+                swerve.getChassisSpeeds(),
+                swerve.getChassisSpeedsCmd(),
+                RadiansPerSecond.of(swerve.getYawVelocityRadPerSec()));
         RobotStateRecorder.periodic();
 
         autoSelector.updateDashboard();
