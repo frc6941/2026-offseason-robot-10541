@@ -16,6 +16,7 @@ public final class AutoPoints {
     private static final double WALL_TO_ROBOT_CENTER_X =
             FieldConstants.Outpost.centerPoint.getX() + FieldConstants.RobotFootprint.fullApothemX;
     private static final double MID_EDGE_CLEARANCE_METERS = 0.35;
+    private static final double BUMP_DIAGONAL_OFFSET_METERS = 0.30;
 
     private static Translation2d verticalFlip(Translation2d blueTranslation) {
         return new Translation2d(
@@ -81,6 +82,22 @@ public final class AutoPoints {
                                 + FieldConstants.RobotFootprint.fullApothemX,
                         FieldConstants.LinesHorizontal.leftBumpMiddle);
         public static final Translation2d RIGHT_OUTER = verticalFlip(LEFT_OUTER);
+
+        // Cross each bump diagonally instead of driving square-on over its crest. The offset stays
+        // inside the usable bump width after accounting for the robot footprint.
+        public static final Translation2d LEFT_DIAGONAL_INNER =
+                LEFT_INNER.plus(new Translation2d(0.0, -BUMP_DIAGONAL_OFFSET_METERS));
+        public static final Translation2d LEFT_DIAGONAL_CENTER =
+                new Translation2d(
+                        FieldConstants.LinesVertical.hubCenter,
+                        FieldConstants.LinesHorizontal.leftBumpMiddle);
+        public static final Translation2d LEFT_DIAGONAL_OUTER =
+                LEFT_OUTER.plus(new Translation2d(0.0, BUMP_DIAGONAL_OFFSET_METERS));
+
+        public static final Translation2d RIGHT_DIAGONAL_INNER = verticalFlip(LEFT_DIAGONAL_INNER);
+        public static final Translation2d RIGHT_DIAGONAL_CENTER =
+                verticalFlip(LEFT_DIAGONAL_CENTER);
+        public static final Translation2d RIGHT_DIAGONAL_OUTER = verticalFlip(LEFT_DIAGONAL_OUTER);
 
         private Bump() {}
     }

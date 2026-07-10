@@ -7,7 +7,6 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.RobotConstants;
-import frc.robot.RobotStateRecorder;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.swerve.Swerve;
@@ -30,7 +29,7 @@ public final class AutoBuilder {
     }
 
     public Pose2d getCurrentPose() {
-        return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
+        return swerve.getEstimatedPose().toPose2d();
     }
 
     public static void configure(Swerve swerve) {
@@ -39,9 +38,9 @@ public final class AutoBuilder {
         }
 
         com.pathplanner.lib.auto.AutoBuilder.configure(
-                () -> RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(),
+                () -> swerve.getEstimatedPose().toPose2d(),
                 pose -> swerve.resetEstimatedPose(new Pose3d(pose)),
-                RobotStateRecorder::getChassisSpeeds,
+                swerve::getChassisSpeeds,
                 (ChassisSpeeds speeds) -> swerve.runTwist(speeds),
                 new PPHolonomicDriveController(
                         new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
