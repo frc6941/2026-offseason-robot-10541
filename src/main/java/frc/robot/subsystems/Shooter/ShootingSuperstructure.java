@@ -11,7 +11,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -27,7 +26,6 @@ import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
 import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
-import lib.ironpulse.swerve.Swerve;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -46,7 +44,6 @@ public class ShootingSuperstructure extends SubsystemBase {
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
     private final HopperSubsystem hopper;
-    private final Swerve swerve;
     private final ShotCalculator calculator = new ShotCalculator();
 
     // TODO: tune kRpsToMuzzleMps until the visualized arc lands in the hub at a known, stationary
@@ -57,13 +54,11 @@ public class ShootingSuperstructure extends SubsystemBase {
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower,
             PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood,
-            HopperSubsystem hopper,
-            Swerve swerve) {
+            HopperSubsystem hopper) {
         this.shooterUpper = shooterUpper;
         this.shooterLower = shooterLower;
         this.hood = hood;
         this.hopper = hopper;
-        this.swerve = swerve;
         cachedAimHeading = AutoAimCommand.getShooterAimHeading(robotPose());
     }
 
@@ -83,14 +78,12 @@ public class ShootingSuperstructure extends SubsystemBase {
      * à la 6328.
      */
     public double effectiveDistanceToTarget() {
-        ChassisSpeeds fieldVel =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), robotPose().getRotation());
+        Pose2d fieldVel = RobotStateRecorder.getVelocityWorldRobotCmdCurrent();
         return calculator.effectiveDistance(
                 robotPose().getTranslation(),
                 AutoAimCommand.getTarget(),
-                fieldVel.vxMetersPerSecond,
-                fieldVel.vyMetersPerSecond);
+                fieldVel.getX(),
+                fieldVel.getY());
     }
 
     /** The shot solution (hood angle + flywheel speed), shoot-on-move compensated. */
@@ -99,18 +92,16 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     private Rotation2d computeAimHeading() {
-        ChassisSpeeds fv =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), robotPose().getRotation());
-        double tof = calculator.timeOfFlightFor(distanceToTarget());
+        // Cache the pose once: robotPose() re-reads the transform buffer on every call (and can
+        // interpolate to a slightly different sample as the timestamp advances mid-method).
+        Pose2d pose = robotPose();
+        Pose2d fv = RobotStateRecorder.getVelocityWorldRobotCmdCurrent();
+        double tof =
+                calculator.timeOfFlightFor(
+                        AutoAimCommand.getDistanceToTarget(pose.getTranslation()));
         Translation2d lookahead =
-                robotPose()
-                        .getTranslation()
-                        .plus(
-                                new Translation2d(
-                                        fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof));
-        return AutoAimCommand.getShooterAimHeading(
-                new Pose2d(lookahead, robotPose().getRotation()));
+                pose.getTranslation().plus(new Translation2d(fv.getX() * tof, fv.getY() * tof));
+        return AutoAimCommand.getShooterAimHeading(new Pose2d(lookahead, pose.getRotation()));
     }
 
     // Below this magnitude the aim-heading rate is treated as zero. A stationary robot aimed at a
@@ -238,16 +229,21 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
-        Command readyWindow =
+        // Hold fire until all three shot DOFs are satisfied (chassis aimed, hood at angle, flywheel
+        // up to speed), bounded by the readiness budget, THEN feed for the requested window.
+        // Without
+        // this gate the hopper would push balls into a flywheel that is still spinning up / a
+        // chassis
+        // still turning to aim (the readyTimeoutSeconds budget the caller allots would go unused).
+        Command readyThenFeed =
                 Commands.sequence(
-                        Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS),
-                        Commands.waitSeconds(feedSeconds));
+                        Commands.waitUntil(this::readyToShoot).withTimeout(readyTimeoutSeconds),
+                        Commands.deadline(Commands.waitSeconds(feedSeconds), hopper.shoot()));
 
         return Commands.deadline(
-                readyWindow,
+                readyThenFeed,
                 runShooterAt(() -> currentSolution().shooterSpeed()),
-                hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterDelay());
+                hood.runMotionMagic(this::clampHoodAngleForSolution));
     }
 
     public Command feedShotForSeconds(double seconds) {
@@ -343,13 +339,10 @@ public class ShootingSuperstructure extends SubsystemBase {
         // --- Shoot-on-move visualization (drag these onto a 2D/3D Field in AdvantageScope) ---
         Pose2d pose = robotPose();
         Translation2d hub = AutoAimCommand.getTarget();
-        ChassisSpeeds fv =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), pose.getRotation());
+        Pose2d fv = RobotStateRecorder.getVelocityWorldRobotCmdCurrent();
         double tof = calculator.timeOfFlightFor(geometric);
         // How far the ball drifts downrange from inheriting chassis velocity over its flight.
-        Translation2d leadOffset =
-                new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
+        Translation2d leadOffset = new Translation2d(fv.getX() * tof, fv.getY() * tof);
         // The point the chassis actually aims at: the hub pulled back against our motion.
         Translation2d virtualTarget = hub.minus(leadOffset);
         // The internal dual the aim math uses: pretend the shooter is here, aim at the real hub.
@@ -374,7 +367,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                 // TODO: verify hood angle sign/zero maps to up-positive launch pitch vs CAD.
                 Rotation2d.fromDegrees(hood.getCurrPos().in(Degrees)),
                 solution.shooterSpeed().in(RotationsPerSecond) * kRpsToMuzzleMps,
-                new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond),
+                new Translation2d(fv.getX(), fv.getY()),
                 true,
                 "");
     }

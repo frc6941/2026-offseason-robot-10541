@@ -39,12 +39,19 @@ public final class AutoBuilder {
         }
 
         com.pathplanner.lib.auto.AutoBuilder.configure(
-                () -> swerve.getEstimatedPose().toPose2d(),
+                () -> RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(),
                 pose -> swerve.resetEstimatedPose(new Pose3d(pose)),
-                swerve::getChassisSpeeds,
+                RobotStateRecorder::getChassisSpeeds,
                 (ChassisSpeeds speeds) -> swerve.runTwist(speeds),
                 new PPHolonomicDriveController(
-                        new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
+                        new PIDConstants(
+                                AutoBuilderParamsNT.translationKP.getValue(),
+                                AutoBuilderParamsNT.translationKI.getValue(),
+                                AutoBuilderParamsNT.translationKD.getValue()),
+                        new PIDConstants(
+                                AutoBuilderParamsNT.rotationKP.getValue(),
+                                AutoBuilderParamsNT.rotationKI.getValue(),
+                                AutoBuilderParamsNT.rotationKD.getValue())),
                 RobotConstants.AUTO_ROBOT_CONFIG,
                 AllianceFlipUtil::shouldFlip,
                 swerve);

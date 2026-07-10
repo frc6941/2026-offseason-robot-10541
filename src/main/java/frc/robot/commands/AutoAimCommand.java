@@ -13,7 +13,6 @@ import frc.robot.RobotStateRecorder;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lib.ironpulse.swerve.Swerve;
-import lib.ironpulse.utils.AllianceFlipUtil;
 import lib.ntext.NTParameter;
 import org.littletonrobotics.junction.Logger;
 
@@ -28,8 +27,6 @@ public class AutoAimCommand extends Command {
     private final Swerve swerve;
     private final DoubleSupplier xSupplier;
     private final DoubleSupplier ySupplier;
-    private final Supplier<Rotation2d> targetHeading;
-    private final DoubleSupplier targetHeadingRate;
 
     public enum TargetMode {
         AUTO,
@@ -53,6 +50,8 @@ public class AutoAimCommand extends Command {
     // supplier — always aims straight at the Hub). O-lock (6328 stopWithO) picks up where the PID
     // leaves off: once settled, X-lock the wheels instead of commanding sub-stiction omegas the
     // drivetrain can't execute, which is what causes the terminal wiggle.
+    // NOTE: these gains are the on-robot-tuned values that actually run; AutoAimParams.kP/kD
+    // (2.5/0.2) are a documented-but-separate set — see summary.md before wiring them live here.
     private final PIDController headingController = new PIDController(2.0, 0.0, 0.05);
 
     // O-lock hysteresis: once settled and X-locked, only unlock when the commanded speed/omega
@@ -60,7 +59,7 @@ public class AutoAimCommand extends Command {
     private static final double LOCK_EXIT_FACTOR = 2.0;
 
     // True while the chassis is X-locked in the settled state (see execute()). Reset on each start.
-    private boolean oLocked = false;
+    private boolean xLocked = false;
 
     // targetHeading/targetHeadingRate are accepted for constructor-signature compatibility with
     // existing call sites but are currently UNUSED — execute() aims straight at the Hub instead
@@ -75,8 +74,6 @@ public class AutoAimCommand extends Command {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
         this.ySupplier = ySupplier;
-        this.targetHeading = targetHeading;
-        this.targetHeadingRate = targetHeadingRate;
         addRequirements(swerve);
         headingController.enableContinuousInput(-Math.PI, Math.PI);
         headingController.setTolerance(Math.toRadians(5));
@@ -84,7 +81,7 @@ public class AutoAimCommand extends Command {
 
     @Override
     public void initialize() {
-        oLocked = false;
+        xLocked = false;
     }
 
     // Drum shooter mounting relative to robot center, robot frame (+X fwd/intake, +Y left).
@@ -120,12 +117,8 @@ public class AutoAimCommand extends Command {
     }
 
     private static Translation2d getHubTarget() {
-        // Hub goal via the transform tree (stored blue, returned alliance-flipped). Equivalent to
-        // AllianceFlipUtil.apply(FieldConstants.Hub.getTarget2d()) but sourced from
-        // RobotStateRecorder.
-        return RobotStateRecorder.getPoseWorldTargetCurrent(RobotStateRecorder.kFrameGoal)
-                .getTranslation()
-                .toTranslation2d();
+        // Hub goal via the transform tree (stored blue, returned alliance-flipped).
+        return RobotStateRecorder.getTranslationTargetCurrent(RobotStateRecorder.kFrameGoal);
     }
 
     /**
@@ -151,19 +144,12 @@ public class AutoAimCommand extends Command {
     }
 
     public static Translation2d getPassTargetLeft() {
-        return AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_LEFT);
+        // Stored blue in the transform tree, returned alliance-flipped — same treatment as the hub.
+        return RobotStateRecorder.getTranslationTargetCurrent(RobotStateRecorder.kFramePassLeft);
     }
 
     public static Translation2d getPassTargetRight() {
-        return AllianceFlipUtil.apply(FieldConstants.PassTargets.BLUE_RIGHT);
-    }
-
-    private static boolean isPassingTarget(Translation2d robotPos) {
-        return switch (targetMode) {
-            case AUTO -> inNeutralZone(robotPos);
-            case HUB -> false;
-            case PASS_LEFT, PASS_RIGHT -> true;
-        };
+        return RobotStateRecorder.getTranslationTargetCurrent(RobotStateRecorder.kFramePassRight);
     }
 
     public static double getDistanceToTarget(Translation2d robotPos) {
@@ -178,14 +164,10 @@ public class AutoAimCommand extends Command {
         Translation2d target = getTarget(robotPose.getTranslation());
         Rotation2d bearing = target.minus(robotPose.getTranslation()).getAngle();
         double distance = target.getDistance(robotPose.getTranslation());
+        // asin already returns [-π/2, π/2]; the inner clamp guards its domain, so no outer clamp.
         Rotation2d lateralCorrection =
                 new Rotation2d(
-                        MathUtil.clamp(
-                                Math.asin(
-                                        MathUtil.clamp(
-                                                ROBOT_TO_SHOOTER.getY() / distance, -1.0, 1.0)),
-                                -Math.PI,
-                                Math.PI));
+                        Math.asin(MathUtil.clamp(ROBOT_TO_SHOOTER.getY() / distance, -1.0, 1.0)));
         return bearing.plus(lateralCorrection).plus(ROBOT_TO_SHOOTER.getRotation());
     }
 
@@ -223,25 +205,26 @@ public class AutoAimCommand extends Command {
         // (shoot-on-move) — then it just drives.
         double lockLin = AutoAimParamsNT.lockLinearMetersPerSec.getValue();
         double lockOmega = AutoAimParamsNT.lockOmegaRadPerSec.getValue();
-        if (oLocked) {
+        if (xLocked) {
             if (vNorm > lockLin * LOCK_EXIT_FACTOR
                     || Math.abs(omega) > lockOmega * LOCK_EXIT_FACTOR) {
-                oLocked = false;
+                xLocked = false;
             }
         } else if (vNorm < lockLin && Math.abs(omega) < lockOmega) {
-            oLocked = true;
+            xLocked = true;
         }
 
-        if (oLocked) {
+        if (xLocked) {
             swerve.runStopAndLock();
         } else {
             swerve.runTwist(
-                    ChassisSpeeds.fromFieldRelativeSpeeds(v.getX(), v.getY(), omega, driverHeading));
+                    ChassisSpeeds.fromFieldRelativeSpeeds(
+                            v.getX(), v.getY(), omega, driverHeading));
         }
 
         // ---- 4. Logging ----
         Logger.recordOutput("AutoAim/onTarget", headingController.atSetpoint());
-        Logger.recordOutput("AutoAim/oLocked", oLocked);
+        Logger.recordOutput("AutoAim/xLocked", xLocked);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
     }
 

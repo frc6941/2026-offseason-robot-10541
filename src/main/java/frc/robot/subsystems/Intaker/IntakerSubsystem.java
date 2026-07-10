@@ -8,6 +8,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
+import java.util.function.Supplier;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -51,60 +52,52 @@ public class IntakerSubsystem extends SubsystemBase {
                                                                         : IntakerRollerParamsNT
                                                                                 .intakeRPS
                                                                                 .getValue()))
-                                        .until(
-                                                () ->
-                                                        currentMode
-                                                                        != IntakerConfig.IntakeMode
-                                                                                .INTAKING
-                                                                && currentMode != IntakeMode.FEEDING
-                                                                && currentMode
-                                                                        != IntakeMode
-                                                                                .EXTENDED_REVERSE
-                                                                && currentMode
-                                                                        != IntakeMode
-                                                                                .RETRACTED_FEEDING),
-                                roller.runStop()
-                                        .until(
-                                                () ->
-                                                        currentMode == IntakeMode.INTAKING
-                                                                || currentMode == IntakeMode.FEEDING
-                                                                || currentMode
-                                                                        == IntakeMode
-                                                                                .EXTENDED_REVERSE
-                                                                || currentMode
-                                                                        == IntakeMode
-                                                                                .RETRACTED_FEEDING),
-                                () ->
-                                        currentMode == IntakeMode.INTAKING
-                                                || currentMode == IntakeMode.FEEDING
-                                                || currentMode == IntakeMode.EXTENDED_REVERSE
-                                                || currentMode == IntakeMode.RETRACTED_FEEDING)
+                                        .until(() -> !isActive()),
+                                roller.runStop().until(this::isActive),
+                                this::isActive)
                         .repeatedly());
 
         pivot.setDefaultCommand(
-                pivot.runStop()
-                        .until(() -> pivotZeroed)
-                        .andThen(runPivotTo(this::pivotTargetAngle)));
+                pivot.runStop().until(() -> pivotZeroed).andThen(runPivotTo(pivotTargetAngle())));
     }
 
-    private Command runPivotTo(java.util.function.Supplier<Angle> target) {
+    /**
+     * True in the "active" intake modes — deployed and running the roller (intaking, feeding,
+     * reversing, or retracted-feeding). Drives the roller default command and is the single source
+     * for "is the intake doing something" used by the indicator and the FieldCore telemetry bridge,
+     * so that four-way check lives in exactly one place.
+     */
+    public boolean isActive() {
+        return currentMode == IntakeMode.INTAKING
+                || currentMode == IntakeMode.FEEDING
+                || currentMode == IntakeMode.EXTENDED_REVERSE
+                || currentMode == IntakeMode.RETRACTED_FEEDING;
+    }
+
+    private Command runPivotTo(Supplier<Angle> target) {
         return pivot.runPosition(target);
     }
 
-    private Angle pivotTargetAngle() {
-        if (!pivotZeroed) {
-            return pivot.getCurrPos();
-        }
+    private Supplier<Angle> pivotTargetAngle() {
+        // Return ONE supplier that re-reads pivotZeroed/currentMode every loop. runPosition() calls
+        // get() each iteration, so the pivot default command tracks live mode changes instead of
+        // latching the branch chosen at command-construction time (when pivotZeroed was still
+        // false).
+        return () -> {
+            if (!pivotZeroed) {
+                return pivot.getCurrPos();
+            }
 
-        return switch (currentMode) {
-            case INTAKING -> Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle);
-            case EXTENDED_IDLE, EXTENDED_REVERSE ->
-                    Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle);
-            case RETRACTED -> Degrees.of(IntakerConfig.IntakerPivotParams.retractPosAngle);
-            case FEEDING -> Degrees.of(IntakerConfig.IntakerPivotParams.feedPosAngle);
-            case RETRACTED_FEEDING ->
-                    Degrees.of(IntakerConfig.IntakerPivotParams.retractedfeedPosAngle);
-            default -> Degrees.of(IntakerConfig.IntakerPivotParams.retractPosAngle);
+            return switch (currentMode) {
+                case INTAKING -> Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
+                case EXTENDED_IDLE, EXTENDED_REVERSE ->
+                        Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
+                case RETRACTED -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
+                case FEEDING -> Degrees.of(IntakerPivotParamsNT.feedPosAngle.getValue());
+                case RETRACTED_FEEDING ->
+                        Degrees.of(IntakerPivotParamsNT.retractedfeedPosAngle.getValue());
+                default -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
+            };
         };
     }
 
@@ -132,15 +125,7 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command runExtendedIdle() {
-        return Commands.runOnce(
-                () -> {
-                    fallbackMode = IntakeMode.EXTENDED_IDLE;
-
-                    if (currentMode != IntakeMode.FEEDING
-                            && currentMode != IntakeMode.EXTENDED_REVERSE) {
-                        currentMode = IntakeMode.EXTENDED_IDLE;
-                    }
-                });
+        return Commands.runOnce(() -> setIntakeMode(IntakeMode.EXTENDED_IDLE));
     }
 
     public Command runFeed() {

@@ -117,7 +117,9 @@ public class ShotCalculator {
      */
     @NTParameter(tableName = "Params/Shooting")
     public static final class ShootingParams {
-        // TODO: tune hood angle (deg) per distance breakpoint on the real robot
+        // TODO: tune hood angle (deg) per distance breakpoint on the real robot.
+        // These must stay within ShooterConfig.HOOD_MAX_ANGLE — the solved angle is clamped to that
+        // ceiling (ShootingSuperstructure.clampHoodAngle), so any row above it is unreachable.
         public static final double hoodAngleDeg2m = 10.0;
         public static final double hoodAngleDeg3m = 18.0;
         public static final double hoodAngleDeg4m = 24.0;

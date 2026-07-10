@@ -7,6 +7,7 @@ package frc.robot;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
+import static edu.wpi.first.units.Units.RadiansPerSecond;
 import static edu.wpi.first.units.Units.Seconds;
 
 import edu.wpi.first.math.geometry.Pose2d;
@@ -28,6 +29,7 @@ import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
+import frc.robot.subsystems.Limelight.LimelightParams;
 import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
@@ -41,7 +43,6 @@ import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
-import lib.ironpulse.limelight.DeviationParamSources;
 import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
@@ -85,11 +86,7 @@ public class RobotContainer {
             buildHood();
     private final ShootingSuperstructure shootingSuperstructure =
             new ShootingSuperstructure(
-                    shooterUpperSubsystem,
-                    shooterLowerSubsystem,
-                    hoodSubsystem,
-                    hopperSubsystem,
-                    swerve);
+                    shooterUpperSubsystem, shooterLowerSubsystem, hoodSubsystem, hopperSubsystem);
     private final AutoBuilder autoBuilder =
             new AutoBuilder(intaker, swerve, shootingSuperstructure);
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
@@ -276,19 +273,24 @@ public class RobotContainer {
         // Feed the swerve pose into the transform tree (World->Robot). This is the single place the
         // robot's world pose enters RobotStateRecorder; everything alliance-aware (driver-relative
         // driving, flipped targets) derives from here. Runs every loop incl. disabled.
-        RobotStateRecorder.getInstance()
-                .putTransform(
-                        swerve.getEstimatedPose(),
-                        Seconds.of(Timer.getTimestamp()),
-                        TransformRecorder.kFrameWorld,
-                        TransformRecorder.kFrameRobot);
+        // Push the whole robot-state sample (pose + measured/commanded velocity + yaw rate) in one
+        // call, stamped with a single loop timestamp so pose and velocity buffer under the same
+        // key.
+        // This is the ONE place the swerve is read; every pose/velocity consumer derives from the
+        // recorder. The recorder holds no swerve reference — we hand it plain values.
+        RobotStateRecorder.putRobotState(
+                Seconds.of(Timer.getTimestamp()),
+                swerve.getEstimatedPose(),
+                swerve.getChassisSpeeds(),
+                swerve.getChassisSpeedsCmd(),
+                RadiansPerSecond.of(swerve.getYawVelocityRadPerSec()));
         RobotStateRecorder.periodic();
 
         autoSelector.updateDashboard();
 
         // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's
         // callbacks).
-        FieldPublisher.setRobotPose(swerve.getEstimatedPose().toPose2d());
+        FieldPublisher.setRobotPose(RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d());
 
         // Vision ghost — re-homed out of the vendored lib so future lib copies stay drop-in. Logs
         // the
@@ -350,11 +352,7 @@ public class RobotContainer {
         }
 
         // --- 4. Intaker-deployed states ---
-        var intakeMode = intaker.getCurrentMode();
-        if (intakeMode == IntakerConfig.IntakeMode.INTAKING
-                || intakeMode == IntakerConfig.IntakeMode.FEEDING
-                || intakeMode == IntakerConfig.IntakeMode.EXTENDED_REVERSE
-                || intakeMode == IntakerConfig.IntakeMode.RETRACTED_FEEDING) {
+        if (intaker.isActive()) {
             indicator.setPattern(IndicatorIO.Patterns.INTAKE);
             return;
         }
@@ -439,28 +437,8 @@ public class RobotContainer {
                         swerve::getIMUYaw,
                         swerve::getYawVelocityRadPerSec,
                         () -> false,
-                        // TODO: tune vision std-devs on the real robot.
-                        new DeviationParamSources() {
-                            public double xStdDev() {
-                                return 0.7;
-                            }
-
-                            public double yStdDev() {
-                                return 0.7;
-                            }
-
-                            public double zStdDev() {
-                                return 9999.0;
-                            }
-
-                            public double angleStdDev() {
-                                return 999999999.0;
-                            }
-
-                            public double imuCorrectionReliabilityThreshold() {
-                                return 0.9;
-                            }
-                        });
+                        // Std-devs are tuned live over NetworkTables; see LimelightParams.
+                        LimelightParams.deviationParamSources());
         return new LimelightSubsystem(swerve, io);
     }
 

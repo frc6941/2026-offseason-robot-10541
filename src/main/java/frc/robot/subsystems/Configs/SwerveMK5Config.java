@@ -32,7 +32,7 @@ public final class SwerveMK5Config {
     // Per-module physical limits (MK5n R1 + Kraken X60/X44 with FOC)
     public static final SwerveModuleLimit kDefaultSwerveModuleLimit =
             SwerveModuleLimit.builder()
-                    .maxDriveVelocity(InchesPerSecond.of(5800 / 60.0 / 7.03 * Math.PI * 4.0))
+                    .maxDriveVelocity(InchesPerSecond.of(5800 / 60.0 / 6.03 * Math.PI * 4.0))
                     .maxDriveAcceleration(MetersPerSecondPerSecond.of(200))
                     .maxSteerAngularVelocity(RotationsPerSecond.of(7368.0 / 60.0 / (287.0 / 11.0)))
                     .maxSteerAngularAcceleration(

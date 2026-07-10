@@ -12,7 +12,6 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Hopper.HopperParamsNT;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
-import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
@@ -59,8 +58,8 @@ public class FieldCoreBridge extends SubsystemBase {
 
     @Override
     public void periodic() {
-        Pose3d pose = swerve.getEstimatedPose();
-        ChassisSpeeds chassisSpeeds = swerve.getChassisSpeeds();
+        Pose3d pose = RobotStateRecorder.getPoseWorldRobotCurrent();
+        ChassisSpeeds chassisSpeeds = RobotStateRecorder.getChassisSpeeds();
         SwerveModuleState[] moduleStates = swerve.getModuleStates();
         boolean intakeEnabled = isIntakeEnabled();
         boolean shooterActive = isShooterActive();
@@ -70,6 +69,13 @@ public class FieldCoreBridge extends SubsystemBase {
             shootCount++;
         }
         previousShootCommand = shootCommand;
+
+        // Snapshot each setpoint/position once — they feed both the NT table and the AdvantageKit
+        // log below, and don't change within a loop.
+        double shooterUpperRPM = shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0;
+        double shooterLowerRPM = shooterLower.getCurrSetpoint().in(RotationsPerSecond) * 60.0;
+        double hoodAngleDeg = hood.getCurrPos().in(Degrees);
+        double hoodTargetDeg = hood.getCurrSetpoint().in(Degrees);
 
         table.getEntry("Enabled").setBoolean(DriverStation.isEnabled());
         table.getEntry("PoseEstimate").setDoubleArray(poseToArray(pose));
@@ -83,39 +89,28 @@ public class FieldCoreBridge extends SubsystemBase {
         table.getEntry("ModuleStates").setDoubleArray(moduleStatesToArray(moduleStates));
         table.getEntry("IntakeEnabled").setBoolean(intakeEnabled);
         table.getEntry("ShooterEnabled").setBoolean(shooterActive);
-        table.getEntry("ShooterRPM")
-                .setDouble(shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
-        table.getEntry("ShooterUpperRPM")
-                .setDouble(shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
-        table.getEntry("ShooterLowerRPM")
-                .setDouble(shooterLower.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
-        table.getEntry("HoodAngleDeg").setDouble(hood.getCurrPos().in(Degrees));
-        table.getEntry("HoodTargetDeg").setDouble(hood.getCurrSetpoint().in(Degrees));
+        table.getEntry("ShooterRPM").setDouble(shooterUpperRPM);
+        table.getEntry("ShooterUpperRPM").setDouble(shooterUpperRPM);
+        table.getEntry("ShooterLowerRPM").setDouble(shooterLowerRPM);
+        table.getEntry("HoodAngleDeg").setDouble(hoodAngleDeg);
+        table.getEntry("HoodTargetDeg").setDouble(hoodTargetDeg);
         table.getEntry("ShootCommand").setBoolean(shootCommand);
         table.getEntry("ShootCount").setDouble(shootCount);
 
         Logger.recordOutput("FieldCoreBridge/IntakeEnabled", intakeEnabled);
         Logger.recordOutput("FieldCoreBridge/FeedActive", feedActive);
         Logger.recordOutput("FieldCoreBridge/ShooterEnabled", shooterActive);
-        Logger.recordOutput(
-                "FieldCoreBridge/ShooterUpperRPM",
-                shooterUpper.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
-        Logger.recordOutput(
-                "FieldCoreBridge/ShooterLowerRPM",
-                shooterLower.getCurrSetpoint().in(RotationsPerSecond) * 60.0);
-        Logger.recordOutput("FieldCoreBridge/HoodAngleDeg", hood.getCurrPos().in(Degrees));
-        Logger.recordOutput("FieldCoreBridge/HoodTargetDeg", hood.getCurrSetpoint().in(Degrees));
+        Logger.recordOutput("FieldCoreBridge/ShooterUpperRPM", shooterUpperRPM);
+        Logger.recordOutput("FieldCoreBridge/ShooterLowerRPM", shooterLowerRPM);
+        Logger.recordOutput("FieldCoreBridge/HoodAngleDeg", hoodAngleDeg);
+        Logger.recordOutput("FieldCoreBridge/HoodTargetDeg", hoodTargetDeg);
         Logger.recordOutput("FieldCoreBridge/ShootCommand", shootCommand);
         Logger.recordOutput("FieldCoreBridge/ShootCount", shootCount);
         Logger.recordOutput("FieldCoreBridge/ModuleStates", moduleStates);
     }
 
     private boolean isIntakeEnabled() {
-        IntakeMode mode = intaker.getCurrentMode();
-        return mode == IntakeMode.INTAKING
-                || mode == IntakeMode.FEEDING
-                || mode == IntakeMode.EXTENDED_REVERSE
-                || mode == IntakeMode.RETRACTED_FEEDING;
+        return intaker.isActive();
     }
 
     private boolean isShooterActive() {

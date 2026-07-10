@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.commands.AutoAimCommand;
+import frc.robot.commands.AutoAimParamsNT;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import java.util.ArrayList;
@@ -29,28 +30,8 @@ import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
 
 public final class AutoCommands {
-    public static final PathConstraints PRECISE_CONSTRAINTS =
-            new PathConstraints(4.0, 2.0, Math.toRadians(360.0), Math.toRadians(540.0));
-    public static final PathConstraints INTAKE_MEDIUM_CONSTRAINTS =
-            new PathConstraints(4.0, 2.5, Math.toRadians(360.0), Math.toRadians(540.0));
-    public static final PathConstraints TRANSIT_CONSTRAINTS =
-            new PathConstraints(4.0, 4.0, Math.toRadians(540.0), Math.toRadians(720.0));
-    public static final double AUTO_DURATION_SECONDS = 20.0;
-    public static final double AUTO_RETURN_TIMEOUT_SECONDS = 3.0;
-    public static final double AUTO_SHOOT_READY_TIMEOUT_SECONDS = 2.0;
-    public static final double AUTO_SHOOT_FEED_SECONDS = 3.0;
-    public static final double AUTO_MOVE_SHOT_FEED_SECONDS = 2.5;
-    private static final double AUTO_THROUGH_VELOCITY_METERS_PER_SECOND = 2.0;
-    private static final double AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND = 1.5;
-    private static final double MOVE_SHOT_TRANSLATION_KP = 10.0;
-    private static final double MOVE_SHOT_TRANSLATION_KD = 0.35;
-    private static final double MOVE_SHOT_ROTATION_KP = 8.0;
-    private static final double MOVE_SHOT_ROTATION_KD = 0.2;
-    private static final double AUTO_TRANSLATION_TOLERANCE_METERS = 0.10;
-    private static final Angle AUTO_ROTATION_TOLERANCE = Units.Degrees.of(3.0);
     private static final PIDController rotationController =
-            new PIDController(AutoAimCommand.AutoAimParams.kP, 0.0, 0.0);
-    private static final int MID_WAVE_SAMPLE_COUNT = 9;
+            new PIDController(AutoAimParamsNT.kP.getValue(), 0.0, 0.0);
 
     public enum NeutralSweepMode {
         CONSERVATIVE,
@@ -99,7 +80,8 @@ public final class AutoCommands {
         return Commands.deadline(
                 Commands.sequence(
                         shootingSuperstructure.shootWhenReadyForSeconds(
-                                AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_SHOOT_FEED_SECONDS),
+                                AutoCommandParamsNT.autoShootReadyTimeoutSeconds.getValue(),
+                                AutoCommandParamsNT.autoShootFeedSeconds.getValue()),
                         shootingSuperstructure.idle().withTimeout(0.05)),
                 intaker.holdRetractedFeedPosition());
     }
@@ -109,7 +91,8 @@ public final class AutoCommands {
         return Commands.deadline(
                 Commands.sequence(
                         shootingSuperstructure.shootWhenReadyForSeconds(
-                                AUTO_SHOOT_READY_TIMEOUT_SECONDS, AUTO_MOVE_SHOT_FEED_SECONDS),
+                                AutoCommandParamsNT.autoShootReadyTimeoutSeconds.getValue(),
+                                AutoCommandParamsNT.autoMoveShotFeedSeconds.getValue()),
                         shootingSuperstructure.idle().withTimeout(0.05)),
                 intaker.holdRetractedFeedPosition());
     }
@@ -129,13 +112,14 @@ public final class AutoCommands {
         Rotation2d goal = flipBlueHeading(blueHeading);
         Rotation2d current = AutoBuilder.getCurrentPose().getRotation();
         double errorDeg = Math.abs(current.minus(goal).getDegrees());
-        return errorDeg <= AUTO_ROTATION_TOLERANCE.in(Units.Degrees);
+        return errorDeg <= AutoCommandParamsNT.autoRotationToleranceDegrees.getValue();
     }
 
     private static boolean translationAtBlueGoal(Translation2d blueTranslation) {
         Translation2d goal = AllianceFlipUtil.apply(blueTranslation);
         Translation2d current = AutoBuilder.getCurrentPose().getTranslation();
-        return current.getDistance(goal) <= AUTO_TRANSLATION_TOLERANCE_METERS;
+        return current.getDistance(goal)
+                <= AutoCommandParamsNT.autoTranslationToleranceMeters.getValue();
     }
 
     private static boolean poseAtGoal(
@@ -154,8 +138,7 @@ public final class AutoCommands {
         return Commands.run(
                         () -> {
                             Rotation2d goalHeading = flipBlueHeading(blueHeading);
-                            Rotation2d currentHeading =
-                                    swerve.getEstimatedPose().toPose2d().getRotation();
+                            Rotation2d currentHeading = AutoBuilder.getCurrentPose().getRotation();
                             double omega =
                                     rotationController.calculate(
                                             currentHeading.getRadians(), goalHeading.getRadians());
@@ -182,7 +165,7 @@ public final class AutoCommands {
         rotationController.enableContinuousInput(-Math.PI, Math.PI);
         return Commands.run(
                         () -> {
-                            Pose2d currentPose = swerve.getEstimatedPose().toPose2d();
+                            Pose2d currentPose = AutoBuilder.getCurrentPose();
                             Pose2d targetPose = targetPoseSupplier.get();
                             Pose2d targetRobot = targetPose.relativeTo(currentPose);
 
@@ -219,7 +202,7 @@ public final class AutoCommands {
                 .until(
                         () ->
                                 poseAtGoal(
-                                        swerve.getEstimatedPose().toPose2d(),
+                                        AutoBuilder.getCurrentPose(),
                                         targetPoseSupplier.get(),
                                         translationTolerance,
                                         rotationTolerance))
@@ -547,22 +530,27 @@ public final class AutoCommands {
             end = temp;
         }
 
-        List<Pose2d> wavePoses = new ArrayList<>(MID_WAVE_SAMPLE_COUNT);
-        List<RotationTarget> rotationTargets = new ArrayList<>(MID_WAVE_SAMPLE_COUNT - 1);
+        List<Pose2d> wavePoses =
+                new ArrayList<>(AutoCommandParamsNT.midWaveSampleCount.getValue().intValue());
+        List<RotationTarget> rotationTargets =
+                new ArrayList<>(AutoCommandParamsNT.midWaveSampleCount.getValue().intValue() - 1);
         Translation2d line = end.minus(start);
         double lineLength = line.getNorm();
         Translation2d unitNormal =
                 lineLength <= 1e-6
                         ? new Translation2d(0.0, 0.0)
                         : new Translation2d(-line.getY() / lineLength, line.getX() / lineLength);
-        for (int i = 0; i < MID_WAVE_SAMPLE_COUNT; i++) {
-            double t = endProgress * i / (MID_WAVE_SAMPLE_COUNT - 1);
+        for (int i = 0; i < AutoCommandParamsNT.midWaveSampleCount.getValue().intValue(); i++) {
+            double t =
+                    endProgress
+                            * i
+                            / (AutoCommandParamsNT.midWaveSampleCount.getValue().intValue() - 1);
             Translation2d base = start.interpolate(end, t);
             double offset = AutoPoints.NeutralZone.waveOffset(t, amplitudeMeters);
             Translation2d point = base.plus(unitNormal.times(offset));
             Rotation2d heading = waveTangentHeading(start, end, t, amplitudeMeters);
             wavePoses.add(new Pose2d(point, heading));
-            if (i < MID_WAVE_SAMPLE_COUNT - 1) {
+            if (i < AutoCommandParamsNT.midWaveSampleCount.getValue().intValue() - 1) {
                 rotationTargets.add(new RotationTarget(i, heading));
             }
         }
@@ -575,10 +563,11 @@ public final class AutoCommands {
                 List.of(),
                 List.of(),
                 List.of(),
-                INTAKE_MEDIUM_CONSTRAINTS,
+                AutoParams.intakeMediumConstraints(),
                 new IdealStartingState(0.0, startPose.getRotation()),
                 new GoalEndState(
-                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND, endPose.getRotation()),
+                        AutoCommandParamsNT.autoIntakeThroughVelocity.getValue(),
+                        endPose.getRotation()),
                 false);
     }
 
@@ -599,7 +588,7 @@ public final class AutoCommands {
                         amplitudeMeters,
                         kind == MidKind.HALF ? 0.5 : 1.0);
         capturePreviewPath(path);
-        Command sweep = AutoBuilder.pathfindThenFollowPath(path, PRECISE_CONSTRAINTS);
+        Command sweep = AutoBuilder.pathfindThenFollowPath(path, AutoParams.preciseConstraints());
         if (kind == MidKind.HALF && !skipHalfHomeLeg) {
             Pose2d endPose = path.getPathPoses().get(path.getPathPoses().size() - 1);
             sweep =
@@ -609,8 +598,8 @@ public final class AutoCommands {
                                     swerve,
                                     halfSweepHomeTowerPoint(endPose.getTranslation()),
                                     Rotation2d.kPi,
-                                    INTAKE_MEDIUM_CONSTRAINTS,
-                                    AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+                                    AutoParams.intakeMediumConstraints(),
+                                    AutoCommandParamsNT.autoIntakeThroughVelocity.getValue()));
         }
         return runWhileIntaking(sweep, intaker);
     }
@@ -665,8 +654,10 @@ public final class AutoCommands {
                             swerve,
                             points[i],
                             heading,
-                            i == 0 ? PRECISE_CONSTRAINTS : INTAKE_MEDIUM_CONSTRAINTS,
-                            AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+                            i == 0
+                                    ? AutoParams.preciseConstraints()
+                                    : AutoParams.intakeMediumConstraints(),
+                            AutoCommandParamsNT.autoIntakeThroughVelocity.getValue()));
         }
         if (kind == MidKind.HALF && !isFlightlessModeForHalf(mode)) {
             sweepSegments.add(
@@ -674,8 +665,8 @@ public final class AutoCommands {
                             swerve,
                             halfSweepHomeTowerPoint(points[points.length - 1]),
                             Rotation2d.kPi,
-                            INTAKE_MEDIUM_CONSTRAINTS,
-                            AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND));
+                            AutoParams.intakeMediumConstraints(),
+                            AutoCommandParamsNT.autoIntakeThroughVelocity.getValue()));
         }
 
         Command sweep = Commands.sequence(sweepSegments.toArray(Command[]::new));
@@ -713,12 +704,16 @@ public final class AutoCommands {
                                                 AllianceFlipUtil.apply(targetTranslation),
                                                 shootingSuperstructure.aimHeading()),
                                 new PIDController(
-                                        MOVE_SHOT_TRANSLATION_KP, 0.0, MOVE_SHOT_TRANSLATION_KD),
+                                        AutoCommandParamsNT.moveShotTranslationKP.getValue(),
+                                        0.0,
+                                        AutoCommandParamsNT.moveShotTranslationKD.getValue()),
                                 new PIDController(
-                                        MOVE_SHOT_ROTATION_KP, 0.0, MOVE_SHOT_ROTATION_KD),
+                                        AutoCommandParamsNT.moveShotRotationKP.getValue(),
+                                        0.0,
+                                        AutoCommandParamsNT.moveShotRotationKD.getValue()),
                                 translationTolerance,
                                 rotationTolerance)
-                        .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
+                        .withTimeout(AutoCommandParamsNT.autoReturnTimeoutSeconds.getValue()),
                 moveShotWindowShort(shootingSuperstructure, intaker));
     }
 
@@ -726,6 +721,12 @@ public final class AutoCommands {
         return depotAxis == AutoSelector.DepotAxis.X
                 ? AutoPoints.DEPOT_X_START
                 : AutoPoints.DEPOT_Y_START;
+    }
+
+    private static Pose2d depotEndPose(AutoSelector.DepotAxis depotAxis) {
+        return depotAxis == AutoSelector.DepotAxis.X
+                ? AutoPoints.DEPOT_X_END
+                : AutoPoints.DEPOT_Y_END;
     }
 
     private static Command depotCollectFromSelection(
@@ -737,15 +738,10 @@ public final class AutoCommands {
 
     private static Command depotCollectFromCurrentStartSelection(
             Swerve swerve, IntakerSubsystem intaker, AutoSelector.DepotAxis depotAxis) {
-        return depotAxis == AutoSelector.DepotAxis.X
-                ? runWhileIntaking(
-                        pathfindToBluePoseStrict(
-                                swerve, AutoPoints.DEPOT_X_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
-                        intaker)
-                : runWhileIntaking(
-                        pathfindToBluePoseStrict(
-                                swerve, AutoPoints.DEPOT_Y_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
-                        intaker);
+        return runWhileIntaking(
+                pathfindToBluePoseStrict(
+                        swerve, depotEndPose(depotAxis), AutoParams.intakeMediumConstraints(), 0.0),
+                intaker);
     }
 
     private static Command shootThenDepotCollect(
@@ -778,9 +774,9 @@ public final class AutoCommands {
                 pathfindToBluePoseStrict(
                                 swerve,
                                 AutoPoints.OUTPOST_APPROACH,
-                                TRANSIT_CONSTRAINTS,
-                                AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
-                        .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
+                                AutoParams.transitConstraints(),
+                                AutoCommandParamsNT.autoThroughVelocity.getValue())
+                        .withTimeout(AutoCommandParamsNT.autoReturnTimeoutSeconds.getValue()),
                 markStep(stepPrefix + ": move-shot to outpost"),
                 driveAndShootToBlueTranslation(
                         swerve,
@@ -807,8 +803,10 @@ public final class AutoCommands {
             return Commands.sequence(
                     markStep("Round " + roundIndex + ": launch pose"),
                     goToBumpLaunchForSweepEnd(
-                                    swerve, shootPosition, AUTO_THROUGH_VELOCITY_METERS_PER_SECOND)
-                            .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
+                                    swerve,
+                                    shootPosition,
+                                    AutoCommandParamsNT.autoThroughVelocity.getValue())
+                            .withTimeout(AutoCommandParamsNT.autoReturnTimeoutSeconds.getValue()),
                     shootThenDepotCollect(
                             swerve,
                             intaker,
@@ -825,7 +823,7 @@ public final class AutoCommands {
         return Commands.sequence(
                 markStep("Round " + roundIndex + ": launch pose"),
                 goToBumpLaunchForSweepEnd(swerve, shootPosition)
-                        .withTimeout(AUTO_RETURN_TIMEOUT_SECONDS),
+                        .withTimeout(AutoCommandParamsNT.autoReturnTimeoutSeconds.getValue()),
                 markStep("Round " + roundIndex + ": shoot"),
                 autoAimAndShoot(swerve, intaker, shootingSuperstructure));
     }
@@ -854,11 +852,11 @@ public final class AutoCommands {
         return shootPosition == AutoSelector.Side.LEFT
                 ? pathfindToBlueTranslationPreserveHeading(
                         AutoPoints.Launch.LEFT_BUMP.getTranslation(),
-                        TRANSIT_CONSTRAINTS,
+                        AutoParams.transitConstraints(),
                         goalEndVelocityMetersPerSecond)
                 : pathfindToBlueTranslationPreserveHeading(
                         AutoPoints.Launch.RIGHT_BUMP.getTranslation(),
-                        TRANSIT_CONSTRAINTS,
+                        AutoParams.transitConstraints(),
                         goalEndVelocityMetersPerSecond);
     }
 
@@ -907,45 +905,46 @@ public final class AutoCommands {
                                 depotRound,
                                 outpostRound,
                                 2))
-                .withTimeout(AUTO_DURATION_SECONDS);
+                .withTimeout(AutoCommandParamsNT.autoDurationSeconds.getValue());
+    }
+
+    private static Command depotCollect(
+            Swerve swerve, IntakerSubsystem intaker, Pose2d startPose, Pose2d endPose) {
+        return Commands.sequence(
+                pathfindToBluePoseStrict(
+                        swerve,
+                        startPose,
+                        AutoParams.preciseConstraints(),
+                        AutoCommandParamsNT.autoIntakeThroughVelocity.getValue()),
+                runWhileIntaking(
+                        pathfindToBluePoseStrict(
+                                swerve, endPose, AutoParams.intakeMediumConstraints(), 0.0),
+                        intaker));
     }
 
     /** DEPOT X START -> intake on -> DEPOT X END */
     public static Command depotXCollect(Swerve swerve, IntakerSubsystem intaker) {
-        return Commands.sequence(
-                pathfindToBluePoseStrict(
-                        swerve,
-                        AutoPoints.DEPOT_X_START,
-                        PRECISE_CONSTRAINTS,
-                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
-                runWhileIntaking(
-                        pathfindToBluePoseStrict(
-                                swerve, AutoPoints.DEPOT_X_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
-                        intaker));
+        return depotCollect(swerve, intaker, AutoPoints.DEPOT_X_START, AutoPoints.DEPOT_X_END);
     }
 
     /** DEPOT Y START -> intake on -> DEPOT Y END */
     public static Command depotYCollect(Swerve swerve, IntakerSubsystem intaker) {
-        return Commands.sequence(
-                pathfindToBluePoseStrict(
-                        swerve,
-                        AutoPoints.DEPOT_Y_START,
-                        PRECISE_CONSTRAINTS,
-                        AUTO_INTAKE_THROUGH_VELOCITY_METERS_PER_SECOND),
-                runWhileIntaking(
-                        pathfindToBluePoseStrict(
-                                swerve, AutoPoints.DEPOT_Y_END, INTAKE_MEDIUM_CONSTRAINTS, 0.0),
-                        intaker));
+        return depotCollect(swerve, intaker, AutoPoints.DEPOT_Y_START, AutoPoints.DEPOT_Y_END);
     }
 
     /** Move to the OUTPOST pose. */
     public static Command goToOutpost(Swerve swerve) {
-        return pathfindToBluePoseStrict(swerve, AutoPoints.OUTPOST, TRANSIT_CONSTRAINTS, 0.0);
+        return pathfindToBluePoseStrict(
+                swerve, AutoPoints.OUTPOST, AutoParams.transitConstraints(), 0.0);
     }
 
     public static Command goToHubCenterStart(Swerve swerve) {
         return pathfindToBlueTranslationWithHeadingStrict(
-                swerve, AutoPoints.Hub.CENTER_START, Rotation2d.kPi, TRANSIT_CONSTRAINTS, 0.0);
+                swerve,
+                AutoPoints.Hub.CENTER_START,
+                Rotation2d.kPi,
+                AutoParams.transitConstraints(),
+                0.0);
     }
 
     public static Command trenchLeftStartToClear(Swerve swerve) {
@@ -954,13 +953,13 @@ public final class AutoCommands {
                         swerve,
                         AutoPoints.Trench.LEFT_START,
                         Rotation2d.kPi,
-                        PRECISE_CONSTRAINTS,
-                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
+                        AutoParams.preciseConstraints(),
+                        AutoCommandParamsNT.autoThroughVelocity.getValue()),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Trench.LEFT_CLEAR,
                         Rotation2d.kPi,
-                        TRANSIT_CONSTRAINTS,
+                        AutoParams.transitConstraints(),
                         0.0));
     }
 
@@ -970,13 +969,13 @@ public final class AutoCommands {
                         swerve,
                         AutoPoints.Trench.RIGHT_START,
                         Rotation2d.kPi,
-                        PRECISE_CONSTRAINTS,
-                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
+                        AutoParams.preciseConstraints(),
+                        AutoCommandParamsNT.autoThroughVelocity.getValue()),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Trench.RIGHT_CLEAR,
                         Rotation2d.kPi,
-                        TRANSIT_CONSTRAINTS,
+                        AutoParams.transitConstraints(),
                         0.0));
     }
 
@@ -986,13 +985,13 @@ public final class AutoCommands {
                         swerve,
                         AutoPoints.Bump.LEFT_INNER,
                         Rotation2d.kPi,
-                        PRECISE_CONSTRAINTS,
-                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
+                        AutoParams.preciseConstraints(),
+                        AutoCommandParamsNT.autoThroughVelocity.getValue()),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Bump.LEFT_OUTER,
                         Rotation2d.kPi,
-                        TRANSIT_CONSTRAINTS,
+                        AutoParams.transitConstraints(),
                         0.0));
     }
 
@@ -1002,13 +1001,13 @@ public final class AutoCommands {
                         swerve,
                         AutoPoints.Bump.RIGHT_INNER,
                         Rotation2d.kPi,
-                        PRECISE_CONSTRAINTS,
-                        AUTO_THROUGH_VELOCITY_METERS_PER_SECOND),
+                        AutoParams.preciseConstraints(),
+                        AutoCommandParamsNT.autoThroughVelocity.getValue()),
                 pathfindToBlueTranslationWithHeadingStrict(
                         swerve,
                         AutoPoints.Bump.RIGHT_OUTER,
                         Rotation2d.kPi,
-                        TRANSIT_CONSTRAINTS,
+                        AutoParams.transitConstraints(),
                         0.0));
     }
 
@@ -1018,7 +1017,7 @@ public final class AutoCommands {
                         swerve,
                         AutoPoints.Depot.LEFT_THROUGH,
                         Rotation2d.kZero,
-                        INTAKE_MEDIUM_CONSTRAINTS,
+                        AutoParams.intakeMediumConstraints(),
                         0.0),
                 intaker);
     }
@@ -1029,47 +1028,57 @@ public final class AutoCommands {
                         swerve,
                         AutoPoints.Depot.RIGHT_THROUGH,
                         Rotation2d.kZero,
-                        INTAKE_MEDIUM_CONSTRAINTS,
+                        AutoParams.intakeMediumConstraints(),
                         0.0),
                 intaker);
     }
 
     public static Command towerLeftThrough(Swerve swerve) {
         return pathfindToBlueTranslationWithHeadingStrict(
-                swerve, AutoPoints.Tower.LEFT_THROUGH, Rotation2d.kZero, PRECISE_CONSTRAINTS, 0.0);
+                swerve,
+                AutoPoints.Tower.LEFT_THROUGH,
+                Rotation2d.kZero,
+                AutoParams.preciseConstraints(),
+                0.0);
     }
 
     public static Command towerRightThrough(Swerve swerve) {
         return pathfindToBlueTranslationWithHeadingStrict(
-                swerve, AutoPoints.Tower.RIGHT_THROUGH, Rotation2d.kZero, PRECISE_CONSTRAINTS, 0.0);
+                swerve,
+                AutoPoints.Tower.RIGHT_THROUGH,
+                Rotation2d.kZero,
+                AutoParams.preciseConstraints(),
+                0.0);
     }
 
     public static Command goToLeftBumpLaunch(Swerve swerve) {
         return pathfindToBluePoseStrict(
-                swerve, AutoPoints.Launch.LEFT_BUMP, TRANSIT_CONSTRAINTS, 0.0);
+                swerve, AutoPoints.Launch.LEFT_BUMP, AutoParams.transitConstraints(), 0.0);
     }
 
     public static Command goToRightBumpLaunch(Swerve swerve) {
         return pathfindToBluePoseStrict(
-                swerve, AutoPoints.Launch.RIGHT_BUMP, TRANSIT_CONSTRAINTS, 0.0);
+                swerve, AutoPoints.Launch.RIGHT_BUMP, AutoParams.transitConstraints(), 0.0);
     }
 
     public static Command goToLeftTrenchLaunch(Swerve swerve) {
         return pathfindToBluePoseStrict(
-                swerve, AutoPoints.Launch.LEFT_TRENCH, TRANSIT_CONSTRAINTS, 0.0);
+                swerve, AutoPoints.Launch.LEFT_TRENCH, AutoParams.transitConstraints(), 0.0);
     }
 
     public static Command goToRightTrenchLaunch(Swerve swerve) {
         return pathfindToBluePoseStrict(
-                swerve, AutoPoints.Launch.RIGHT_TRENCH, TRANSIT_CONSTRAINTS, 0.0);
+                swerve, AutoPoints.Launch.RIGHT_TRENCH, AutoParams.transitConstraints(), 0.0);
     }
 
     public static Command goToLeftClimb(Swerve swerve) {
-        return pathfindToBluePoseStrict(swerve, AutoPoints.Climb.LEFT, PRECISE_CONSTRAINTS, 0.0);
+        return pathfindToBluePoseStrict(
+                swerve, AutoPoints.Climb.LEFT, AutoParams.preciseConstraints(), 0.0);
     }
 
     public static Command goToRightClimb(Swerve swerve) {
-        return pathfindToBluePoseStrict(swerve, AutoPoints.Climb.RIGHT, PRECISE_CONSTRAINTS, 0.0);
+        return pathfindToBluePoseStrict(
+                swerve, AutoPoints.Climb.RIGHT, AutoParams.preciseConstraints(), 0.0);
     }
 
     /** Sweep the middle line from left to right while facing -90 degrees and intaking. */
