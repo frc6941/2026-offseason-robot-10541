@@ -1,12 +1,13 @@
 package frc.robot.auto;
 
-import static frc.robot.auto.AutoRoutines.*;
+import static frc.robot.auto.AutoActions.*;
 
 import com.pathplanner.lib.path.PathPlannerPath;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.auto.AutoRoutines.EndBehaviour;
 import java.io.File;
 import java.io.IOException;
 import lombok.Getter;
@@ -16,23 +17,30 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 /**
  * Autonomous selector, ported from the competition robot's {@code AutoFile}.
  *
- * <p>Publishes dashboard choosers, and {@link #buildAuto()} assembles the selected routine from
- * {@link AutoRoutines}. Wire it up in {@code RobotContainer}: call {@link #init()} once, then
- * return {@link #buildAuto()} from {@code getAutonomousCommand()}.
+ * <p>Choosers (in order): Side, Start Behaviour, Second Sweep, Sweep Times, End Behaviour. {@link
+ * #buildAuto()} maps them onto {@link AutoRoutines#competitionAuto}.
+ *
+ * <p><b>Right-side rule:</b> depot end behaviours (Depot / DepotDriveThrough) only exist on the
+ * left; if Side = RIGHT they are forced back to None.
  */
 public class AutoFile {
     @Getter
-    private static final LoggedDashboardChooser<AutoType> autoChooser =
-            new LoggedDashboardChooser<>("Auto/Type");
-
-    private static final LoggedDashboardChooser<AutoSide> sideChooser =
+    private static final LoggedDashboardChooser<Side> sideChooser =
             new LoggedDashboardChooser<>("Auto/Side");
-    private static final LoggedDashboardChooser<SweepMode> sweepModeChooser =
-            new LoggedDashboardChooser<>("Auto/Sweep Mode");
 
-    private static final Alert nullConfigAlert =
+    private static final LoggedDashboardChooser<StartBehaviour> startBehaviourChooser =
+            new LoggedDashboardChooser<>("Auto/Start Behaviour");
+    private static final LoggedDashboardChooser<SecondSweepBehaviour> secondSweepChooser =
+            new LoggedDashboardChooser<>("Auto/Second Sweep");
+    private static final LoggedDashboardChooser<Integer> sweepTimesChooser =
+            new LoggedDashboardChooser<>("Auto/Sweep Times");
+    private static final LoggedDashboardChooser<EndBehaviour> endBehaviourChooser =
+            new LoggedDashboardChooser<>("Auto/End Behaviour");
+
+    private static final Alert rightSideDepotAlert =
             new Alert(
-                    "Auto configuration is null, running Commands.none()", Alert.AlertType.kError);
+                    "Depot end behaviour is left-only; forcing None on the right side.",
+                    Alert.AlertType.kWarning);
 
     private static <E extends Enum<E>> void initChooser(
             LoggedDashboardChooser<E> chooser, E[] values, E defaultValue) {
@@ -46,9 +54,14 @@ public class AutoFile {
 
     public static void init() {
         validatePaths();
-        initChooser(autoChooser, AutoType.values(), AutoType.SWEEP_AND_SHOOT);
-        initChooser(sideChooser, AutoSide.values(), AutoSide.RIGHT);
-        initChooser(sweepModeChooser, SweepMode.values(), SweepMode.NORMAL);
+        // Default config: Trench start, Middle second sweep, 2 sweeps, no end behaviour.
+        initChooser(sideChooser, Side.values(), Side.RIGHT);
+        initChooser(startBehaviourChooser, StartBehaviour.values(), StartBehaviour.TRENCH_START);
+        initChooser(secondSweepChooser, SecondSweepBehaviour.values(), SecondSweepBehaviour.MIDDLE);
+        initChooser(endBehaviourChooser, EndBehaviour.values(), EndBehaviour.NONE);
+
+        sweepTimesChooser.addDefaultOption("2", 2);
+        sweepTimesChooser.addOption("1", 1);
     }
 
     /** Fail fast at boot if a referenced path file is missing / malformed. */
@@ -68,63 +81,96 @@ public class AutoFile {
     }
 
     public static String selectionSummary() {
-        return "Type="
-                + autoChooser.get()
-                + ", Side="
+        return "Side="
                 + sideChooser.get()
-                + ", Sweep="
-                + sweepModeChooser.get();
+                + ", Start="
+                + startBehaviourChooser.get()
+                + ", SecondSweep="
+                + secondSweepChooser.get()
+                + ", Sweeps="
+                + sweepTimesChooser.get()
+                + ", End="
+                + endBehaviourChooser.get();
     }
 
     public static Command buildAuto() {
-        AutoType type = autoChooser.get();
-        if (type == null) {
-            nullConfigAlert.set(true);
-            return Commands.none();
+        Side side = orDefault(sideChooser.get(), Side.RIGHT);
+        StartBehaviour start = orDefault(startBehaviourChooser.get(), StartBehaviour.TRENCH_START);
+        SecondSweepBehaviour secondSweep =
+                orDefault(secondSweepChooser.get(), SecondSweepBehaviour.MIDDLE);
+        int sweepTimes = sweepTimesChooser.get() != null ? sweepTimesChooser.get() : 2;
+        EndBehaviour end = orDefault(endBehaviourChooser.get(), EndBehaviour.NONE);
+
+        boolean isLeft = side == Side.LEFT;
+
+        // Right-side rule: depot end behaviours are left-only (MIDDLE and NONE are fine on both).
+        boolean isDepot = end == EndBehaviour.DEPOT || end == EndBehaviour.DEPOT_DRIVE_THROUGH;
+        if (!isLeft && isDepot) {
+            end = EndBehaviour.NONE;
+            rightSideDepotAlert.set(true);
+        } else {
+            rightSideDepotAlert.set(false);
         }
-        nullConfigAlert.set(false);
 
-        boolean isLeft = sideChooser.get() == AutoSide.LEFT;
-        String sweepPath = sweepPathFor(sweepModeChooser.get());
+        Pose2d blueStartPose = startPose(start, isLeft);
+        Pose2d blueSecondSweepStart = isLeft ? kSecondSweepStartL : kSecondSweepStartR;
 
-        return switch (type) {
-            case DO_NOTHING -> Commands.none();
-            case SHOOT_ONLY -> shootPreload();
-            case SWEEP_AND_SHOOT -> withZeroing(sweepAndShoot(sweepPath, isLeft));
-            case PRELOAD_THEN_SWEEP -> withZeroing(preloadThenSweep(sweepPath, isLeft));
-            case DOUBLE_SWEEP -> withZeroing(doubleSweep(sweepPath, isLeft));
-            case TEST -> test();
+        return AutoRoutines.competitionAuto(
+                isLeft,
+                start == StartBehaviour.BUMP_START,
+                blueStartPose,
+                startPath(start),
+                blueSecondSweepStart,
+                secondSweepPath(secondSweep),
+                sweepTimes,
+                end);
+    }
+
+    // ---- chooser -> path/pose mapping (paths are RIGHT-authored; left mirrors them) ----
+
+    private static String startPath(StartBehaviour start) {
+        return switch (start) {
+            case TRENCH_START -> "RightTrenchStart";
+            case TRENCH_START_SHORT -> "RightTrenchStartShort";
+            case BUMP_START -> "RightBumpStart";
         };
     }
 
-    private static String sweepPathFor(SweepMode mode) {
-        if (mode == null) {
-            return "sweepRight";
-        }
-        return switch (mode) {
-            case FAST -> "quickSweepRight";
-            case NORMAL -> "sweepRight";
-            case LONG -> "longSweepRight";
+    private static Pose2d startPose(StartBehaviour start, boolean isLeft) {
+        return switch (start) {
+                // Bump start begins at its own 45-deg pose, then drives past the slope into
+                // neutral.
+            case BUMP_START -> isLeft ? kBumpStartL : kBumpStartR;
+            case TRENCH_START, TRENCH_START_SHORT -> isLeft ? kTrenchStartL : kTrenchStartR;
         };
     }
 
-    private enum AutoType {
-        DO_NOTHING,
-        SHOOT_ONLY,
-        SWEEP_AND_SHOOT,
-        PRELOAD_THEN_SWEEP,
-        DOUBLE_SWEEP,
-        TEST
+    private static String secondSweepPath(SecondSweepBehaviour secondSweep) {
+        return switch (secondSweep) {
+            case MIDDLE -> "RightTrenchSecondMiddle";
+            case CROSS -> "RightTrenchSecondCross";
+            case AVOID -> "RightTrenchSecondAvoid";
+        };
     }
 
-    private enum AutoSide {
-        RIGHT,
-        LEFT
+    private static <E> E orDefault(E value, E fallback) {
+        return value != null ? value : fallback;
     }
 
-    private enum SweepMode {
-        FAST,
-        NORMAL,
-        LONG
+    private enum Side {
+        LEFT,
+        RIGHT
+    }
+
+    private enum StartBehaviour {
+        BUMP_START,
+        TRENCH_START,
+        TRENCH_START_SHORT
+    }
+
+    private enum SecondSweepBehaviour {
+        MIDDLE,
+        CROSS,
+        AVOID
     }
 }

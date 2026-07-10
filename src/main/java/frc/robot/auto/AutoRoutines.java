@@ -2,23 +2,29 @@ package frc.robot.auto;
 
 import static frc.robot.auto.AutoActions.*;
 
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import lib.ironpulse.swerve.Swerve;
+import lib.ironpulse.utils.AllianceFlipUtil;
 
 /**
  * Composed autonomous routines, ported from the competition robot's {@code AutoRoutines}.
  *
- * <p>Every routine follows the same non-turret shape: <b>collect</b> balls while following a
- * PathPlanner path with the intake running, then <b>drive to a shoot pose and empty the hopper</b>
- * (the robot cannot shoot while moving like the turreted competition robot).
+ * <p>The one competition routine has this shape (see {@link #competitionAuto}):
  *
- * <p>Path names (e.g. {@code "sweepRight"}) refer to {@code .path} files you author in the
- * PathPlanner GUI under {@code deploy/pathplanner/paths}. Mirror = true reuses one path for the
- * opposite side.
+ * <ol>
+ *   <li>Follow the <b>start</b> path with the intake running (collect on the way out).
+ *   <li>{@code drivePastSlope} back across the bump.
+ *   <li>Aim the chassis at the hub and empty the hopper.
+ *   <li>{@code driveToPose} to the hardcoded second-sweep start, run the <b>second sweep</b> path
+ *       (intake on), come back, aim + shoot again — only when sweep count is 2.
+ *   <li>Run the <b>end behaviour</b> (depot paths) with the intake running.
+ * </ol>
  */
 public class AutoRoutines {
     public static Swerve swerve;
@@ -32,51 +38,61 @@ public class AutoRoutines {
         AutoRoutines.intake = intake;
     }
 
-    /** Wrap any routine so the mechanisms home while it runs. */
-    public static Command withZeroing(Command routine) {
-        return Commands.parallel(routine, zeroEverything());
+    /** What to do after the sweep cycles. MIDDLE works both sides; DEPOT options are LEFT-only. */
+    public enum EndBehaviour {
+        NONE,
+        MIDDLE,
+        DEPOT,
+        DEPOT_DRIVE_THROUGH
     }
 
-    /** Sit still and empty the preload from the current pose (assumes we already face the hub). */
-    public static Command shootPreload() {
-        return Commands.deadline(shootAllBalls(), holdStill());
+    public static Command competitionAuto(
+            boolean isLeft,
+            boolean startFromBump,
+            Pose2d blueStartPose,
+            String startPath,
+            Pose2d blueSecondSweepStart,
+            String secondSweepPath,
+            int sweepTimes,
+            EndBehaviour endBehaviour) {
+        List<Command> steps = new ArrayList<>();
+
+        // 0. Sim-only pose reset so the robot starts where the path expects.
+        steps.add(resetOnPose(blueStartPose));
+
+        // 0b. Bump start begins on the bump — cross out into the neutral zone before anything else.
+        if (startFromBump) {
+            steps.add(drivePastSlope(isLeft, true));
+        }
+
+        // 1. First sweep: collect out, drive back, aim + shoot.
+        steps.add(sweepCollectShoot(startPath, isLeft));
+
+        // 2. Optional second sweep: reposition to the hardcoded start, then collect/shoot again.
+        if (sweepTimes >= 2) {
+            steps.add(driveToPose(AllianceFlipUtil.apply(blueSecondSweepStart)));
+            steps.add(sweepCollectShoot(secondSweepPath, isLeft));
+        }
+
+        // 3. End behaviour (intake running throughout).
+        steps.add(endBehaviour(endBehaviour, isLeft));
+
+        return Commands.sequence(steps.toArray(Command[]::new))
+                .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 
     /**
-     * One "collect then score" cycle: run {@code sweepPath} with the intake on, then drive to the
-     * shoot pose and empty the hopper.
+     * End behaviour with the intake running. MIDDLE uses the RIGHT-authored path (mirrored for the
+     * left side); the depot paths are LEFT-authored (depot lives on the left), so never mirrored.
      */
-    public static Command sweepAndShoot(String sweepPath, boolean isLeft) {
-        return Commands.defer(
-                () ->
-                        Commands.sequence(
-                                Commands.deadline(followPathFile(sweepPath, isLeft), intake()),
-                                driveToShootAndFire(isLeft)),
-                Set.of(swerve, shootingSuperstructure, intake));
-    }
-
-    /** Shoot the preload first, then run one sweep-and-shoot cycle. */
-    public static Command preloadThenSweep(String sweepPath, boolean isLeft) {
-        return Commands.defer(
-                () ->
-                        Commands.sequence(
-                                driveToShootAndFire(isLeft),
-                                Commands.deadline(followPathFile(sweepPath, isLeft), intake()),
-                                driveToShootAndFire(isLeft)),
-                Set.of(swerve, shootingSuperstructure, intake));
-    }
-
-    /** Two collect/score cycles, second cycle reuses the same sweep path. */
-    public static Command doubleSweep(String sweepPath, boolean isLeft) {
-        return Commands.defer(
-                () ->
-                        Commands.sequence(
-                                sweepAndShoot(sweepPath, isLeft), sweepAndShoot(sweepPath, isLeft)),
-                Set.of(swerve, shootingSuperstructure, intake));
-    }
-
-    /** Bare-bones diagnostic: drive the generated test path. */
-    public static Command test() {
-        return Commands.sequence(resetOnPose(AutoActions.kTestA), testPath());
+    public static Command endBehaviour(EndBehaviour endBehaviour, boolean isLeft) {
+        return switch (endBehaviour) {
+            case NONE -> Commands.none();
+            case MIDDLE -> Commands.deadline(followPathFile("RightEndtoMiddle", isLeft), intake());
+            case DEPOT -> Commands.deadline(followPathFile("LeftDriveDepot", false), intake());
+            case DEPOT_DRIVE_THROUGH ->
+                    Commands.deadline(
+                            followPathFile("LeftDriveDepotDriveThrough", false), intake());
+        };
     }
 }

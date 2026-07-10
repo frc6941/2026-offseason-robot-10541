@@ -20,6 +20,7 @@ import frc.robot.FieldConstants;
 import frc.robot.Robot;
 import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
+import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import java.io.IOException;
@@ -40,35 +41,37 @@ import org.littletonrobotics.junction.Logger;
  * Low-level autonomous building blocks, ported from the competition robot's {@code AutoActions}.
  *
  * <p>Driving is done the <b>PathPlanner</b> way: {@link #followPathFile} loads a {@code .path} file
- * and follows it with a {@link FollowPathCommand} (NOT the pathfinding / setpoint-generator
- * approach). {@link #driveToPose} / {@link #driveToHeading} handle precise point moves.
+ * (authored in the GUI under {@code deploy/pathplanner/paths}) and follows it with a {@link
+ * FollowPathCommand}. {@link #drivePastSlope} crosses the bump and stops once stable, and {@link
+ * #driveToPose} handles precise hardcoded moves.
  *
- * <p><b>Key difference from the competition robot:</b> that robot has a turret and can shoot while
- * moving; this robot cannot. So instead of a "shoot anytime" action, autonomous drives to a fixed
- * <b>shoot pose</b> (already facing the hub), holds still, and empties the hopper — see {@link
- * #driveToShootAndFire}.
+ * <p><b>Key difference from the competition robot:</b> that robot has a turret and shoots while
+ * moving; this robot rotates the whole chassis to aim. So {@link #aimAtHub} spins the chassis
+ * toward the hub (via {@link AutoAimCommand}) while {@link #shootAtHub} runs the shooter/feed —
+ * combined in {@link #aimAndShootAtHub}.
  *
- * <p>All poses below are authored in the <b>blue</b> field frame; wrap with {@link
- * AllianceFlipUtil#apply} at use so they work for both alliances. These are PLACEHOLDERS — measure
- * and edit them for the real field.
+ * <p>Poses are authored in the <b>blue</b> field frame for the <b>right</b> side; the left variants
+ * are the Y-mirror ({@link #mirrorY}). Wrap with {@link AllianceFlipUtil#apply} at use. These are
+ * PLACEHOLDERS derived from the current path files — verify on the real field.
  */
 public class AutoActions {
-    // ---- Shoot poses: robot sits here, already aimed at the hub, and empties the hopper. ----
-    public static final Pose2d kShootL = new Pose2d(3.0, 5.35, Rotation2d.fromDegrees(-45));
-    public static final Pose2d kShootR = new Pose2d(3.0, 2.56, Rotation2d.fromDegrees(45));
+    // ---- Start poses (robot begins here; used by resetOnPose in sim). ----
+    public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTrenchStartL = mirrorY(kTrenchStartR);
+    // Bump start begins here (alliance side, 45 deg), then drives past the slope into neutral.
+    public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.56, Rotation2d.fromDegrees(45));
+    public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
 
-    // ---- Intake / depot alignment poses. ----
-    public static final Pose2d kDepotIntake = new Pose2d(1.013, 5.987, Rotation2d.fromDegrees(180));
-    public static final Pose2d kStationIntake = new Pose2d(0.59, 0.72, Rotation2d.fromDegrees(180));
+    // ---- Second-sweep entry pose (drive here before the second sweep path). ----
+    public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.683, Rotation2d.fromDegrees(0));
+    public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
 
-    // ---- Start poses (used by resetOnPose in sim). ----
-    public static final Pose2d kStartL = new Pose2d(7.54, 5.35, Rotation2d.fromDegrees(0));
-    public static final Pose2d kStartR = new Pose2d(7.54, 2.56, Rotation2d.fromDegrees(0));
-
-    // ---- Test path waypoints. ----
-    public static final Pose2d kTestA = new Pose2d(1.509, 6.14, Rotation2d.fromDegrees(6.3));
-    public static final Pose2d kTestB = new Pose2d(2.79, 5.2, Rotation2d.fromDegrees(-72));
-    public static final Pose2d kTestC = new Pose2d(2.69, 3.07, Rotation2d.fromDegrees(-110));
+    // ---- Slope crossing poses. Front = neutral side, End = alliance side (drive-back target).
+    // ----
+    public static final Pose2d kSlopeFrontR = new Pose2d(5.84, 2.56, Rotation2d.fromDegrees(-135));
+    public static final Pose2d kSlopeFrontL = mirrorY(kSlopeFrontR);
+    public static final Pose2d kSlopeEndR = new Pose2d(3, 2.56, Rotation2d.fromDegrees(-135));
+    public static final Pose2d kSlopeEndL = mirrorY(kSlopeEndR);
 
     private static Swerve swerve;
     private static ShootingSuperstructure shootingSuperstructure;
@@ -79,6 +82,12 @@ public class AutoActions {
         AutoActions.swerve = swerve;
         AutoActions.shootingSuperstructure = shootingSuperstructure;
         AutoActions.intake = intake;
+    }
+
+    /** Mirror a blue-frame pose across the field's horizontal centerline (right pose -> left). */
+    private static Pose2d mirrorY(Pose2d p) {
+        return new Pose2d(
+                p.getX(), FieldConstants.fieldWidth - p.getY(), p.getRotation().unaryMinus());
     }
 
     // =====================================================================================
@@ -112,8 +121,9 @@ public class AutoActions {
     }
 
     /**
-     * Load a {@code .path} file from {@code deploy/pathplanner/paths}, optionally mirror it (for
-     * the left/right symmetric variant), flip it for the current alliance, then follow it.
+     * Load a {@code .path} file, optionally mirror it (for the left/right symmetric variant), flip
+     * it for the current alliance, then follow it. Right-authored paths pass {@code mirror =
+     * isLeft}.
      */
     public static Command followPathFile(String pathName, boolean shouldMirror) {
         return Commands.defer(
@@ -160,6 +170,7 @@ public class AutoActions {
     // Driving — precise point moves
     // =====================================================================================
 
+    /** Drive to an <b>already alliance-flipped</b> pose with the pose controller. */
     static Command driveToPose(Supplier<Pose2d> targetPoseSupplier) {
         return Commands.defer(
                 () -> {
@@ -209,7 +220,51 @@ public class AutoActions {
     }
 
     // =====================================================================================
-    // Intake actions
+    // Drive past the slope / bump (ported from the competition robot)
+    // =====================================================================================
+
+    /**
+     * Drive across the bump toward {@code isToNeutral ? slopeFront : slopeEnd} and stop as soon as
+     * the robot has crossed the bump line and its pitch has settled. Use {@code isToNeutral =
+     * false} to come back to the alliance side after a sweep.
+     */
+    public static Command drivePastSlope(boolean isLeft, boolean isToNeutral) {
+        if (isToNeutral) {
+            // Out to neutral: drive toward the slope front and stop once over the bump line and
+            // settled. Here the target only sets DIRECTION — the stop is the bump crossing.
+            return Commands.defer(
+                    () ->
+                            Commands.deadline(
+                                    waitCrossedBump(true),
+                                    driveToPose(
+                                            AllianceFlipUtil.apply(
+                                                    isLeft ? kSlopeFrontL : kSlopeFrontR))),
+                    Set.of(swerve));
+        }
+        // Back: actually drive TO kSlopeEnd (so editing that pose moves where we end up). Timeout
+        // so it can't stall if SwerveDriveToPose never nails the position + heading tolerance.
+        return driveToPose(() -> AllianceFlipUtil.apply(isLeft ? kSlopeEndL : kSlopeEndR))
+                .withTimeout(3.0);
+    }
+
+    static Command waitCrossedBump(boolean isToNeutral) {
+        return Commands.waitUntil(() -> isPitchStable());
+    }
+
+    public static boolean hasCrossedBump(boolean isToNeutral) {
+        return isToNeutral
+                ? AllianceFlipUtil.applyX(getRobotX())
+                        > FieldConstants.LinesVertical.neutralZoneNear
+                : AllianceFlipUtil.applyX(getRobotX()) < FieldConstants.LinesVertical.starting;
+    }
+
+    public static boolean isPitchStable() {
+        return Math.abs(swerve.getPitchVelocityRadPerSec()) < 1.5
+                && Math.abs(swerve.getPitchPosRad()) < 0.03;
+    }
+
+    // =====================================================================================
+    // Intake + shooting (non-turret: rotate the chassis to aim, then empty the hopper)
     // =====================================================================================
 
     public static Command intake() {
@@ -224,42 +279,40 @@ public class AutoActions {
         return intake.runRetract();
     }
 
-    // =====================================================================================
-    // Shooting actions (non-turret: drive to a pose, hold still, empty the hopper)
-    // =====================================================================================
-
-    /** Hold the current spot with the wheels X-locked so we don't drift while shooting. */
-    public static Command holdStill() {
-        return Commands.run(swerve::runStopAndLock, swerve);
+    /** Continuously rotate the chassis so the shooter faces the hub (no translation). */
+    public static Command aimAtHub() {
+        return new AutoAimCommand(
+                swerve,
+                () -> 0.0,
+                () -> 0.0,
+                shootingSuperstructure::aimHeading,
+                shootingSuperstructure::aimHeadingRateRadPerSec);
     }
 
-    /** Spin up and feed for {@code feedSeconds}; sized to empty a full hopper. */
-    public static Command shootAllBalls(double feedSeconds) {
+    /** Spin up and feed for {@code feedSeconds}; size it to empty a full hopper. */
+    public static Command shootAtHub(double feedSeconds) {
         return shootingSuperstructure.shootWhenReadyForSeconds(
                 AutoParams.AutoShootParams.readyTimeoutSeconds, feedSeconds);
     }
 
-    public static Command shootAllBalls() {
-        return shootAllBalls(AutoParams.AutoShootParams.feedSeconds);
+    /** Hold the chassis aimed at the hub while emptying the hopper. */
+    public static Command aimAndShootAtHub(double feedSeconds) {
+        return Commands.deadline(shootAtHub(feedSeconds), aimAtHub());
+    }
+
+    public static Command aimAndShootAtHub() {
+        return aimAndShootAtHub(AutoParams.AutoShootParams.feedSeconds);
     }
 
     /**
-     * The core non-turret scoring move: drive to {@code blueShootPose} (which already faces the
-     * hub), then hold position and empty the hopper.
+     * One collect/score cycle: follow {@code sweepPath} with the intake on, drive back across the
+     * slope, then aim at the hub and empty the hopper.
      */
-    public static Command driveToShootAndFire(Pose2d blueShootPose, double feedSeconds) {
+    public static Command sweepCollectShoot(String sweepPath, boolean isLeft) {
         return Commands.sequence(
-                driveToPose(AllianceFlipUtil.apply(blueShootPose)),
-                Commands.deadline(shootAllBalls(feedSeconds), holdStill()));
-    }
-
-    public static Command driveToShootAndFire(Pose2d blueShootPose) {
-        return driveToShootAndFire(blueShootPose, AutoParams.AutoShootParams.feedSeconds);
-    }
-
-    /** Convenience: drive to the left or right shoot pose and empty the hopper. */
-    public static Command driveToShootAndFire(boolean isLeft) {
-        return driveToShootAndFire(isLeft ? kShootL : kShootR);
+                Commands.deadline(followPathFile(sweepPath, isLeft), intake()),
+                drivePastSlope(isLeft, false),
+                aimAndShootAtHub());
     }
 
     // =====================================================================================
@@ -270,7 +323,7 @@ public class AutoActions {
         return Commands.parallel(shootingSuperstructure.zeroHoodHere(), intake.zeroCommand());
     }
 
-    /** In sim only, snap the pose estimator + transform tree to a known start pose. */
+    /** In sim only, snap the pose estimator + transform tree to a known blue start pose. */
     public static Command resetOnPose(Pose2d bluePose) {
         Pose3d resetPose = new Pose3d(AllianceFlipUtil.apply(bluePose));
         return SwerveCommands.reset(swerve, resetPose)
@@ -285,33 +338,11 @@ public class AutoActions {
                 .ignoringDisable(true);
     }
 
-    /** Example on-the-fly path (mirrors the competition robot's {@code testPath}). */
-    public static Command testPath() {
-        return Commands.defer(
-                () -> {
-                    Pose2d current = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
-                    List<Pose2d> waypoints =
-                            List.of(
-                                    current,
-                                    AllianceFlipUtil.apply(kTestA),
-                                    AllianceFlipUtil.apply(kTestB),
-                                    AllianceFlipUtil.apply(kTestC));
-                    PathPlannerPath path =
-                            generatePath(waypoints, Collections.emptyList(), 4.2, 6.0, 0.0);
-                    return followPath(path);
-                },
-                Set.of(swerve));
-    }
-
     static double getRobotX() {
         return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d().getX();
     }
 
     static double getRobotY() {
         return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d().getY();
-    }
-
-    static boolean hasCrossedNeutralLine() {
-        return AllianceFlipUtil.applyX(getRobotX()) > FieldConstants.LinesVertical.neutralZoneNear;
     }
 }
