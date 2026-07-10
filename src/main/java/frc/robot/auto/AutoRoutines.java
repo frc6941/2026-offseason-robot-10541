@@ -60,6 +60,11 @@ public class AutoRoutines {
         // 0. Sim-only pose reset so the robot starts where the path expects.
         steps.add(resetOnPose(blueStartPose));
 
+        // 0a. Home the intake pivot once at the start (must run before the intake is used; a
+        // trigger
+        // can't do this because the auto sequence holds the intaker requirement the whole time).
+        steps.add(intake.zeroCommand());
+
         // 0b. Bump start begins on the bump — cross out into the neutral zone before anything else.
         if (startFromBump) {
             steps.add(drivePastSlope(isLeft, true));

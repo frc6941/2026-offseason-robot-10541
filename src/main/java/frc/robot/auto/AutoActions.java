@@ -295,9 +295,15 @@ public class AutoActions {
                 AutoParams.AutoShootParams.readyTimeoutSeconds, feedSeconds);
     }
 
-    /** Hold the chassis aimed at the hub while emptying the hopper. */
+    /**
+     * Hold the chassis aimed at the hub while emptying the hopper, then spin the drum back to idle.
+     */
     public static Command aimAndShootAtHub(double feedSeconds) {
-        return Commands.deadline(shootAtHub(feedSeconds), aimAtHub());
+        return Commands.sequence(
+                Commands.deadline(shootAtHub(feedSeconds), aimAtHub()),
+                // The auto is one big sequence that holds the shooter requirement, so its default
+                // idle can't run on its own — explicitly drop the drum to idle RPS after the shot.
+                shootingSuperstructure.idle().withTimeout(0.02));
     }
 
     public static Command aimAndShootAtHub() {
