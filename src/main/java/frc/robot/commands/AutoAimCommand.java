@@ -259,8 +259,8 @@ public class AutoAimCommand extends Command {
      */
     public static final class AutoAimParams {
         // omega = targetRate + kP * headingError + kD * (targetRate - measuredYawRate)
-        public static final double kP = 2.5;
-        public static final double kD = 0.2;
+        public static final double kP = 3.25;
+        public static final double kD = 0.30;
         // Hard cap on commanded yaw rate (rad/s). Drivetrain caps are ~7.85 rad/s; keep some
         // margin.
         public static final double maxAngularVelRadPerSec = 6.0;

@@ -15,6 +15,8 @@ import frc.robot.RobotStateRecorder;
 import java.util.function.DoubleSupplier;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
+import lib.ntext.NTParameter;
+
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -170,7 +172,7 @@ public class AutoTrenchCommand extends Command {
         // Hold-to-run: the whileTrue binding ends it on button release.
         return false;
     }
-
+    @NTParameter(tableName = "Params/AutoTrench")
     public static final class AutoTrenchParams {
         // --- Lateral (Y) hold. Profiled so an off-center engage snaps in smoothly and arrives at
         // rest. ---
