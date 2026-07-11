@@ -25,11 +25,15 @@ import frc.robot.auto.AutoFile;
 import frc.robot.auto.AutoRoutines;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.AutoTrenchCommand;
+import frc.robot.subsystems.Configs.LimeLightConfig;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
+import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
+import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
+import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
@@ -39,8 +43,6 @@ import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
-import lib.ironpulse.limelight.DeviationParamSources;
-import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
 import lib.ironpulse.math.rbd.TransformRecorder;
@@ -63,10 +65,6 @@ import org.littletonrobotics.junction.Logger;
  */
 public class RobotContainer {
     private boolean isReal = RobotBase.isReal();
-
-    // Limelight device id — must exactly match the limelight's hostname (web UI -> Settings ->
-    // Hostname). Single source of truth so the IO registration and every lookup can't drift apart.
-    private static final String LIMELIGHT_NAME = "limelight-a";
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
             buildIntakerRoller();
@@ -290,7 +288,7 @@ public class RobotContainer {
         // tag-derived robot pose as a Pose2d[], hidden (empty array) when there's no target so it
         // doesn't snap to the field origin. Bind a translucent robot to Vision/Ghost in
         // AdvantageScope.
-        Pose2d visionPose = limelightSubsystem.getPose(LIMELIGHT_NAME);
+        Pose2d visionPose = limelightSubsystem.getPose(LimeLightConfig.NAME);
         Logger.recordOutput(
                 "Vision/Ghost",
                 visionPose.equals(new Pose2d()) ? new Pose2d[0] : new Pose2d[] {visionPose});
@@ -375,7 +373,7 @@ public class RobotContainer {
                 isReal && RobotConstants.HAS_INTAKER_IO
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
-                IntakerConfig.IntakerRollerParams.asVelocityParamSources());
+                IntakerRollerParamsNT.asVelocityParamSources());
     }
 
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildIntakerPivot() {
@@ -385,7 +383,7 @@ public class RobotContainer {
                 isReal && RobotConstants.HAS_INTAKER_IO
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_PIVOT_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_PIVOT_CONFIG),
-                IntakerConfig.IntakerPivotParams.asPositionParamSources(),
+                IntakerPivotParamsNT.asPositionParamSources(),
                 Degrees.of(0),
                 IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
     }
@@ -407,7 +405,7 @@ public class RobotContainer {
                 isReal && RobotConstants.HAS_SHOOTER_IO
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_DRUM_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_DRUM_CONFIG),
-                ShooterConfig.ShooterUpperParams.asVelocityParamSources());
+                ShooterUpperParamsNT.asVelocityParamSources());
     }
 
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterFeed() {
@@ -417,45 +415,17 @@ public class RobotContainer {
                 isReal && RobotConstants.HAS_SHOOTER_IO
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_FEED_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_FEED_CONFIG),
-                ShooterConfig.ShooterLowerParams.asVelocityParamSources());
+                ShooterLowerParamsNT.asVelocityParamSources());
     }
 
     private LimelightSubsystem buildLimelight() {
-        LimelightIOConfig config =
-                LimelightIOConfig.builder()
-                        .name(LIMELIGHT_NAME)
-                        .useMegaTag2(true)
-                        .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
-                        .build();
-
         LimelightIOReal io =
                 new LimelightIOReal(
-                        config,
+                        LimeLightConfig.limelightConfig,
                         swerve::getIMUYaw,
                         swerve::getYawVelocityRadPerSec,
                         () -> false,
-                        // TODO: tune vision std-devs on the real robot.
-                        new DeviationParamSources() {
-                            public double xStdDev() {
-                                return 0.7;
-                            }
-
-                            public double yStdDev() {
-                                return 0.7;
-                            }
-
-                            public double zStdDev() {
-                                return 9999.0;
-                            }
-
-                            public double angleStdDev() {
-                                return 999999999.0;
-                            }
-
-                            public double imuCorrectionReliabilityThreshold() {
-                                return 0.9;
-                            }
-                        });
+                        LimeLightConfig.asDeviationParams());
         return new LimelightSubsystem(swerve, io);
     }
 
@@ -474,7 +444,7 @@ public class RobotContainer {
                 isReal && RobotConstants.HAS_HOOD_IO
                         ? new MotorIOTalonFX(ShooterConfig.HOOD_CONFIG)
                         : new MotorIOSim(ShooterConfig.HOOD_CONFIG),
-                ShooterConfig.HoodParams.asPositionParamSources(),
+                HoodParamsNT.asPositionParamSources(),
                 ShooterConfig.HOOD_STOW_ANGLE,
                 ShooterConfig.HOOD_ANGLE_PER_ROTATION);
     }

@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
+import lib.ntext.NTParameter;
 
 /**
  * Single source of truth for distance-based aiming on the drum shooter: maps distance-to-hub to a
@@ -83,25 +84,25 @@ public class ShotCalculator {
 
     private void initializeTables() {
         hoodAngleDeg.clear();
-        hoodAngleDeg.put(BREAKPOINTS_M[0], ShootingParams.hoodAngleDeg2m);
-        hoodAngleDeg.put(BREAKPOINTS_M[1], ShootingParams.hoodAngleDeg3m);
-        hoodAngleDeg.put(BREAKPOINTS_M[2], ShootingParams.hoodAngleDeg4m);
-        hoodAngleDeg.put(BREAKPOINTS_M[3], ShootingParams.hoodAngleDeg5m);
-        hoodAngleDeg.put(BREAKPOINTS_M[4], ShootingParams.hoodAngleDeg6m);
+        hoodAngleDeg.put(BREAKPOINTS_M[0], ShootingParamsNT.hoodAngleDeg2m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_M[1], ShootingParamsNT.hoodAngleDeg3m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_M[2], ShootingParamsNT.hoodAngleDeg4m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_M[3], ShootingParamsNT.hoodAngleDeg5m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_M[4], ShootingParamsNT.hoodAngleDeg6m.getValue());
 
         shooterRps.clear();
-        shooterRps.put(BREAKPOINTS_M[0], ShootingParams.shooterRps2m);
-        shooterRps.put(BREAKPOINTS_M[1], ShootingParams.shooterRps3m);
-        shooterRps.put(BREAKPOINTS_M[2], ShootingParams.shooterRps4m);
-        shooterRps.put(BREAKPOINTS_M[3], ShootingParams.shooterRps5m);
-        shooterRps.put(BREAKPOINTS_M[4], ShootingParams.shooterRps6m);
+        shooterRps.put(BREAKPOINTS_M[0], ShootingParamsNT.shooterRps2m.getValue());
+        shooterRps.put(BREAKPOINTS_M[1], ShootingParamsNT.shooterRps3m.getValue());
+        shooterRps.put(BREAKPOINTS_M[2], ShootingParamsNT.shooterRps4m.getValue());
+        shooterRps.put(BREAKPOINTS_M[3], ShootingParamsNT.shooterRps5m.getValue());
+        shooterRps.put(BREAKPOINTS_M[4], ShootingParamsNT.shooterRps6m.getValue());
 
         timeOfFlightSec.clear();
-        timeOfFlightSec.put(BREAKPOINTS_M[0], ShootingParams.tofSec2m);
-        timeOfFlightSec.put(BREAKPOINTS_M[1], ShootingParams.tofSec3m);
-        timeOfFlightSec.put(BREAKPOINTS_M[2], ShootingParams.tofSec4m);
-        timeOfFlightSec.put(BREAKPOINTS_M[3], ShootingParams.tofSec5m);
-        timeOfFlightSec.put(BREAKPOINTS_M[4], ShootingParams.tofSec6m);
+        timeOfFlightSec.put(BREAKPOINTS_M[0], ShootingParamsNT.tofSec2m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_M[1], ShootingParamsNT.tofSec3m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_M[2], ShootingParamsNT.tofSec4m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_M[3], ShootingParamsNT.tofSec5m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_M[4], ShootingParamsNT.tofSec6m.getValue());
     }
 
     /**
@@ -109,6 +110,7 @@ public class ShotCalculator {
      * distances themselves are fixed in {@link #BREAKPOINTS_M}; only the hood angle / flywheel
      * speed / time-of-flight at each distance, and the chassis heading tolerance, are exposed here.
      */
+    @NTParameter(tableName = "Params/Shooting")
     public static final class ShootingParams {
         // TODO: tune hood angle (deg) per distance breakpoint on the real robot
         public static final double hoodAngleDeg2m = 10.0;

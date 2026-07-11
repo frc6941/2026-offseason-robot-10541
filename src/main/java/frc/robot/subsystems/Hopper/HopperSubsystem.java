@@ -19,7 +19,7 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
             SubsystemConfig config,
             MotorInputsAutoLogged inputs,
             MotorIO io) {
-        super(config, inputs, io, HopperConfig.HopperParams.asVelocityParamSources());
+        super(config, inputs, io, HopperParamsNT.asVelocityParamSources());
         this.intaker = intaker;
     }
 

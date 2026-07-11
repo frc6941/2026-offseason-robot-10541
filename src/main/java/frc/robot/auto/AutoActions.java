@@ -103,13 +103,13 @@ public class AutoActions {
                         (vel, ff) -> swerve.runTwist(vel),
                         new PPHolonomicDriveController(
                                 new PIDConstants(
-                                        AutoParams.AutoPathParams.kpStrave,
-                                        AutoParams.AutoPathParams.kiStrave,
-                                        AutoParams.AutoPathParams.kdStrave),
+                                        AutoPathParamsNT.kpStrave.getValue(),
+                                        AutoPathParamsNT.kiStrave.getValue(),
+                                        AutoPathParamsNT.kdStrave.getValue()),
                                 new PIDConstants(
-                                        AutoParams.AutoPathParams.kpSpin,
-                                        AutoParams.AutoPathParams.kiSpin,
-                                        AutoParams.AutoPathParams.kdSpin),
+                                        AutoPathParamsNT.kpSpin.getValue(),
+                                        AutoPathParamsNT.kiSpin.getValue(),
+                                        AutoPathParamsNT.kdSpin.getValue()),
                                 RobotConstants.LOOPER_DT),
                         RobotConstants.AUTO_ROBOT_CONFIG,
                         () -> false, // already flipped/mirrored before we get here
@@ -181,15 +181,15 @@ public class AutoActions {
                                     () -> new Pose3d(targetPose),
                                     RobotStateRecorder::getVelocityWorldRobotCurrent,
                                     new PIDController(
-                                            AutoParams.AutoPoseParams.kpStrave,
-                                            AutoParams.AutoPoseParams.kiStrave,
-                                            AutoParams.AutoPoseParams.kdStrave),
+                                            AutoPoseParamsNT.kpStrave.getValue(),
+                                            AutoPoseParamsNT.kiStrave.getValue(),
+                                            AutoPoseParamsNT.kdStrave.getValue()),
                                     new PIDController(
-                                            AutoParams.AutoPoseParams.kpSpin,
-                                            AutoParams.AutoPoseParams.kiSpin,
-                                            AutoParams.AutoPoseParams.kdSpin),
-                                    Meters.of(AutoParams.AutoPoseParams.tolerancePositionM),
-                                    Degrees.of(AutoParams.AutoPoseParams.toleranceHeadingDeg))
+                                            AutoPoseParamsNT.kpSpin.getValue(),
+                                            AutoPoseParamsNT.kiSpin.getValue(),
+                                            AutoPoseParamsNT.kdSpin.getValue()),
+                                    Meters.of(AutoPoseParamsNT.tolerancePositionM.getValue()),
+                                    Degrees.of(AutoPoseParamsNT.toleranceHeadingDeg.getValue()))
                             .beforeStarting(
                                     Commands.runOnce(
                                             () ->
@@ -211,10 +211,10 @@ public class AutoActions {
                                 RobotStateRecorder::getPoseWorldRobotCurrent,
                                 targetRotationSupplier,
                                 new PIDController(
-                                        AutoParams.AutoPoseParams.kpSpin,
-                                        AutoParams.AutoPoseParams.kiSpin,
-                                        AutoParams.AutoPoseParams.kdSpin),
-                                Degrees.of(AutoParams.AutoPoseParams.toleranceHeadingDeg),
+                                        AutoPoseParamsNT.kpSpin.getValue(),
+                                        AutoPoseParamsNT.kiSpin.getValue(),
+                                        AutoPoseParamsNT.kdSpin.getValue()),
+                                Degrees.of(AutoPoseParamsNT.toleranceHeadingDeg.getValue()),
                                 () -> DegreesPerSecond.of(80)),
                 Set.of(swerve));
     }
@@ -292,7 +292,7 @@ public class AutoActions {
     /** Spin up and feed for {@code feedSeconds}; size it to empty a full hopper. */
     public static Command shootAtHub(double feedSeconds) {
         return shootingSuperstructure.shootWhenReadyForSeconds(
-                AutoParams.AutoShootParams.readyTimeoutSeconds, feedSeconds);
+                AutoShootParamsNT.readyTimeoutSeconds.getValue(), feedSeconds);
     }
 
     /**
@@ -307,7 +307,7 @@ public class AutoActions {
     }
 
     public static Command aimAndShootAtHub() {
-        return aimAndShootAtHub(AutoParams.AutoShootParams.feedSeconds);
+        return aimAndShootAtHub(AutoShootParamsNT.feedSeconds.getValue());
     }
 
     /**

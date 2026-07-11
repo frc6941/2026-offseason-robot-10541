@@ -13,6 +13,21 @@ public class NTParameterRegistry {
     private static final List<Pair<NTParameterWrapper<?>, BiConsumer<Object, Object>>>
             onchangeBiConsumers = new ArrayList<>();
 
+    // Master gate for live NT tuning. When false, refresh() is a no-op: no NetworkTables reads and
+    // no onChange callbacks, so every @NTParameter value stays at its compile-time default. This
+    // source set (src/ext) is compiled before frc.robot and cannot import RobotConstants, so the
+    // flag is pushed in via setEnabled() at startup (see RobotConstants.ENABLE_NT_PARAMS).
+    private static boolean enabled = true;
+
+    /** Enable or disable live NT parameter updates. Off = refresh() does nothing. */
+    public static void setEnabled(boolean value) {
+        enabled = value;
+    }
+
+    public static boolean isEnabled() {
+        return enabled;
+    }
+
     protected static void registerWrapper(NTParameterWrapper<?> wrapper) {
         wrappers.add(wrapper);
     }
@@ -31,6 +46,10 @@ public class NTParameterRegistry {
     }
 
     public static void refresh() {
+        // Gated off: skip all NT reads + onChange callbacks; values hold their defaults.
+        if (!enabled) {
+            return;
+        }
         onchangeSiConsumers.forEach(
                 pair -> {
                     if (pair.getFirst().hasChanged())

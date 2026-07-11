@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.RobotStateRecorder;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveLimit;
+import lib.ntext.NTParameter;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -60,25 +61,27 @@ public class AutoPilotCommand extends Command {
                 new APConstraints(
                         limit.maxLinearVelocity().in(MetersPerSecond),
                         limit.maxSkidAcceleration().in(MetersPerSecondPerSecond),
-                        AutoPilotParams.jerk);
+                        AutoPilotParamsNT.jerk.getValue());
         APProfile profile =
                 new APProfile(constraints)
-                        .withErrorXY(Meters.of(AutoPilotParams.errorXYMeters))
-                        .withErrorTheta(Degrees.of(AutoPilotParams.errorThetaDegrees))
-                        .withBeelineRadius(Meters.of(AutoPilotParams.beelineRadiusMeters));
+                        .withErrorXY(Meters.of(AutoPilotParamsNT.errorXYMeters.getValue()))
+                        .withErrorTheta(Degrees.of(AutoPilotParamsNT.errorThetaDegrees.getValue()))
+                        .withBeelineRadius(
+                                Meters.of(AutoPilotParamsNT.beelineRadiusMeters.getValue()));
         this.autopilot = new Autopilot(profile);
 
         // Rotational constraints come from the swerve angular limits.
         headingController =
                 new ProfiledPIDController(
-                        AutoPilotParams.headingKP,
-                        AutoPilotParams.headingKI,
-                        AutoPilotParams.headingKD,
+                        AutoPilotParamsNT.headingKP.getValue(),
+                        AutoPilotParamsNT.headingKI.getValue(),
+                        AutoPilotParamsNT.headingKD.getValue(),
                         new TrapezoidProfile.Constraints(
                                 limit.maxAngularVelocity().in(RadiansPerSecond),
                                 limit.maxAngularAcceleration().in(RadiansPerSecondPerSecond)));
         headingController.enableContinuousInput(-Math.PI, Math.PI);
-        headingController.setTolerance(Math.toRadians(AutoPilotParams.errorThetaDegrees));
+        headingController.setTolerance(
+                Math.toRadians(AutoPilotParamsNT.errorThetaDegrees.getValue()));
 
         addRequirements(swerve);
     }
@@ -143,6 +146,7 @@ public class AutoPilotCommand extends Command {
         return autopilot.atTarget(RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(), target);
     }
 
+    @NTParameter(tableName = "Params/AutoPilot")
     public static final class AutoPilotParams {
         // Heading-control gains for the rotational axis. Autopilot owns translation; this only
         // steers
