@@ -90,13 +90,13 @@ public class IntakerConfig {
 
     @NTParameter(tableName = "Params/" + INTAKER_ROLLER_NAME)
     public static final class IntakerRollerParams {
-        public static final double kP = 1.5;
+        public static final double kP = 0.2;
         public static final double kI = 0.0;
         public static final double kD = 0.05;
 
-        public static final double kV = 0.16;
-        public static final double kA = 0.0;
-        public static final double kS = 3.0;
+        public static final double kV = 0.069267;
+        public static final double kA = 0.0031438;
+        public static final double kS = 0.2007;
 
         public static final double intakeRPS = 100.0;
         public static final double outtakeRPS = -15.0;
