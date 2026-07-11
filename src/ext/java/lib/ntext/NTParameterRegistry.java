@@ -54,7 +54,8 @@ public class NTParameterRegistry {
         if (!enabled) {
             // Gated off: never read NetworkTables. But we cannot just return, because every
             // wrapper starts with prevValue == null (hasChanged() == true by design, so the
-            // default gets applied once). If we never advance prevValue, hasChanged()/isAnyChanged()
+            // default gets applied once). If we never advance prevValue,
+            // hasChanged()/isAnyChanged()
             // stays true forever and every consumer that polls it re-applies its config on every
             // loop. So run exactly one pass: fire the onChange callbacks once (apply defaults, same
             // as the first enabled loop would) and settle every wrapper so it goes quiet after.

@@ -229,16 +229,17 @@ public class AutoActions {
      * false} to come back to the alliance side after a sweep.
      */
     public static Command drivePastSlope(boolean isLeft, boolean isToNeutral) {
-        // Default cross out to neutral holds the bump-start heading (used by the initial bump start).
+        // Default cross out to neutral holds the bump-start heading (used by the initial bump
+        // start).
         return drivePastSlope(
                 isLeft, isToNeutral, (isLeft ? kBumpStartL : kBumpStartR).getRotation());
     }
 
     /**
      * As {@link #drivePastSlope(boolean, boolean)}, but when crossing out to neutral the chassis
-     * holds {@code neutralHoldHeading} (blue frame) the whole way instead of the bump-start heading.
-     * Used by the bump-again second sweep, which crosses while keeping the slope-end heading it
-     * already carries rather than spinning back to the bump-start rotation.
+     * holds {@code neutralHoldHeading} (blue frame) the whole way instead of the bump-start
+     * heading. Used by the bump-again second sweep, which crosses while keeping the slope-end
+     * heading it already carries rather than spinning back to the bump-start rotation.
      */
     public static Command drivePastSlope(
             boolean isLeft, boolean isToNeutral, Rotation2d neutralHoldHeading) {

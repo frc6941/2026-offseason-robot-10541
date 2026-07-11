@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.auto.AutoActions;
 import frc.robot.auto.AutoFile;
 import frc.robot.auto.AutoRoutines;
@@ -35,6 +36,7 @@ import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import lib.ironpulse.command.SysIdCommand;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -147,7 +149,13 @@ public class RobotContainer {
      */
     private void configureBindings() {
         // Manual intake pivot hard-stop zero.
-        driverController.povLeft().onTrue(intaker.zeroCommand());
+        // driverController.povLeft().onTrue(intaker.zeroCommand());
+
+        SysIdCommand shooterSysId = new SysIdCommand(intakerRoller);
+        driverController.povUp().whileTrue(shooterSysId.quasistatic(Direction.kForward));
+        driverController.povDown().whileTrue(shooterSysId.quasistatic(Direction.kReverse));
+        driverController.povRight().whileTrue(shooterSysId.dynamic(Direction.kForward));
+        driverController.povLeft().whileTrue(shooterSysId.dynamic(Direction.kReverse));
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
