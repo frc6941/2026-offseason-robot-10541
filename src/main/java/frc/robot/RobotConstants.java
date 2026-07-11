@@ -11,6 +11,13 @@ public final class RobotConstants {
     // (RobotMechanism3d 3D model) and the shooter muzzle release point (projectile viz).
     public static final Translation3d HOOD_PIVOT = new Translation3d(-0.2579, 0.0, 0.47525);
 
+    public static final boolean HAS_INTAKER_IO = true;
+    public static final boolean HAS_HOPPER_IO = true;
+    public static final boolean HAS_SWERVE_IO = true;
+    public static final boolean HAS_SHOOTER_IO = true;
+    public static final boolean HAS_LED_IO = false;
+    public static final boolean HAS_HOOD_IO = true;
+
     // CAN
     public static final String ROBORIO_CAN_BUS_NAME = "rio";
     public static final String CANIVORE_CAN_BUS_NAME = "10541Canivore0";

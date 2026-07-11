@@ -8,6 +8,7 @@ import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Seconds;
+import static frc.robot.RobotConstants.HAS_SWERVE_IO;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -371,7 +372,7 @@ public class RobotContainer {
         return new VelocityMotorSubsystem<>(
                 IntakerConfig.INTAKER_ROLLER_CONFIG,
                 new MotorInputsAutoLogged(),
-                isReal
+                isReal && RobotConstants.HAS_INTAKER_IO
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
                 IntakerConfig.IntakerRollerParams.asVelocityParamSources());
@@ -381,7 +382,7 @@ public class RobotContainer {
         return new PositionMotorSubsystem<>(
                 IntakerConfig.INTAKER_PIVOT_CONFIG,
                 new MotorInputsAutoLogged(),
-                isReal
+                isReal && RobotConstants.HAS_INTAKER_IO
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_PIVOT_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_PIVOT_CONFIG),
                 IntakerConfig.IntakerPivotParams.asPositionParamSources(),
@@ -394,7 +395,7 @@ public class RobotContainer {
                 intaker,
                 HopperConfig.HOPPER_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_HOPPER_IO
                         ? new MotorIOTalonFX(HopperConfig.HOPPER_CONFIG)
                         : new MotorIOSim(HopperConfig.HOPPER_CONFIG));
     }
@@ -403,7 +404,7 @@ public class RobotContainer {
         return new VelocityMotorSubsystem<>(
                 ShooterConfig.SHOOTER_DRUM_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_SHOOTER_IO
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_DRUM_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_DRUM_CONFIG),
                 ShooterConfig.ShooterUpperParams.asVelocityParamSources());
@@ -413,7 +414,7 @@ public class RobotContainer {
         return new VelocityMotorSubsystem<>(
                 ShooterConfig.SHOOTER_FEED_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_SHOOTER_IO
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_FEED_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_FEED_CONFIG),
                 ShooterConfig.ShooterLowerParams.asVelocityParamSources());
@@ -458,9 +459,10 @@ public class RobotContainer {
         return new LimelightSubsystem(swerve, io);
     }
 
+    @SuppressWarnings("unused")
     private IndicatorSubsystem buildIndicator() {
         return new IndicatorSubsystem(
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_LED_IO
                         ? new IndicatorIOARGB(/* PWM port */ 9, /* LED count */ 60)
                         : new IndicatorIOSim());
     }
@@ -469,7 +471,7 @@ public class RobotContainer {
         return new PositionMotorSubsystem<>(
                 ShooterConfig.HOOD_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_HOOD_IO
                         ? new MotorIOTalonFX(ShooterConfig.HOOD_CONFIG)
                         : new MotorIOSim(ShooterConfig.HOOD_CONFIG),
                 ShooterConfig.HoodParams.asPositionParamSources(),
@@ -478,7 +480,7 @@ public class RobotContainer {
     }
 
     private Swerve buildSwerve() {
-        if (RobotBase.isReal()) {
+        if (isReal && HAS_SWERVE_IO) {
             // Build the modules BEFORE the IMU. SwerveModuleIOMK5N lazily creates the shared
             // PhoenixSynchronizationThread; ImuIOPigeon then grabs it via getSyncThread() to
             // register its
