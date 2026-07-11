@@ -17,8 +17,8 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 /**
  * Autonomous selector, ported from the competition robot's {@code AutoFile}.
  *
- * <p>Choosers (in order): Side, Start Behaviour, Second Sweep, Sweep Times, End Behaviour. {@link
- * #buildAuto()} maps them onto {@link AutoRoutines#competitionAuto}.
+ * <p>Choosers (in order): Side, Waiting, Start Behaviour, Second Sweep, Sweep Times, End Behaviour.
+ * {@link #buildAuto()} maps them onto {@link AutoRoutines#competitionAuto}.
  *
  * <p><b>Right-side rule:</b> depot end behaviours (Depot / DepotDriveThrough) only exist on the
  * left; if Side = RIGHT they are forced back to None.
@@ -28,6 +28,8 @@ public class AutoFile {
     private static final LoggedDashboardChooser<Side> sideChooser =
             new LoggedDashboardChooser<>("Auto/Side");
 
+    private static final LoggedDashboardChooser<Integer> waitingChooser =
+            new LoggedDashboardChooser<>("Auto/Waiting");
     private static final LoggedDashboardChooser<StartBehaviour> startBehaviourChooser =
             new LoggedDashboardChooser<>("Auto/Start Behaviour");
     private static final LoggedDashboardChooser<SecondSweepBehaviour> secondSweepChooser =
@@ -60,6 +62,12 @@ public class AutoFile {
         initChooser(secondSweepChooser, SecondSweepBehaviour.values(), SecondSweepBehaviour.MIDDLE);
         initChooser(endBehaviourChooser, EndBehaviour.values(), EndBehaviour.NONE);
 
+        // Pre-auto delay in whole seconds (0 = start immediately).
+        waitingChooser.addDefaultOption("0", 0);
+        waitingChooser.addOption("1", 1);
+        waitingChooser.addOption("2", 2);
+        waitingChooser.addOption("3", 3);
+
         sweepTimesChooser.addDefaultOption("2", 2);
         sweepTimesChooser.addOption("1", 1);
     }
@@ -83,6 +91,8 @@ public class AutoFile {
     public static String selectionSummary() {
         return "Side="
                 + sideChooser.get()
+                + ", Wait="
+                + waitingChooser.get()
                 + ", Start="
                 + startBehaviourChooser.get()
                 + ", SecondSweep="
@@ -95,6 +105,7 @@ public class AutoFile {
 
     public static Command buildAuto() {
         Side side = orDefault(sideChooser.get(), Side.RIGHT);
+        int waitSeconds = waitingChooser.get() != null ? waitingChooser.get() : 0;
         StartBehaviour start = orDefault(startBehaviourChooser.get(), StartBehaviour.TRENCH_START);
         SecondSweepBehaviour secondSweep =
                 orDefault(secondSweepChooser.get(), SecondSweepBehaviour.MIDDLE);
@@ -117,13 +128,16 @@ public class AutoFile {
 
         return AutoRoutines.competitionAuto(
                 isLeft,
+                waitSeconds,
                 start == StartBehaviour.BUMP_START,
                 blueStartPose,
                 startPath(start),
                 blueSecondSweepStart,
                 secondSweepPath(secondSweep),
                 sweepTimes,
-                end);
+                end,
+                secondSweep == SecondSweepBehaviour.BUMP_AGAIN,
+                startPath(StartBehaviour.BUMP_START));
     }
 
     // ---- chooser -> path/pose mapping (paths are RIGHT-authored; left mirrors them) ----
@@ -150,6 +164,9 @@ public class AutoFile {
             case MIDDLE -> "RightTrenchSecondMiddle";
             case CROSS -> "RightTrenchSecondCross";
             case AVOID -> "RightTrenchSecondAvoid";
+                // Not used for BUMP_AGAIN (it runs the bump cycle, not a trench path); kept so the
+                // switch stays exhaustive.
+            case BUMP_AGAIN -> startPath(StartBehaviour.BUMP_START);
         };
     }
 
@@ -171,6 +188,8 @@ public class AutoFile {
     private enum SecondSweepBehaviour {
         MIDDLE,
         CROSS,
-        AVOID
+        AVOID,
+        // Repeats the full bump cycle for the second sweep instead of a trench path.
+        BUMP_AGAIN
     }
 }

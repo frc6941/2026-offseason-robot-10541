@@ -229,16 +229,31 @@ public class AutoActions {
      * false} to come back to the alliance side after a sweep.
      */
     public static Command drivePastSlope(boolean isLeft, boolean isToNeutral) {
+        // Default cross out to neutral holds the bump-start heading (used by the initial bump start).
+        return drivePastSlope(
+                isLeft, isToNeutral, (isLeft ? kBumpStartL : kBumpStartR).getRotation());
+    }
+
+    /**
+     * As {@link #drivePastSlope(boolean, boolean)}, but when crossing out to neutral the chassis
+     * holds {@code neutralHoldHeading} (blue frame) the whole way instead of the bump-start heading.
+     * Used by the bump-again second sweep, which crosses while keeping the slope-end heading it
+     * already carries rather than spinning back to the bump-start rotation.
+     */
+    public static Command drivePastSlope(
+            boolean isLeft, boolean isToNeutral, Rotation2d neutralHoldHeading) {
         if (isToNeutral) {
             // Out to neutral: drive toward the slope front and stop once over the bump line and
-            // settled. Here the target only sets DIRECTION — the stop is the bump crossing.
+            // settled. The slope-front translation only sets DIRECTION; the stop is the bump
+            // crossing. Hold neutralHoldHeading the whole way across (not kSlopeFront's) so the
+            // chassis doesn't spin while climbing the slope.
+            Pose2d slopeFront = isLeft ? kSlopeFrontL : kSlopeFrontR;
+            Pose2d target = new Pose2d(slopeFront.getTranslation(), neutralHoldHeading);
             return Commands.defer(
                     () ->
                             Commands.deadline(
                                     waitCrossedBump(true),
-                                    driveToPose(
-                                            AllianceFlipUtil.apply(
-                                                    isLeft ? kSlopeFrontL : kSlopeFrontR))),
+                                    driveToPose(AllianceFlipUtil.apply(target))),
                     Set.of(swerve));
         }
         // Back: actually drive TO kSlopeEnd (so editing that pose moves where we end up). Timeout
@@ -247,15 +262,20 @@ public class AutoActions {
                 .withTimeout(3.0);
     }
 
+    /** Blue-frame heading the robot carries at the end of the back trip (drive to slope end). */
+    public static Rotation2d slopeEndHeading(boolean isLeft) {
+        return (isLeft ? kSlopeEndL : kSlopeEndR).getRotation();
+    }
+
     static Command waitCrossedBump(boolean isToNeutral) {
-        return Commands.waitUntil(() -> isPitchStable());
+        return Commands.waitUntil(() -> hasCrossedBump(isToNeutral) && isPitchStable());
     }
 
     public static boolean hasCrossedBump(boolean isToNeutral) {
         return isToNeutral
                 ? AllianceFlipUtil.applyX(getRobotX())
                         > FieldConstants.LinesVertical.neutralZoneNear
-                : AllianceFlipUtil.applyX(getRobotX()) < FieldConstants.LinesVertical.starting;
+                : AllianceFlipUtil.applyX(getRobotX()) < 3.3;
     }
 
     public static boolean isPitchStable() {

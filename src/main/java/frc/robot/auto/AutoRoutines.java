@@ -48,14 +48,22 @@ public class AutoRoutines {
 
     public static Command competitionAuto(
             boolean isLeft,
+            int waitSeconds,
             boolean startFromBump,
             Pose2d blueStartPose,
             String startPath,
             Pose2d blueSecondSweepStart,
             String secondSweepPath,
             int sweepTimes,
-            EndBehaviour endBehaviour) {
+            EndBehaviour endBehaviour,
+            boolean secondRunBumpAgain,
+            String bumpPath) {
         List<Command> steps = new ArrayList<>();
+
+        // 0. Optional pre-auto delay (e.g. to let alliance partners clear the field first).
+        if (waitSeconds > 0) {
+            steps.add(Commands.waitSeconds(waitSeconds));
+        }
 
         // 0. Sim-only pose reset so the robot starts where the path expects.
         steps.add(resetOnPose(blueStartPose));
@@ -73,10 +81,19 @@ public class AutoRoutines {
         // 1. First sweep: collect out, drive back, aim + shoot.
         steps.add(sweepCollectShoot(startPath, isLeft));
 
-        // 2. Optional second sweep: reposition to the hardcoded start, then collect/shoot again.
+        // 2. Optional second sweep. BUMP_AGAIN repeats the bump cycle so it can follow any first
+        // attempt (trench or bump) without repositioning to the trench start: cross the bump again
+        // — holding the slope-end heading it already carries rather than spinning to the bump-start
+        // rotation — then follow the bumpstart path, drive back, aim + shoot. Otherwise reposition
+        // to the hardcoded start and run the trench second-sweep path.
         if (sweepTimes >= 2) {
-            steps.add(driveToPose(AllianceFlipUtil.apply(blueSecondSweepStart)));
-            steps.add(sweepCollectShoot(secondSweepPath, isLeft));
+            if (secondRunBumpAgain) {
+                steps.add(drivePastSlope(isLeft, true, slopeEndHeading(isLeft)));
+                steps.add(sweepCollectShoot(bumpPath, isLeft));
+            } else {
+                steps.add(driveToPose(AllianceFlipUtil.apply(blueSecondSweepStart)));
+                steps.add(sweepCollectShoot(secondSweepPath, isLeft));
+            }
         }
 
         // 3. End behaviour (intake running throughout).
