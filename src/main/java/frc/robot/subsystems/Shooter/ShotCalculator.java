@@ -15,7 +15,7 @@ import lib.ntext.NTParameter;
  * <p>The interpolation breakpoints, hood angles, flywheel speeds, and times of flight are fixed in
  * {@link ShootingParams}. The interpolation maps are built once at startup.
  *
- * <p>{@link InterpolatingDoubleTreeMap#get} clamps to the nearest endpoint for distances outside
+ * <p>{@link InterpolatingDoubleTreeMap} clamps to the nearest endpoint for distances outside
  * the tabulated range, so out-of-range lookups are safe.
  *
  * <p>Shoot-on-move (Step 1): {@link #effectiveDistance} converts the geometric robot→hub distance
