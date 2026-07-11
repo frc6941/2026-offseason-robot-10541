@@ -206,7 +206,13 @@ public class AutoAimCommand extends Command {
         double x = MathUtil.applyDeadband(xSupplier.getAsDouble(), 0.1);
         double y = MathUtil.applyDeadband(ySupplier.getAsDouble(), 0.1);
         double vNorm = Math.hypot(x, y) * maxSpeed;
-        Translation2d v = new Translation2d(vNorm, new Rotation2d(x, y));
+        // When the driver isn't translating (x == y == 0, e.g. sticks neutral or controller
+        // unplugged), the direction is undefined and new Rotation2d(0, 0) reports a WPILib error
+        // every loop. The vector is zero regardless, so build it directly.
+        Translation2d v =
+                (x == 0.0 && y == 0.0)
+                        ? new Translation2d()
+                        : new Translation2d(vNorm, new Rotation2d(x, y));
         // Driver-relative so "forward" isn't mirrored on red while aiming. Aim omega is unaffected.
         Rotation2d driverHeading =
                 RobotStateRecorder.getPoseDriverRobotCurrent().getRotation().toRotation2d();
