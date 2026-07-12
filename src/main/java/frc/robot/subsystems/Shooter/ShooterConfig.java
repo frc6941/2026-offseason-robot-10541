@@ -37,13 +37,8 @@ public class ShooterConfig {
     public static final Angle SHOOTER_FIRING_YAW_OFFSET = Degrees.of(0.0);
 
     public static final Angle HOOD_MIN_ANGLE = Degrees.of(0.0);
-    // PLACEHOLDER — must equal the hood's true mechanical travel, measured on the real robot.
-    // Keep reconciled with ShotCalculator.ShootingParams: the hood-angle LUT there sweeps up to
-    // 30 deg and the aim solution is clamped to this ceiling, so any LUT row above HOOD_MAX_ANGLE
-    // is
-    // silently unreachable. Set to 30 so the full LUT curve is expressible; lower it (and re-fit
-    // the
-    // LUT) if the real hood tops out sooner.
+    // Must equal the hood's true mechanical travel. ShotCalculator converts physical launch pitch
+    // to this mechanism angle and clamps the result to this range.
     public static final Angle HOOD_MAX_ANGLE = Degrees.of(30.0);
     public static final Angle HOOD_STOW_ANGLE = HOOD_MIN_ANGLE;
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
@@ -123,17 +118,16 @@ public class ShooterConfig {
 
     @NTParameter(tableName = "Params/" + SHOOTER_DRUM_NAME)
     public static final class ShooterUpperParams {
-        public static final double kP = 0.4;
+        public static final double kP = 0.3;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.1;
+        public static final double kV = 0.09;
         public static final double kA = 0.01;
-        public static final double kS = 0.0;
+        public static final double kS = 0.01;
 
         public static final double shootRPS = 80.0;
-        // public static final double idleRPS = 5.0;
-        public static final double idleRPS = 0.0;
+        public static final double idleRPS = 5.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
         // Bench-test setpoint: drum (upper) RPS for the isolated spin-up test binding.
@@ -144,11 +138,11 @@ public class ShooterConfig {
 
     @NTParameter(tableName = "Params/" + SHOOTER_FEED_NAME)
     public static final class ShooterLowerParams {
-        public static final double kP = 0.4;
+        public static final double kP = 0.3;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.1;
+        public static final double kV = 0.08;
         public static final double kA = 0.01;
         public static final double kS = 0.0;
 

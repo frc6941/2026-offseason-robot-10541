@@ -29,7 +29,7 @@ public class Robot extends LoggedRobot {
     // Keep the full AdvantageKit pipeline off the roboRIO while diagnosing loop overruns. Merely
     // omitting NT4Publisher is not enough: Logger.start() still clones the full log table each
     // loop.
-    private static final boolean ENABLE_REAL_NT4_LOGGING = false;
+    private static final boolean ENABLE_REAL_NT4_LOGGING = true;
     private static final boolean ENABLE_REAL_WPILOG_LOGGING = false;
     private static final long LOOP_WARNING_MICROS = 40_000;
     private static final long LOOP_WARNING_INTERVAL_MICROS = 1_000_000;

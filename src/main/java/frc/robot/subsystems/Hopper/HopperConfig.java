@@ -37,13 +37,13 @@ public class HopperConfig {
 
     @NTParameter(tableName = "Params/" + HOPPER_NAME)
     public static final class HopperParams {
-        public static final double kP = 0.2;
-        public static final double kI = 0.0;
+        public static final double kP = 1;
+        public static final double kI = 0.1;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.061058;
-        public static final double kA = 0.00422463;
-        public static final double kS = 0.25162;
+        public static final double kV = 0.15;
+        public static final double kA = 0.004;
+        public static final double kS = 0.252;
 
         public static final double feedRPS = 20;
         public static final double shootRPS = 40;
