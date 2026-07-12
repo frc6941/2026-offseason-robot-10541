@@ -68,18 +68,20 @@ public class AutoRoutines {
         // 0. Sim-only pose reset so the robot starts where the path expects.
         steps.add(resetOnPose(blueStartPose));
 
-        // 0a. Home the intake pivot once at the start (must run before the intake is used; a
-        // trigger
-        // can't do this because the auto sequence holds the intaker requirement the whole time).
-        steps.add(intake.zeroCommand());
-
-        // 0b. Bump start begins on the bump — cross out into the neutral zone before anything else.
+        // 0a. Bump start begins on the bump — cross out into the neutral zone before anything else.
         if (startFromBump) {
             steps.add(drivePastSlope(isLeft, true));
         }
 
-        // 1. First sweep: collect out, drive back, aim + shoot.
-        steps.add(sweepCollectShoot(startPath, isLeft));
+        // 1. First sweep: collect out, drive back, aim + shoot. The intake pivot is homed on the
+        // move — the sweep path drives immediately while the pivot zeros, and collecting only
+        // starts
+        // once it's homed — instead of the robot sitting still to home before it can move. Homing
+        // must complete before the sweep path does (it's the deadline) or it gets cut short; the
+        // path is seconds long and homing is sub-second, so that margin holds.
+        steps.add(
+                sweepCollectShoot(
+                        startPath, isLeft, Commands.sequence(intake.zeroCommand(), intake())));
 
         // 2. Optional second sweep. BUMP_AGAIN repeats the bump cycle so it can follow any first
         // attempt (trench or bump) without repositioning to the trench start: cross the bump again

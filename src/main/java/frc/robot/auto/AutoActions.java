@@ -373,8 +373,22 @@ public class AutoActions {
      * slope, then aim at the hub and empty the hopper.
      */
     public static Command sweepCollectShoot(String sweepPath, boolean isLeft) {
+        return sweepCollectShoot(sweepPath, isLeft, intake());
+    }
+
+    /**
+     * As {@link #sweepCollectShoot(String, boolean)}, but runs {@code intakeBranch} alongside the
+     * sweep path instead of the plain intake. Lets the first sweep home the intake pivot on the
+     * move — pass {@code Commands.sequence(intake.zeroCommand(), intake())} so the path drives
+     * immediately while the pivot homes, and collecting only begins once it's zeroed. The path is
+     * the deadline, so {@code intakeBranch} must finish (or reach its collecting phase) before the
+     * path does, or it gets cancelled mid-home; the sweep path is seconds long and homing is
+     * sub-second, so keep that margin if you ever shorten the start path.
+     */
+    public static Command sweepCollectShoot(
+            String sweepPath, boolean isLeft, Command intakeBranch) {
         return Commands.sequence(
-                Commands.deadline(followPathFile(sweepPath, isLeft), intake()),
+                Commands.deadline(followPathFile(sweepPath, isLeft), intakeBranch),
                 drivePastSlope(isLeft, false),
                 aimAndShootAtHub());
     }

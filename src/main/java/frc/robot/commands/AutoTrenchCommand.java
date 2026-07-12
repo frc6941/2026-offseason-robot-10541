@@ -44,9 +44,10 @@ public class AutoTrenchCommand extends Command {
     private static final double LEFT_TRENCH_Y = FieldConstants.LeftTrench.center.getY();
     private static final double RIGHT_TRENCH_Y = FieldConstants.RightTrench.center.getY();
 
-    // Lateral (Y) hold and heading hold are profiled PIDs built from one deterministic parameter
-    // set. Keeping this command off NT prevents stale dashboard values from changing its behavior
-    // after a deploy or reboot.
+    // Lateral (Y) hold and heading hold are profiled PIDs. All gains/limits/tolerances are
+    // NT-tunable under Params/AutoTrench (see AutoTrenchParams at the bottom); the controllers are
+    // built from those params in the constructor and re-pushed live whenever the dashboard changes
+    // a value (see execute()).
     private final ProfiledPIDController yController;
     private final ProfiledPIDController headingController;
 
@@ -69,9 +70,11 @@ public class AutoTrenchCommand extends Command {
     }
 
     /**
-     * Push the {@link AutoTrenchParams} values into both profiled PID controllers. Called once from
-     * the constructor: this command is intentionally deterministic (see the field comment above),
-     * so the controllers are configured at build time and not re-read from NetworkTables per loop.
+     * Push the current {@link AutoTrenchParams} values into both profiled PID controllers. Called
+     * once in the constructor and again from {@link #execute()} whenever any param changes, so
+     * gains, constraints, and tolerances tune live (see {@code AutoTrenchParamsNT.isAnyChanged()}).
+     * The setters only swap the values used on the next {@code calculate()}; they don't reset the
+     * profile state, so re-applying mid-trench doesn't jerk the chassis.
      */
     private void applyParams() {
         yController.setPID(
@@ -126,6 +129,9 @@ public class AutoTrenchCommand extends Command {
 
     @Override
     public void execute() {
+        // Live tuning: re-push gains/constraints/tolerances when the dashboard changes any param.
+        if (AutoTrenchParamsNT.isAnyChanged()) applyParams();
+
         Pose2d pose = swerve.getEstimatedPose().toPose2d();
         double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
 

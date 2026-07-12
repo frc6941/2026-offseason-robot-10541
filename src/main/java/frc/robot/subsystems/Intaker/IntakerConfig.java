@@ -36,7 +36,7 @@ public class IntakerConfig {
     public static final Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
     // Placeholder template values for homing. These MUST be verified on the real robot.
     // Sign must drive the intake pivot toward the zero hard stop.
-    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -1.5;
+    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -3;
     // Must be above free-run current and below breaker / unsafe stall current.
     public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 60.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
