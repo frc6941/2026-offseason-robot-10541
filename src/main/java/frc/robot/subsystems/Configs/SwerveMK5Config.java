@@ -30,22 +30,29 @@ public final class SwerveMK5Config {
                     .build();
 
     // Per-module physical limits (MK5n R1 + Kraken X60/X44 with FOC)
-    public static final SwerveModuleLimit kDefaultSwerveModuleLimit =
+    
+    public static SwerveModuleLimit kDefaultSwerveModuleLimit =
             SwerveModuleLimit.builder()
+                    // MK5n R1 defaults (drive ~= 6.03, steer = 287/11 ~= 26.09, wheel = 4.0in)
+                    // v (mps) = 5800rpm (X60 with FOC) / 60 / 6.03 * pi * 4.0in
                     .maxDriveVelocity(InchesPerSecond.of(5800 / 60.0 / 6.03 * Math.PI * 4.0))
-                    .maxDriveAcceleration(MetersPerSecondPerSecond.of(200))
+                    .maxDriveAcceleration(MetersPerSecondPerSecond.of(100))
+                    // omega (rps) = 7368rpm (X44 with FOC) / 60 / (287/11) ~= 4.707 rps
                     .maxSteerAngularVelocity(RotationsPerSecond.of(7368.0 / 60.0 / (287.0 / 11.0)))
+                    // accelerate in 0.2s
                     .maxSteerAngularAcceleration(
                             RotationsPerSecondPerSecond.of(7008.0 / 60.0 / (287.0 / 11.0) / 0.2))
                     .build();
-
-    // Chassis-level limits
-    public static final SwerveLimit kDefaultSwerveLimit =
+    public static SwerveLimit kDefaultSwerveLimit =
             SwerveLimit.builder()
-                    .maxLinearVelocity(MetersPerSecond.of(4.0))
-                    .maxSkidAcceleration(MetersPerSecondPerSecond.of(200))
-                    .maxAngularVelocity(DegreesPerSecond.of(450))
-                    .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000))
+                    .maxLinearVelocity(MetersPerSecond.of(3.9)) // theoretically 5.10
+                    // prevents skidding, see orbit archive ytb channel open class for theory
+                    .maxSkidAcceleration(MetersPerSecondPerSecond.of(22)) // <maxDriveAcceleration
+                    // omega_max ≈ vMax / r.
+                    .maxAngularVelocity(DegreesPerSecond.of(1000))
+                    // accelerate in 0.32s, also must be smaller than the defined module limit to be
+                    // actually effective
+                    .maxAngularAcceleration(DegreesPerSecondPerSecond.of(4000)) // 1000-1472
                     .build();
 
     // Module configs — encoder offsets are from the competition robot and will need re-tuning
@@ -85,7 +92,7 @@ public final class SwerveMK5Config {
                     .steerMotorId(5)
                     .encoderId(4)
                     .driveMotorEncoderOffset(Degree.of(0))
-                    .steerMotorEncoderOffset(Rotations.of(0.076172))
+                    .steerMotorEncoderOffset(Rotations.of(0.29541015625))
                     .driveInverted(false)
                     .steerInverted(false)
                     .encoderInverted(false)

@@ -50,7 +50,7 @@ public class LimeLightConfig {
         public static final double xStdDev = 0.7;
         public static final double yStdDev = 0.7;
         public static final double zStdDev = 1.0;
-        public static final double angleStdDev = 0.1;
+        public static final double angleStdDev = 99999999;
         public static final double imuCorrectionReliabilityThreshold = 0.6;
     }
 }

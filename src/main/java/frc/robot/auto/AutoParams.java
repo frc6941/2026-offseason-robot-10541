@@ -16,10 +16,10 @@ public final class AutoParams {
      */
     @NTParameter(tableName = "Params/AutoPath")
     public static final class AutoPathParams {
-        public static final double kpStrave = 5.0;
+        public static final double kpStrave = 1.6;
         public static final double kiStrave = 0.0;
         public static final double kdStrave = 0.0;
-        public static final double kpSpin = 5.0;
+        public static final double kpSpin = 0.2;
         public static final double kiSpin = 0.0;
         public static final double kdSpin = 0.0;
 

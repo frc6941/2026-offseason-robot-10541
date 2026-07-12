@@ -217,6 +217,11 @@ public class RobotContainer {
 
         driverController.a().onTrue(intaker.runRetract());
 
+        // Test path: follow the "New Path" PathPlanner path (deploy/pathplanner/paths/New Path.path)
+        // while the left bumper is held. Deferred so the command builds only on press — AutoActions
+        // is initialized after configureBindings() runs, so it must not be constructed eagerly here.
+        driverController.leftBumper().whileTrue(testPathCommand());
+
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
         driverController
                 .rightTrigger()
@@ -247,6 +252,11 @@ public class RobotContainer {
 
     private Command autoTrenchCommand() {
         return new AutoTrenchCommand(swerve, () -> -driverController.getLeftY());
+    }
+
+    /** Follows the "New Path" PathPlanner path for on-field testing (no alliance mirror). */
+    private Command testPathCommand() {
+        return Commands.deferredProxy(() -> AutoActions.followPathFile("RightTrenchStart", false));
     }
 
     private Command holdHubTargetMode() {
