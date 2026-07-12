@@ -115,11 +115,12 @@ public class AutoActions {
 
     /**
      * A {@link PathFollowingController} that reads its PID from {@code Params/AutoPath} live. The
-     * vendored {@link PPHolonomicDriveController} bakes gains into private final PID controllers with
-     * no setters, so we wrap one and rebuild it whenever any AutoPath param changes ({@code
+     * vendored {@link PPHolonomicDriveController} bakes gains into private final PID controllers
+     * with no setters, so we wrap one and rebuild it whenever any AutoPath param changes ({@code
      * isAnyChanged()} is true for exactly the loop(s) after a dashboard edit). Rebuilding drops the
-     * integral accumulators, which is harmless with the kI≈0 path gains and only happens the instant
-     * you retune. This makes {@link #followPath} honor NT edits mid-path, not just at construction.
+     * integral accumulators, which is harmless with the kI≈0 path gains and only happens the
+     * instant you retune. This makes {@link #followPath} honor NT edits mid-path, not just at
+     * construction.
      */
     private static final class TunablePathController implements PathFollowingController {
         private PPHolonomicDriveController inner = build();

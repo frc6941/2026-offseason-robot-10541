@@ -30,7 +30,7 @@ public final class SwerveMK5Config {
                     .build();
 
     // Per-module physical limits (MK5n R1 + Kraken X60/X44 with FOC)
-    
+
     public static SwerveModuleLimit kDefaultSwerveModuleLimit =
             SwerveModuleLimit.builder()
                     // MK5n R1 defaults (drive ~= 6.03, steer = 287/11 ~= 26.09, wheel = 4.0in)

@@ -77,10 +77,10 @@ public class AutoPilotCommand extends Command {
     /**
      * (Re)build the {@link Autopilot} from the current {@link AutoPilotParams} and push the heading
      * gains/tolerance into the controller. Called in the constructor and from {@link #execute()}
-     * whenever any param changes, so the profile and gains tune live. Autopilot itself is stateless,
-     * so swapping the instance mid-run is safe; the heading controller's setters only affect the next
-     * {@code calculate()}, not the profile state. The translational constraints still pull from the
-     * live swerve limit each rebuild.
+     * whenever any param changes, so the profile and gains tune live. Autopilot itself is
+     * stateless, so swapping the instance mid-run is safe; the heading controller's setters only
+     * affect the next {@code calculate()}, not the profile state. The translational constraints
+     * still pull from the live swerve limit each rebuild.
      */
     private void applyParams() {
         SwerveLimit limit = swerve.getSwerveLimit();

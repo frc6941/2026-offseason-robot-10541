@@ -60,7 +60,8 @@ public class AutoTrenchCommand extends Command {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
 
-        yController = new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0, 0));
+        yController =
+                new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0, 0));
         headingController =
                 new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0, 0));
         headingController.enableContinuousInput(-Math.PI, Math.PI);
@@ -71,14 +72,16 @@ public class AutoTrenchCommand extends Command {
 
     /**
      * Push the current {@link AutoTrenchParams} values into both profiled PID controllers. Called
-     * once in the constructor and again from {@link #execute()} whenever any param changes, so gains,
-     * constraints, and tolerances tune live (see {@code AutoTrenchParamsNT.isAnyChanged()}). Setters
-     * only swap the values used on the next {@code calculate()}; they don't reset the profile state,
-     * so re-applying mid-trench doesn't jerk the chassis.
+     * once in the constructor and again from {@link #execute()} whenever any param changes, so
+     * gains, constraints, and tolerances tune live (see {@code AutoTrenchParamsNT.isAnyChanged()}).
+     * Setters only swap the values used on the next {@code calculate()}; they don't reset the
+     * profile state, so re-applying mid-trench doesn't jerk the chassis.
      */
     private void applyParams() {
         yController.setPID(
-                AutoTrenchParamsNT.lateralKP.getValue(), 0.0, AutoTrenchParamsNT.lateralKD.getValue());
+                AutoTrenchParamsNT.lateralKP.getValue(),
+                0.0,
+                AutoTrenchParamsNT.lateralKD.getValue());
         yController.setConstraints(
                 new TrapezoidProfile.Constraints(
                         AutoTrenchParamsNT.lateralMaxVel.getValue(),
@@ -88,7 +91,9 @@ public class AutoTrenchCommand extends Command {
                 AutoTrenchParamsNT.lateralVelocityToleranceMetersPerSec.getValue());
 
         headingController.setPID(
-                AutoTrenchParamsNT.headingKP.getValue(), 0.0, AutoTrenchParamsNT.headingKD.getValue());
+                AutoTrenchParamsNT.headingKP.getValue(),
+                0.0,
+                AutoTrenchParamsNT.headingKD.getValue());
         headingController.setConstraints(
                 new TrapezoidProfile.Constraints(
                         AutoTrenchParamsNT.headingMaxVel.getValue(),
@@ -186,7 +191,7 @@ public class AutoTrenchCommand extends Command {
         // Hold-to-run: the whileTrue binding ends it on button release.
         return false;
     }
-    
+
     @NTParameter(tableName = "Params/AutoTrench")
     public static final class AutoTrenchParams {
         // --- Lateral (Y) hold. Profiled so an off-center engage snaps in smoothly and arrives at
