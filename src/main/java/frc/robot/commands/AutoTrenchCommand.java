@@ -60,32 +60,42 @@ public class AutoTrenchCommand extends Command {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
 
-        yController =
-                new ProfiledPIDController(
-                        AutoTrenchParamsNT.lateralKP.getValue(),
-                        0.0,
-                        AutoTrenchParamsNT.lateralKD.getValue(),
-                        new TrapezoidProfile.Constraints(
-                                AutoTrenchParamsNT.lateralMaxVel.getValue(),
-                                AutoTrenchParamsNT.lateralMaxAccel.getValue()));
+        yController = new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0, 0));
+        headingController =
+                new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0, 0));
+        headingController.enableContinuousInput(-Math.PI, Math.PI);
+        applyParams();
+
+        addRequirements(swerve);
+    }
+
+    /**
+     * Push the current {@link AutoTrenchParams} values into both profiled PID controllers. Called
+     * once in the constructor and again from {@link #execute()} whenever any param changes, so gains,
+     * constraints, and tolerances tune live (see {@code AutoTrenchParamsNT.isAnyChanged()}). Setters
+     * only swap the values used on the next {@code calculate()}; they don't reset the profile state,
+     * so re-applying mid-trench doesn't jerk the chassis.
+     */
+    private void applyParams() {
+        yController.setPID(
+                AutoTrenchParamsNT.lateralKP.getValue(), 0.0, AutoTrenchParamsNT.lateralKD.getValue());
+        yController.setConstraints(
+                new TrapezoidProfile.Constraints(
+                        AutoTrenchParamsNT.lateralMaxVel.getValue(),
+                        AutoTrenchParamsNT.lateralMaxAccel.getValue()));
         yController.setTolerance(
                 AutoTrenchParamsNT.lateralToleranceMeters.getValue(),
                 AutoTrenchParamsNT.lateralVelocityToleranceMetersPerSec.getValue());
 
-        headingController =
-                new ProfiledPIDController(
-                        AutoTrenchParamsNT.headingKP.getValue(),
-                        0.0,
-                        AutoTrenchParamsNT.headingKD.getValue(),
-                        new TrapezoidProfile.Constraints(
-                                AutoTrenchParamsNT.headingMaxVel.getValue(),
-                                AutoTrenchParamsNT.headingMaxAccel.getValue()));
+        headingController.setPID(
+                AutoTrenchParamsNT.headingKP.getValue(), 0.0, AutoTrenchParamsNT.headingKD.getValue());
+        headingController.setConstraints(
+                new TrapezoidProfile.Constraints(
+                        AutoTrenchParamsNT.headingMaxVel.getValue(),
+                        AutoTrenchParamsNT.headingMaxAccel.getValue()));
         headingController.setTolerance(
                 Math.toRadians(AutoTrenchParamsNT.headingToleranceDeg.getValue()),
                 AutoTrenchParamsNT.headingVelocityToleranceRadPerSec.getValue());
-        headingController.enableContinuousInput(-Math.PI, Math.PI);
-
-        addRequirements(swerve);
     }
 
     @Override
@@ -114,6 +124,9 @@ public class AutoTrenchCommand extends Command {
 
     @Override
     public void execute() {
+        // Live tuning: re-push gains/constraints/tolerances when the dashboard changes any param.
+        if (AutoTrenchParamsNT.isAnyChanged()) applyParams();
+
         Pose2d pose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
         double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
 

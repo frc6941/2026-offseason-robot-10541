@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.*;
 import com.pathplanner.lib.commands.FollowPathCommand;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import com.pathplanner.lib.controllers.PathFollowingController;
 import com.pathplanner.lib.path.GoalEndState;
 import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.path.PathPlannerPath;
@@ -14,6 +15,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.FieldConstants;
@@ -101,16 +103,7 @@ public class AutoActions {
                         () -> RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(),
                         swerve::getChassisSpeeds,
                         (vel, ff) -> swerve.runTwist(vel),
-                        new PPHolonomicDriveController(
-                                new PIDConstants(
-                                        AutoPathParamsNT.kpStrave.getValue(),
-                                        AutoPathParamsNT.kiStrave.getValue(),
-                                        AutoPathParamsNT.kdStrave.getValue()),
-                                new PIDConstants(
-                                        AutoPathParamsNT.kpSpin.getValue(),
-                                        AutoPathParamsNT.kiSpin.getValue(),
-                                        AutoPathParamsNT.kdSpin.getValue()),
-                                RobotConstants.LOOPER_DT),
+                        new TunablePathController(),
                         RobotConstants.AUTO_ROBOT_CONFIG,
                         () -> false, // already flipped/mirrored before we get here
                         swerve)
@@ -118,6 +111,49 @@ public class AutoActions {
                         () ->
                                 Logger.recordOutput(
                                         "Auto/Traj", path.getPathPoses().toArray(new Pose2d[0])));
+    }
+
+    /**
+     * A {@link PathFollowingController} that reads its PID from {@code Params/AutoPath} live. The
+     * vendored {@link PPHolonomicDriveController} bakes gains into private final PID controllers with
+     * no setters, so we wrap one and rebuild it whenever any AutoPath param changes ({@code
+     * isAnyChanged()} is true for exactly the loop(s) after a dashboard edit). Rebuilding drops the
+     * integral accumulators, which is harmless with the kI≈0 path gains and only happens the instant
+     * you retune. This makes {@link #followPath} honor NT edits mid-path, not just at construction.
+     */
+    private static final class TunablePathController implements PathFollowingController {
+        private PPHolonomicDriveController inner = build();
+
+        private static PPHolonomicDriveController build() {
+            return new PPHolonomicDriveController(
+                    new PIDConstants(
+                            AutoPathParamsNT.kpStrave.getValue(),
+                            AutoPathParamsNT.kiStrave.getValue(),
+                            AutoPathParamsNT.kdStrave.getValue()),
+                    new PIDConstants(
+                            AutoPathParamsNT.kpSpin.getValue(),
+                            AutoPathParamsNT.kiSpin.getValue(),
+                            AutoPathParamsNT.kdSpin.getValue()),
+                    RobotConstants.LOOPER_DT);
+        }
+
+        @Override
+        public ChassisSpeeds calculateRobotRelativeSpeeds(
+                Pose2d currentPose,
+                com.pathplanner.lib.trajectory.PathPlannerTrajectoryState targetState) {
+            if (AutoPathParamsNT.isAnyChanged()) inner = build();
+            return inner.calculateRobotRelativeSpeeds(currentPose, targetState);
+        }
+
+        @Override
+        public void reset(Pose2d currentPose, ChassisSpeeds currentSpeeds) {
+            inner.reset(currentPose, currentSpeeds);
+        }
+
+        @Override
+        public boolean isHolonomic() {
+            return true;
+        }
     }
 
     /**
