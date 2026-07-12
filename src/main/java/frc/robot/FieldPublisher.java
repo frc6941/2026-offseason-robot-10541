@@ -10,7 +10,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  * active PathPlanner path / target pose.
  *
  * <p>Lives in {@code frc.robot} (not the vendored lib) so future lib copies don't wipe it.
- * Supersedes the unused {@code lib.ironpulse.display.FieldView}.
+ * Supersedes the%competitionAuto unused {@code lib.ironpulse.display.FieldView}.
  */
 public final class FieldPublisher {
     private static final Field2d field = new Field2d();

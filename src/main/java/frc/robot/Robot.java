@@ -9,6 +9,7 @@ import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import lib.ironpulse.utils.LoggedTracer;
 import lib.ironpulse.utils.PhoenixUtils;
 import lib.ntext.NTParameterRegistry;
 import org.littletonrobotics.junction.LoggedRobot;
@@ -47,6 +48,9 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void robotInit() {
+        // Push the NT live-tuning gate into the ntext framework once, before any refresh() runs.
+        NTParameterRegistry.setEnabled(RobotConstants.ENABLE_NT_PARAMS);
+
         // AdvantageKit logger — sends data to AdvantageScope and writes .wpilog files
         boolean enableNt4 = RobotBase.isSimulation() || ENABLE_REAL_NT4_LOGGING;
         boolean enableWpilog = RobotBase.isReal() && ENABLE_REAL_WPILOG_LOGGING;
@@ -72,6 +76,11 @@ public class Robot extends LoggedRobot {
      */
     @Override
     public void robotPeriodic() {
+        // Reset the shared stopwatch at the very top of the loop so each subsystem's
+        // LoggedTracer.record(...) reports time elapsed since here (otherwise the deltas chain from
+        // an arbitrary point and the first sample is garbage).
+        LoggedTracer.reset();
+
         long loopStart = RobotController.getFPGATime();
 
         // Runs the Scheduler.  This is responsible for polling buttons, adding newly-scheduled
@@ -88,11 +97,9 @@ public class Robot extends LoggedRobot {
         CommandScheduler.getInstance().run();
         long schedulerEnd = RobotController.getFPGATime();
 
-        // Robot parameters are fixed constants. Keep vendored command tuning available in
-        // simulation only; competition code does no per-loop NT parameter polling.
-        if (RobotBase.isSimulation()) {
-            NTParameterRegistry.refresh();
-        }
+        // Live NT tuning is gated by RobotConstants.ENABLE_NT_PARAMS (pushed into the registry in
+        // robotInit). When off, this is a no-op — no per-loop NT JNI reads on the loop budget.
+        NTParameterRegistry.refresh();
         robotContainer.updateDashboard();
         long loopEnd = RobotController.getFPGATime();
 

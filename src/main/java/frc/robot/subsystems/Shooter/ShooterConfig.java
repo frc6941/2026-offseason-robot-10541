@@ -9,8 +9,7 @@ import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.units.measure.Angle;
 import lib.ironpulse.subsystem.SubsystemConfig;
-import lib.ironpulse.subsystem.position.PositionParamSources;
-import lib.ironpulse.subsystem.velocity.VelocityParamSources;
+import lib.ntext.NTParameter;
 
 public class ShooterConfig {
     private static final CANBus CANBUS = ROBORIO_CAN_BUS;
@@ -122,6 +121,7 @@ public class ShooterConfig {
                     .zeroOffset(HOOD_ZERO_OFFSET)
                     .build();
 
+    @NTParameter(tableName = "Params/" + SHOOTER_DRUM_NAME)
     public static final class ShooterUpperParams {
         public static final double kP = 0.4;
         public static final double kI = 0.0;
@@ -139,13 +139,10 @@ public class ShooterConfig {
         // Bench-test setpoint: drum (upper) RPS for the isolated spin-up test binding.
         public static final double testRPS = 40.0;
 
-        public static VelocityParamSources asVelocityParamSources() {
-            return velocityParams(kP, kI, kD, kV, kA, kS, velocityAtGoalToleranceRPS);
-        }
-
         private ShooterUpperParams() {}
     }
 
+    @NTParameter(tableName = "Params/" + SHOOTER_FEED_NAME)
     public static final class ShooterLowerParams {
         public static final double kP = 0.4;
         public static final double kI = 0.0;
@@ -159,13 +156,10 @@ public class ShooterConfig {
         public static final double idleRPS = 0.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
-        public static VelocityParamSources asVelocityParamSources() {
-            return velocityParams(kP, kI, kD, kV, kA, kS, velocityAtGoalToleranceRPS);
-        }
-
         private ShooterLowerParams() {}
     }
 
+    @NTParameter(tableName = "Params/" + HOOD_NAME)
     public static final class HoodParams {
         public static final double kP = 100.0;
         public static final double kI = 0.0;
@@ -186,88 +180,7 @@ public class ShooterConfig {
         // Clamped to [HOOD_MIN_ANGLE, HOOD_MAX_ANGLE] before use.
         public static final double testAngleDeg = 10.0;
 
-        public static PositionParamSources asPositionParamSources() {
-            return new PositionParamSources() {
-                public double kP() {
-                    return kP;
-                }
-
-                public double kI() {
-                    return kI;
-                }
-
-                public double kD() {
-                    return kD;
-                }
-
-                public double kV() {
-                    return kV;
-                }
-
-                public double kA() {
-                    return kA;
-                }
-
-                public double kS() {
-                    return kS;
-                }
-
-                public double kG() {
-                    return kG;
-                }
-
-                public double motionMagicVelRPS() {
-                    return motionMagicVelRPS;
-                }
-
-                public double motionMagicAccelRPS2() {
-                    return motionMagicAccelRPS2;
-                }
-
-                public double motionMagicJerkRPS3() {
-                    return motionMagicJerkRPS3;
-                }
-
-                public double positionAtGoalToleranceDegrees() {
-                    return positionAtGoalToleranceDegrees;
-                }
-            };
-        }
-
         private HoodParams() {}
-    }
-
-    private static VelocityParamSources velocityParams(
-            double kP, double kI, double kD, double kV, double kA, double kS, double toleranceRPS) {
-        return new VelocityParamSources() {
-            public double kP() {
-                return kP;
-            }
-
-            public double kI() {
-                return kI;
-            }
-
-            public double kD() {
-                return kD;
-            }
-
-            public double kV() {
-                return kV;
-            }
-
-            public double kA() {
-                return kA;
-            }
-
-            public double kS() {
-                return kS;
-            }
-
-            public double velocityAtGoalToleranceRPS() {
-                return toleranceRPS;
-            }
-        };
     }
 
     private ShooterConfig() {}

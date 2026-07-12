@@ -18,6 +18,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Robot;
 import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
@@ -74,7 +75,14 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** Horizontal distance from the robot to the (alliance-flipped) hub, in meters. */
     public double distanceToTarget() {
-        return AutoAimCommand.getDistanceToTarget(robotPose().getTranslation());
+        return distanceToTarget(robotPose());
+    }
+
+    // Pose-taking overloads let periodic() read the robot pose ONCE and thread it through,
+    // instead of each helper re-reading the transform buffer (a TreeMap lookup + quaternion
+    // inverse) several times per loop. See periodic().
+    private double distanceToTarget(Pose2d pose) {
+        return AutoAimCommand.getDistanceToTarget(pose.getTranslation());
     }
 
     /**
@@ -84,11 +92,15 @@ public class ShootingSuperstructure extends SubsystemBase {
      * à la 6328.
      */
     public double effectiveDistanceToTarget() {
+        return effectiveDistanceToTarget(robotPose());
+    }
+
+    private double effectiveDistanceToTarget(Pose2d pose) {
         ChassisSpeeds fieldVel =
                 ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), robotPose().getRotation());
+                        swerve.getChassisSpeedsCmd(), pose.getRotation());
         return calculator.effectiveDistance(
-                robotPose().getTranslation(),
+                pose.getTranslation(),
                 AutoAimCommand.getTarget(),
                 fieldVel.vxMetersPerSecond,
                 fieldVel.vyMetersPerSecond);
@@ -99,19 +111,17 @@ public class ShootingSuperstructure extends SubsystemBase {
         return calculator.solve(effectiveDistanceToTarget());
     }
 
-    private Rotation2d computeAimHeading() {
+    private Rotation2d computeAimHeading(Pose2d pose) {
         ChassisSpeeds fv =
                 ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), robotPose().getRotation());
-        double tof = calculator.timeOfFlightFor(distanceToTarget());
+                        swerve.getChassisSpeedsCmd(), pose.getRotation());
+        double tof = calculator.timeOfFlightFor(distanceToTarget(pose));
         Translation2d lookahead =
-                robotPose()
-                        .getTranslation()
+                pose.getTranslation()
                         .plus(
                                 new Translation2d(
                                         fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof));
-        return AutoAimCommand.getShooterAimHeading(
-                new Pose2d(lookahead, robotPose().getRotation()));
+        return AutoAimCommand.getShooterAimHeading(new Pose2d(lookahead, pose.getRotation()));
     }
 
     // Below this magnitude the aim-heading rate is treated as zero. A stationary robot aimed at a
@@ -147,15 +157,22 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** True when the shooter is pointed at the hub within the configured heading tolerance. */
     public boolean headingAtGoal() {
-        Pose2d pose = robotPose();
+        return headingAtGoal(robotPose());
+    }
+
+    private boolean headingAtGoal(Pose2d pose) {
         Rotation2d aimHeading = aimHeading();
         double errorDeg = Math.abs(pose.getRotation().minus(aimHeading).getDegrees());
-        return errorDeg <= ShotCalculator.ShootingParams.headingToleranceDeg;
+        return errorDeg <= ShootingParamsNT.headingToleranceDeg.getValue();
     }
 
     /** All three shot DOFs satisfied: chassis aimed, hood at angle, flywheel up to speed. */
     public boolean readyToShoot() {
-        return headingAtGoal() && hood.positionAtGoal() && shooterAtGoal();
+        return readyToShoot(robotPose());
+    }
+
+    private boolean readyToShoot(Pose2d pose) {
+        return headingAtGoal(pose) && hood.positionAtGoal() && shooterAtGoal();
     }
 
     public boolean shooterAtGoal() {
@@ -198,7 +215,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     private AngularVelocity lowerSpeedFor(AngularVelocity upperSpeed) {
         return RotationsPerSecond.of(
                 upperSpeed.in(RotationsPerSecond)
-                        * ShotCalculator.ShootingParams.lowerShooterSpeedScale);
+                        * ShootingParamsNT.lowerShooterSpeedScale.getValue());
     }
 
     private Command runShooterAt(Supplier<AngularVelocity> upperSpeedSupplier) {
@@ -311,10 +328,14 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     @Override
     public void periodic() {
-        double geometric = distanceToTarget();
-        double effective = effectiveDistanceToTarget();
+        // Read the world pose ONCE per loop and thread it through; each robotPose() call re-reads
+        // the transform buffer (TreeMap lookup + quaternion inverse), and this method used to do it
+        // ~6x. See the pose-taking overloads above.
+        Pose2d pose = robotPose();
+        double geometric = distanceToTarget(pose);
+        double effective = effectiveDistanceToTarget(pose);
         ShotSolution solution = calculator.solve(effective);
-        Rotation2d heading = computeAimHeading();
+        Rotation2d heading = computeAimHeading(pose);
         double timestampSec = Timer.getFPGATimestamp();
         double dtSec = timestampSec - lastAimTimestampSec;
         double raw =
@@ -338,45 +359,55 @@ public class ShootingSuperstructure extends SubsystemBase {
                 "Shooting/shooterLowerTargetRPS",
                 lowerSpeedFor(solution.shooterSpeed()).in(RotationsPerSecond));
         Logger.recordOutput("Shooting/shooterAtGoal", shooterAtGoal());
-        Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal());
-        Logger.recordOutput("Shooting/readyToShoot", readyToShoot());
+        Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal(pose));
+        Logger.recordOutput("Shooting/readyToShoot", readyToShoot(pose));
 
-        // --- Shoot-on-move visualization (drag these onto a 2D/3D Field in AdvantageScope) ---
-        Pose2d pose = robotPose();
-        Translation2d hub = AutoAimCommand.getTarget();
-        ChassisSpeeds fv =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), pose.getRotation());
-        double tof = calculator.timeOfFlightFor(geometric);
-        // How far the ball drifts downrange from inheriting chassis velocity over its flight.
-        Translation2d leadOffset =
-                new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
-        // The point the chassis actually aims at: the hub pulled back against our motion.
-        Translation2d virtualTarget = hub.minus(leadOffset);
-        // The internal dual the aim math uses: pretend the shooter is here, aim at the real hub.
-        Translation2d virtualShooter = pose.getTranslation().plus(leadOffset);
+        // Visualization is debug-only telemetry (pose math + a full projectile-arc log). Skip it
+        // when the flywheel is idle so it stays off the loop budget; the fields simply hold their
+        // last value in AdvantageScope while not shooting.
+        if (isShooterActive()) {
+            // --- Shoot-on-move visualization (drag these onto a 2D/3D Field in AdvantageScope) ---
+            Translation2d hub = AutoAimCommand.getTarget();
+            ChassisSpeeds fv =
+                    ChassisSpeeds.fromRobotRelativeSpeeds(
+                            swerve.getChassisSpeedsCmd(), pose.getRotation());
+            double tof = calculator.timeOfFlightFor(geometric);
+            // How far the ball drifts downrange from inheriting chassis velocity over its flight.
+            Translation2d leadOffset =
+                    new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
+            // The point the chassis actually aims at: the hub pulled back against our motion.
+            Translation2d virtualTarget = hub.minus(leadOffset);
+            // The internal dual the aim math uses: pretend the shooter is here, aim at the real
+            // hub.
+            Translation2d virtualShooter = pose.getTranslation().plus(leadOffset);
 
-        Logger.recordOutput("Shooting/Viz/Hub", new Pose2d(hub, new Rotation2d()));
-        Logger.recordOutput(
-                "Shooting/Viz/VirtualTarget", new Pose2d(virtualTarget, new Rotation2d()));
-        Logger.recordOutput(
-                "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
-        Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
+            Logger.recordOutput("Shooting/Viz/Hub", new Pose2d(hub, new Rotation2d()));
+            Logger.recordOutput(
+                    "Shooting/Viz/VirtualTarget", new Pose2d(virtualTarget, new Rotation2d()));
+            Logger.recordOutput(
+                    "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
+            Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
 
-        // --- Ballistic arc overlay (3D Field: Commands/VisualizeProjectileShot/pathWorld) ---
-        // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
-        Pose3d muzzle =
-                new Pose3d(pose).plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
-        VisualizeProjectileShot.logPath(
-                muzzle,
-                // TODO: verify the shooter fires off the back (-X); drop the +180 if it points
-                // forward.
-                pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
-                // TODO: verify hood angle sign/zero maps to up-positive launch pitch vs CAD.
-                Rotation2d.fromDegrees(hood.getCurrPos().in(Degrees)),
-                solution.shooterSpeed().in(RotationsPerSecond) * kRpsToMuzzleMps,
-                new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond),
-                true,
-                "");
+            // --- Ballistic arc overlay (3D Field: Commands/VisualizeProjectileShot/pathWorld) ---
+            // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
+            Pose3d muzzle =
+                    new Pose3d(pose)
+                            .plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
+            if (Robot.isSimulation()) {
+                VisualizeProjectileShot.logPath(
+                        muzzle,
+                        // TODO: verify the shooter fires off the back (-X); drop the +180 if it
+                        // points
+                        // forward.
+                        pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
+                        // TODO: verify hood angle sign/zero maps to up-positive launch pitch vs
+                        // CAD.
+                        Rotation2d.fromDegrees(hood.getCurrPos().in(Degrees)),
+                        solution.shooterSpeed().in(RotationsPerSecond) * kRpsToMuzzleMps,
+                        new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond),
+                        true,
+                        "");
+            }
+        }
     }
 }

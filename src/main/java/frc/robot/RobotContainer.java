@@ -8,6 +8,7 @@ import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.Seconds;
+import static frc.robot.RobotConstants.HAS_SWERVE_IO;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -19,17 +20,23 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
+import frc.robot.auto.AutoActions;
+import frc.robot.auto.AutoFile;
+import frc.robot.auto.AutoRoutines;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.AutoTrenchCommand;
-import frc.robot.commands.DefaultAuto;
-import frc.robot.commands.auto.AutoBuilder;
-import frc.robot.commands.auto.AutoSelector;
+import frc.robot.subsystems.Configs.LimeLightConfig;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.*;
+import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
+import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
+import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import lib.ironpulse.command.SysIdCommand;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -38,8 +45,6 @@ import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
 import lib.ironpulse.io.MotorInputsAutoLogged;
-import lib.ironpulse.limelight.DeviationParamSources;
-import lib.ironpulse.limelight.LimelightIOConfig;
 import lib.ironpulse.limelight.LimelightIOReal;
 import lib.ironpulse.limelight.LimelightSubsystem;
 import lib.ironpulse.math.rbd.TransformRecorder;
@@ -63,10 +68,6 @@ import org.littletonrobotics.junction.Logger;
 public class RobotContainer {
     private boolean isReal = RobotBase.isReal();
 
-    // Limelight device id — must exactly match the limelight's hostname (web UI -> Settings ->
-    // Hostname). Single source of truth so the IO registration and every lookup can't drift apart.
-    private static final String LIMELIGHT_NAME = "limelight-a";
-
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
             buildIntakerRoller();
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> intakerPivot =
@@ -87,8 +88,6 @@ public class RobotContainer {
                     hoodSubsystem,
                     hopperSubsystem,
                     swerve);
-    private final AutoBuilder autoBuilder =
-            new AutoBuilder(intaker, swerve, shootingSuperstructure);
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
     private final IndicatorSubsystem indicator = buildIndicator();
 
@@ -110,7 +109,6 @@ public class RobotContainer {
     // Replace with CommandPS4Controller or CommandJoystick if needed
     private final CommandXboxController driverController = new CommandXboxController(0);
 
-    private final AutoSelector autoSelector;
     private int hubTargetModeRequests = 0;
     private AutoAimCommand.TargetMode targetModeBeforeHubRequests = AutoAimCommand.TargetMode.AUTO;
 
@@ -128,9 +126,11 @@ public class RobotContainer {
         hopperSubsystem.configureDefaultCommand();
         shootingSuperstructure.configureDefaultCommands();
         // Intake zeroing stays manual-only on D-pad Left.
-        AutoBuilder.configure(swerve);
         configureBindings();
-        autoSelector = new AutoSelector(autoBuilder, DefaultAuto.driveForward(swerve));
+        // Autonomous: PathPlanner path-following routines (see frc.robot.auto).
+        AutoActions.init(swerve, shootingSuperstructure, intaker);
+        AutoRoutines.init(swerve, shootingSuperstructure, intaker);
+        AutoFile.init();
         new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
 
         // Publish the Field2d ("Field") for Elastic + hook PathPlanner active-path logging
@@ -149,7 +149,13 @@ public class RobotContainer {
      */
     private void configureBindings() {
         // Manual intake pivot hard-stop zero.
-        driverController.povLeft().onTrue(intaker.zeroCommand());
+        // driverController.povLeft().onTrue(intaker.zeroCommand());
+
+        SysIdCommand shooterSysId = new SysIdCommand(intakerRoller);
+        driverController.povUp().whileTrue(shooterSysId.quasistatic(Direction.kForward));
+        driverController.povDown().whileTrue(shooterSysId.quasistatic(Direction.kReverse));
+        driverController.povRight().whileTrue(shooterSysId.dynamic(Direction.kForward));
+        driverController.povLeft().whileTrue(shooterSysId.dynamic(Direction.kReverse));
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
@@ -211,6 +217,11 @@ public class RobotContainer {
 
         driverController.a().onTrue(intaker.runRetract());
 
+        // Test path: follow the "New Path" PathPlanner path (deploy/pathplanner/paths/New Path.path)
+        // while the left bumper is held. Deferred so the command builds only on press — AutoActions
+        // is initialized after configureBindings() runs, so it must not be constructed eagerly here.
+        driverController.leftBumper().whileTrue(testPathCommand());
+
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
         driverController
                 .rightTrigger()
@@ -243,6 +254,11 @@ public class RobotContainer {
         return new AutoTrenchCommand(swerve, () -> -driverController.getLeftY());
     }
 
+    /** Follows the "New Path" PathPlanner path for on-field testing (no alliance mirror). */
+    private Command testPathCommand() {
+        return Commands.deferredProxy(() -> AutoActions.followPathFile("RightTrenchStart", false));
+    }
+
     private Command holdHubTargetMode() {
         return Commands.startEnd(
                 () -> {
@@ -266,7 +282,7 @@ public class RobotContainer {
      * @return the command to run in autonomous
      */
     public Command getAutonomousCommand() {
-        return autoSelector.getCommand();
+        return AutoFile.buildAuto();
     }
 
     public void updateDashboard() {
@@ -281,8 +297,6 @@ public class RobotContainer {
                         TransformRecorder.kFrameRobot);
         RobotStateRecorder.periodic();
 
-        autoSelector.updateDashboard();
-
         // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's
         // callbacks).
         FieldPublisher.setRobotPose(swerve.getEstimatedPose().toPose2d());
@@ -292,14 +306,14 @@ public class RobotContainer {
         // tag-derived robot pose as a Pose2d[], hidden (empty array) when there's no target so it
         // doesn't snap to the field origin. Bind a translucent robot to Vision/Ghost in
         // AdvantageScope.
-        Pose2d visionPose = limelightSubsystem.getPose(LIMELIGHT_NAME);
+        Pose2d visionPose = limelightSubsystem.getPose(LimeLightConfig.NAME);
         Logger.recordOutput(
                 "Vision/Ghost",
                 visionPose.equals(new Pose2d()) ? new Pose2d[0] : new Pose2d[] {visionPose});
     }
 
     public String getAutoSelectionSummary() {
-        return autoSelector.getSelectionSummary();
+        return AutoFile.selectionSummary();
     }
 
     /**
@@ -374,20 +388,20 @@ public class RobotContainer {
         return new VelocityMotorSubsystem<>(
                 IntakerConfig.INTAKER_ROLLER_CONFIG,
                 new MotorInputsAutoLogged(),
-                isReal
+                isReal && RobotConstants.HAS_INTAKER_IO
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
-                IntakerConfig.IntakerRollerParams.asVelocityParamSources());
+                IntakerRollerParamsNT.asVelocityParamSources());
     }
 
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildIntakerPivot() {
         return new PositionMotorSubsystem<>(
                 IntakerConfig.INTAKER_PIVOT_CONFIG,
                 new MotorInputsAutoLogged(),
-                isReal
+                isReal && RobotConstants.HAS_INTAKER_IO
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_PIVOT_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_PIVOT_CONFIG),
-                IntakerConfig.IntakerPivotParams.asPositionParamSources(),
+                IntakerPivotParamsNT.asPositionParamSources(),
                 Degrees.of(0),
                 IntakerConfig.INTAKER_ANGLE_PER_ROTATION);
     }
@@ -397,7 +411,7 @@ public class RobotContainer {
                 intaker,
                 HopperConfig.HOPPER_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_HOPPER_IO
                         ? new MotorIOTalonFX(HopperConfig.HOPPER_CONFIG)
                         : new MotorIOSim(HopperConfig.HOPPER_CONFIG));
     }
@@ -406,64 +420,37 @@ public class RobotContainer {
         return new VelocityMotorSubsystem<>(
                 ShooterConfig.SHOOTER_DRUM_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_SHOOTER_IO
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_DRUM_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_DRUM_CONFIG),
-                ShooterConfig.ShooterUpperParams.asVelocityParamSources());
+                ShooterUpperParamsNT.asVelocityParamSources());
     }
 
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildShooterFeed() {
         return new VelocityMotorSubsystem<>(
                 ShooterConfig.SHOOTER_FEED_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_SHOOTER_IO
                         ? new MotorIOTalonFX(ShooterConfig.SHOOTER_FEED_CONFIG)
                         : new MotorIOSim(ShooterConfig.SHOOTER_FEED_CONFIG),
-                ShooterConfig.ShooterLowerParams.asVelocityParamSources());
+                ShooterLowerParamsNT.asVelocityParamSources());
     }
 
     private LimelightSubsystem buildLimelight() {
-        LimelightIOConfig config =
-                LimelightIOConfig.builder()
-                        .name(LIMELIGHT_NAME)
-                        .useMegaTag2(true)
-                        .mountPosition(LimelightIOConfig.MountPosition.ON_ROBOT)
-                        .build();
-
         LimelightIOReal io =
                 new LimelightIOReal(
-                        config,
+                        LimeLightConfig.limelightConfig,
                         swerve::getIMUYaw,
                         swerve::getYawVelocityRadPerSec,
                         () -> false,
-                        // TODO: tune vision std-devs on the real robot.
-                        new DeviationParamSources() {
-                            public double xStdDev() {
-                                return 0.7;
-                            }
-
-                            public double yStdDev() {
-                                return 0.7;
-                            }
-
-                            public double zStdDev() {
-                                return 9999.0;
-                            }
-
-                            public double angleStdDev() {
-                                return 999999999.0;
-                            }
-
-                            public double imuCorrectionReliabilityThreshold() {
-                                return 0.9;
-                            }
-                        });
+                        LimeLightConfig.asDeviationParams());
         return new LimelightSubsystem(swerve, io);
     }
 
+    @SuppressWarnings("unused")
     private IndicatorSubsystem buildIndicator() {
         return new IndicatorSubsystem(
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_LED_IO
                         ? new IndicatorIOARGB(/* PWM port */ 9, /* LED count */ 60)
                         : new IndicatorIOSim());
     }
@@ -472,16 +459,16 @@ public class RobotContainer {
         return new PositionMotorSubsystem<>(
                 ShooterConfig.HOOD_CONFIG,
                 new MotorInputsAutoLogged(),
-                RobotBase.isReal()
+                isReal && RobotConstants.HAS_HOOD_IO
                         ? new MotorIOTalonFX(ShooterConfig.HOOD_CONFIG)
                         : new MotorIOSim(ShooterConfig.HOOD_CONFIG),
-                ShooterConfig.HoodParams.asPositionParamSources(),
+                HoodParamsNT.asPositionParamSources(),
                 ShooterConfig.HOOD_STOW_ANGLE,
                 ShooterConfig.HOOD_ANGLE_PER_ROTATION);
     }
 
     private Swerve buildSwerve() {
-        if (RobotBase.isReal()) {
+        if (isReal && HAS_SWERVE_IO) {
             // Build the modules BEFORE the IMU. SwerveModuleIOMK5N lazily creates the shared
             // PhoenixSynchronizationThread; ImuIOPigeon then grabs it via getSyncThread() to
             // register its

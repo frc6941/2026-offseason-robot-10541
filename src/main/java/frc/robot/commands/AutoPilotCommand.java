@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.RobotStateRecorder;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveLimit;
+import lib.ntext.NTParameter;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -39,7 +40,8 @@ import org.littletonrobotics.junction.Logger;
 public class AutoPilotCommand extends Command {
     private final Swerve swerve;
     private final APTarget target;
-    private final Autopilot autopilot;
+    // Rebuilt from NT params on change (Autopilot has no live setters), so not final.
+    private Autopilot autopilot;
 
     // Heading is motion-profiled the same way AutoAimCommand does it: the trapezoid plans the
     // deceleration so the chassis arrives at the target heading at zero angular velocity.
@@ -54,33 +56,53 @@ public class AutoPilotCommand extends Command {
         this.swerve = swerve;
         this.target = target;
 
-        // Pull translational limits from the live swerve limit so the path respects the drivetrain.
+        // Rotational constraints come from the swerve angular limits (not NT), set once here.
+        SwerveLimit limit = swerve.getSwerveLimit();
+        headingController =
+                new ProfiledPIDController(
+                        0.0,
+                        0.0,
+                        0.0,
+                        new TrapezoidProfile.Constraints(
+                                limit.maxAngularVelocity().in(RadiansPerSecond),
+                                limit.maxAngularAcceleration().in(RadiansPerSecondPerSecond)));
+        headingController.enableContinuousInput(-Math.PI, Math.PI);
+
+        // Build the Autopilot profile + heading gains from the current NT params.
+        applyParams();
+
+        addRequirements(swerve);
+    }
+
+    /**
+     * (Re)build the {@link Autopilot} from the current {@link AutoPilotParams} and push the heading
+     * gains/tolerance into the controller. Called in the constructor and from {@link #execute()}
+     * whenever any param changes, so the profile and gains tune live. Autopilot itself is stateless,
+     * so swapping the instance mid-run is safe; the heading controller's setters only affect the next
+     * {@code calculate()}, not the profile state. The translational constraints still pull from the
+     * live swerve limit each rebuild.
+     */
+    private void applyParams() {
         SwerveLimit limit = swerve.getSwerveLimit();
         APConstraints constraints =
                 new APConstraints(
                         limit.maxLinearVelocity().in(MetersPerSecond),
                         limit.maxSkidAcceleration().in(MetersPerSecondPerSecond),
-                        AutoPilotParams.jerk);
+                        AutoPilotParamsNT.jerk.getValue());
         APProfile profile =
                 new APProfile(constraints)
-                        .withErrorXY(Meters.of(AutoPilotParams.errorXYMeters))
-                        .withErrorTheta(Degrees.of(AutoPilotParams.errorThetaDegrees))
-                        .withBeelineRadius(Meters.of(AutoPilotParams.beelineRadiusMeters));
+                        .withErrorXY(Meters.of(AutoPilotParamsNT.errorXYMeters.getValue()))
+                        .withErrorTheta(Degrees.of(AutoPilotParamsNT.errorThetaDegrees.getValue()))
+                        .withBeelineRadius(
+                                Meters.of(AutoPilotParamsNT.beelineRadiusMeters.getValue()));
         this.autopilot = new Autopilot(profile);
 
-        // Rotational constraints come from the swerve angular limits.
-        headingController =
-                new ProfiledPIDController(
-                        AutoPilotParams.headingKP,
-                        AutoPilotParams.headingKI,
-                        AutoPilotParams.headingKD,
-                        new TrapezoidProfile.Constraints(
-                                limit.maxAngularVelocity().in(RadiansPerSecond),
-                                limit.maxAngularAcceleration().in(RadiansPerSecondPerSecond)));
-        headingController.enableContinuousInput(-Math.PI, Math.PI);
-        headingController.setTolerance(Math.toRadians(AutoPilotParams.errorThetaDegrees));
-
-        addRequirements(swerve);
+        headingController.setPID(
+                AutoPilotParamsNT.headingKP.getValue(),
+                AutoPilotParamsNT.headingKI.getValue(),
+                AutoPilotParamsNT.headingKD.getValue());
+        headingController.setTolerance(
+                Math.toRadians(AutoPilotParamsNT.errorThetaDegrees.getValue()));
     }
 
     @Override
@@ -96,6 +118,9 @@ public class AutoPilotCommand extends Command {
 
     @Override
     public void execute() {
+        // Live tuning: rebuild the profile + heading gains when the dashboard changes any param.
+        if (AutoPilotParamsNT.isAnyChanged()) applyParams();
+
         Pose2d currentPose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
         // Autopilot expects the robot-relative chassis speeds (it rotates them into field frame
         // using
@@ -143,6 +168,7 @@ public class AutoPilotCommand extends Command {
         return autopilot.atTarget(RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(), target);
     }
 
+    @NTParameter(tableName = "Params/AutoPilot")
     public static final class AutoPilotParams {
         // Heading-control gains for the rotational axis. Autopilot owns translation; this only
         // steers

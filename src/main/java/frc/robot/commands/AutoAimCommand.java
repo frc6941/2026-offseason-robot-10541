@@ -13,6 +13,7 @@ import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
+import lib.ntext.NTParameter;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -194,16 +195,24 @@ public class AutoAimCommand extends Command {
         // Direct gyro-rate damping is independent of PIDController's assumed 20 ms derivative
         // period, so occasional scheduler overruns do not amplify the derivative term.
         double omega =
-                ffVel + AutoAimParams.kP * error + AutoAimParams.kD * (ffVel - measuredOmega);
-        double maxVel = AutoAimParams.maxAngularVelRadPerSec;
+                ffVel
+                        + AutoAimParamsNT.kP.getValue() * error
+                        + AutoAimParamsNT.kD.getValue() * (ffVel - measuredOmega);
+        double maxVel = AutoAimParamsNT.maxAngularVelRadPerSec.getValue();
         omega = MathUtil.clamp(omega, -maxVel, maxVel);
 
         // ---- 2. Driver translation (capped, driver-relative) ----
-        double maxSpeed = AutoAimParams.maxSpeedMPS;
+        double maxSpeed = AutoAimParamsNT.maxSpeedMPS.getValue();
         double x = MathUtil.applyDeadband(xSupplier.getAsDouble(), 0.1);
         double y = MathUtil.applyDeadband(ySupplier.getAsDouble(), 0.1);
         double vNorm = Math.hypot(x, y) * maxSpeed;
-        Translation2d v = new Translation2d(vNorm, new Rotation2d(x, y));
+        // When the driver isn't translating (x == y == 0, e.g. sticks neutral or controller
+        // unplugged), the direction is undefined and new Rotation2d(0, 0) reports a WPILib error
+        // every loop. The vector is zero regardless, so build it directly.
+        Translation2d v =
+                (x == 0.0 && y == 0.0)
+                        ? new Translation2d()
+                        : new Translation2d(vNorm, new Rotation2d(x, y));
         // Driver-relative so "forward" isn't mirrored on red while aiming. Aim omega is unaffected.
         Rotation2d driverHeading =
                 RobotStateRecorder.getPoseDriverRobotCurrent().getRotation().toRotation2d();
@@ -214,8 +223,8 @@ public class AutoAimCommand extends Command {
         // drivetrain can't execute — that dither is the terminal wiggle. Hysteresis on exit keeps
         // the wheels from flipping X<->drive at the boundary. It never engages while translating
         // (shoot-on-move) — then it just drives.
-        double lockLin = AutoAimParams.lockLinearMetersPerSec;
-        double lockOmega = AutoAimParams.lockOmegaRadPerSec;
+        double lockLin = AutoAimParamsNT.lockLinearMetersPerSec.getValue();
+        double lockOmega = AutoAimParamsNT.lockOmegaRadPerSec.getValue();
         if (oLocked) {
             if (vNorm > lockLin * LOCK_EXIT_FACTOR
                     || Math.abs(omega) > lockOmega * LOCK_EXIT_FACTOR) {
@@ -237,7 +246,8 @@ public class AutoAimCommand extends Command {
         Logger.recordOutput("AutoAim/targetHeadingDeg", target.getDegrees());
         Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
         Logger.recordOutput(
-                "AutoAim/onTarget", Math.abs(error) <= Math.toRadians(AutoAimParams.toleranceDeg));
+                "AutoAim/onTarget",
+                Math.abs(error) <= Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue()));
         Logger.recordOutput("AutoAim/oLocked", oLocked);
         Logger.recordOutput("AutoAim/omegaCmd", omega);
         Logger.recordOutput("AutoAim/omegaMeasured", measuredOmega);
@@ -257,6 +267,7 @@ public class AutoAimCommand extends Command {
      * Fixed heading-control gains. Simulation gives only a ballpark; retune on the real robot and
      * commit the resulting values here.
      */
+    @NTParameter(tableName = "Params/AutoAim")
     public static final class AutoAimParams {
         // omega = targetRate + kP * headingError + kD * (targetRate - measuredYawRate)
         public static final double kP = 3.25;

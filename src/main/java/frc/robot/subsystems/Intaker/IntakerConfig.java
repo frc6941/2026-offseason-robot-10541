@@ -8,8 +8,7 @@ import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import edu.wpi.first.units.measure.Angle;
 import lib.ironpulse.subsystem.SubsystemConfig;
-import lib.ironpulse.subsystem.position.PositionParamSources;
-import lib.ironpulse.subsystem.velocity.VelocityParamSources;
+import lib.ntext.NTParameter;
 
 public class IntakerConfig {
 
@@ -89,47 +88,23 @@ public class IntakerConfig {
                                     .build())
                     .build();
 
+    @NTParameter(tableName = "Params/" + INTAKER_ROLLER_NAME)
     public static final class IntakerRollerParams {
-        public static final double kP = 1.5;
+        public static final double kP = 0.2;
         public static final double kI = 0.0;
         public static final double kD = 0.05;
 
-        public static final double kV = 0.16;
-        public static final double kA = 0.0;
-        public static final double kS = 3.0;
+        public static final double kV = 0.069267;
+        public static final double kA = 0.0031438;
+        public static final double kS = 0.2007;
 
         public static final double intakeRPS = 100.0;
         public static final double outtakeRPS = -15.0;
 
-        public static VelocityParamSources asVelocityParamSources() {
-            return new VelocityParamSources() {
-                public double kP() {
-                    return kP;
-                }
-
-                public double kI() {
-                    return kI;
-                }
-
-                public double kD() {
-                    return kD;
-                }
-
-                public double kV() {
-                    return kV;
-                }
-
-                public double kA() {
-                    return kA;
-                }
-
-                public double kS() {
-                    return kS;
-                }
-            };
-        }
+        private IntakerRollerParams() {}
     }
 
+    @NTParameter(tableName = "Params/" + INTAKER_PIVOT_NAME)
     public static final class IntakerPivotParams {
         public static final double kP = 120.0;
         public static final double kI = 0.0;
@@ -151,48 +126,6 @@ public class IntakerConfig {
         public static final double feedPosAngle = 35.0;
         public static final double retractedfeedPosAngle = 20.0;
 
-        public static PositionParamSources asPositionParamSources() {
-            return new PositionParamSources() {
-                public double kP() {
-                    return kP;
-                }
-
-                public double kI() {
-                    return kI;
-                }
-
-                public double kD() {
-                    return kD;
-                }
-
-                public double kV() {
-                    return kV;
-                }
-
-                public double kA() {
-                    return kA;
-                }
-
-                public double kS() {
-                    return kS;
-                }
-
-                public double kG() {
-                    return kG;
-                }
-
-                public double motionMagicVelRPS() {
-                    return motionMagicVelRPS;
-                }
-
-                public double motionMagicAccelRPS2() {
-                    return motionMagicAccelRPS2;
-                }
-
-                public double motionMagicJerkRPS3() {
-                    return motionMagicJerkRPS3;
-                }
-            };
-        }
+        private IntakerPivotParams() {}
     }
 }

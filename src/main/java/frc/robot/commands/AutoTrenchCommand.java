@@ -16,7 +16,6 @@ import java.util.function.DoubleSupplier;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.utils.AllianceFlipUtil;
 import lib.ntext.NTParameter;
-
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -61,30 +60,42 @@ public class AutoTrenchCommand extends Command {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
 
-        yController =
-                new ProfiledPIDController(
-                        AutoTrenchParams.lateralKP,
-                        0.0,
-                        AutoTrenchParams.lateralKD,
-                        new TrapezoidProfile.Constraints(
-                                AutoTrenchParams.lateralMaxVel, AutoTrenchParams.lateralMaxAccel));
-        yController.setTolerance(
-                AutoTrenchParams.lateralToleranceMeters,
-                AutoTrenchParams.lateralVelocityToleranceMetersPerSec);
-
+        yController = new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0, 0));
         headingController =
-                new ProfiledPIDController(
-                        AutoTrenchParams.headingKP,
-                        0.0,
-                        AutoTrenchParams.headingKD,
-                        new TrapezoidProfile.Constraints(
-                                AutoTrenchParams.headingMaxVel, AutoTrenchParams.headingMaxAccel));
-        headingController.setTolerance(
-                Math.toRadians(AutoTrenchParams.headingToleranceDeg),
-                AutoTrenchParams.headingVelocityToleranceRadPerSec);
+                new ProfiledPIDController(0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0, 0));
         headingController.enableContinuousInput(-Math.PI, Math.PI);
+        applyParams();
 
         addRequirements(swerve);
+    }
+
+    /**
+     * Push the current {@link AutoTrenchParams} values into both profiled PID controllers. Called
+     * once in the constructor and again from {@link #execute()} whenever any param changes, so gains,
+     * constraints, and tolerances tune live (see {@code AutoTrenchParamsNT.isAnyChanged()}). Setters
+     * only swap the values used on the next {@code calculate()}; they don't reset the profile state,
+     * so re-applying mid-trench doesn't jerk the chassis.
+     */
+    private void applyParams() {
+        yController.setPID(
+                AutoTrenchParamsNT.lateralKP.getValue(), 0.0, AutoTrenchParamsNT.lateralKD.getValue());
+        yController.setConstraints(
+                new TrapezoidProfile.Constraints(
+                        AutoTrenchParamsNT.lateralMaxVel.getValue(),
+                        AutoTrenchParamsNT.lateralMaxAccel.getValue()));
+        yController.setTolerance(
+                AutoTrenchParamsNT.lateralToleranceMeters.getValue(),
+                AutoTrenchParamsNT.lateralVelocityToleranceMetersPerSec.getValue());
+
+        headingController.setPID(
+                AutoTrenchParamsNT.headingKP.getValue(), 0.0, AutoTrenchParamsNT.headingKD.getValue());
+        headingController.setConstraints(
+                new TrapezoidProfile.Constraints(
+                        AutoTrenchParamsNT.headingMaxVel.getValue(),
+                        AutoTrenchParamsNT.headingMaxAccel.getValue()));
+        headingController.setTolerance(
+                Math.toRadians(AutoTrenchParamsNT.headingToleranceDeg.getValue()),
+                AutoTrenchParamsNT.headingVelocityToleranceRadPerSec.getValue());
     }
 
     @Override
@@ -113,6 +124,9 @@ public class AutoTrenchCommand extends Command {
 
     @Override
     public void execute() {
+        // Live tuning: re-push gains/constraints/tolerances when the dashboard changes any param.
+        if (AutoTrenchParamsNT.isAnyChanged()) applyParams();
+
         Pose2d pose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
         double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
 
@@ -127,10 +141,10 @@ public class AutoTrenchCommand extends Command {
         double vy =
                 yController.calculate(pose.getY(), new TrapezoidProfile.State(lockedTrenchY, 0.0))
                         + yController.getSetpoint().velocity;
-        double lateralMaxVel = AutoTrenchParams.lateralMaxVel;
+        double lateralMaxVel = AutoTrenchParamsNT.lateralMaxVel.getValue();
         vy = MathUtil.clamp(vy, -lateralMaxVel, lateralMaxVel);
         if (yController.atGoal()
-                || Math.abs(vy) < AutoTrenchParams.lateralOutputDeadbandMetersPerSec) {
+                || Math.abs(vy) < AutoTrenchParamsNT.lateralOutputDeadbandMetersPerSec.getValue()) {
             vy = 0.0;
         }
 
@@ -140,10 +154,10 @@ public class AutoTrenchCommand extends Command {
                                 pose.getRotation().getRadians(),
                                 new TrapezoidProfile.State(lockedHeading.getRadians(), 0.0))
                         + headingController.getSetpoint().velocity;
-        double headingMaxVel = AutoTrenchParams.headingMaxVel;
+        double headingMaxVel = AutoTrenchParamsNT.headingMaxVel.getValue();
         omega = MathUtil.clamp(omega, -headingMaxVel, headingMaxVel);
         if (headingController.atGoal()
-                || Math.abs(omega) < AutoTrenchParams.headingOutputDeadbandRadPerSec) {
+                || Math.abs(omega) < AutoTrenchParamsNT.headingOutputDeadbandRadPerSec.getValue()) {
             omega = 0.0;
         }
 
@@ -172,6 +186,7 @@ public class AutoTrenchCommand extends Command {
         // Hold-to-run: the whileTrue binding ends it on button release.
         return false;
     }
+    
     @NTParameter(tableName = "Params/AutoTrench")
     public static final class AutoTrenchParams {
         // --- Lateral (Y) hold. Profiled so an off-center engage snaps in smoothly and arrives at
