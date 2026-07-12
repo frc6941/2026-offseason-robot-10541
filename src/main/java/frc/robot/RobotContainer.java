@@ -150,13 +150,13 @@ public class RobotContainer {
      */
     private void configureBindings() {
         // Manual intake pivot hard-stop zero.
-        // driverController.povLeft().onTrue(intaker.zeroCommand());
+        driverController.povLeft().onTrue(intaker.zeroCommand());
 
-        SysIdCommand shooterSysId = new SysIdCommand(intakerRoller);
-        driverController.povUp().whileTrue(shooterSysId.quasistatic(Direction.kForward));
-        driverController.povDown().whileTrue(shooterSysId.quasistatic(Direction.kReverse));
-        driverController.povRight().whileTrue(shooterSysId.dynamic(Direction.kForward));
-        driverController.povLeft().whileTrue(shooterSysId.dynamic(Direction.kReverse));
+        // SysIdCommand shooterSysId = new SysIdCommand(intakerRoller);
+        // driverController.povUp().whileTrue(shooterSysId.quasistatic(Direction.kForward));
+        // driverController.povDown().whileTrue(shooterSysId.quasistatic(Direction.kReverse));
+        // driverController.povRight().whileTrue(shooterSysId.dynamic(Direction.kForward));
+        // driverController.povLeft().whileTrue(shooterSysId.dynamic(Direction.kReverse));
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
@@ -391,7 +391,7 @@ public class RobotContainer {
         return new VelocityMotorSubsystem<>(
                 IntakerConfig.INTAKER_ROLLER_CONFIG,
                 new MotorInputsAutoLogged(),
-                isReal && RobotConstants.HAS_INTAKER_IO
+                false
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
                 IntakerRollerParamsNT.asVelocityParamSources());

@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.*;
 import static lib.ironpulse.math.MathTools.*;
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Twist2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -30,6 +31,35 @@ public class SwerveSetpointGenerator {
 
     @Getter @Setter private SwerveLimit chassisLimit;
     @Getter @Setter private SwerveModuleLimit moduleLimit;
+
+    /**
+     * Generate a feasible setpoint that rotates the chassis about {@code centerOfRotation} rather
+     * than the drivetrain's geometric center.
+     *
+     * <p>{@code centerOfRotation} is expressed in the robot frame, in meters, relative to the
+     * geometric center (the origin of the module locations). {@link Translation2d#kZero} reproduces
+     * the standard center-pivot behavior.
+     *
+     * <p>A rigid-body rotation about an arbitrary point is exactly equivalent to a geometric-center
+     * {@link ChassisSpeeds} — pivoting about {@code c} with {@code (vx, vy, omega)} equals {@code
+     * (vx + omega*c.y, vy - omega*c.x, omega)} about the center. We fold the pivot in once here and
+     * defer to the center-frame generator, so all of its vel/accel limiting stays exact and
+     * self-consistent (no approximation, and the returned {@link ChassisSpeeds} is the true
+     * center-frame motion, correct for odometry).
+     */
+    public SwerveSetpoint generate(
+            ChassisSpeeds desiredChassisSpeed,
+            SwerveSetpoint prevSetpoint,
+            double dt,
+            Translation2d centerOfRotation) {
+        double omega = desiredChassisSpeed.omegaRadiansPerSecond;
+        ChassisSpeeds centered =
+                new ChassisSpeeds(
+                        desiredChassisSpeed.vxMetersPerSecond + omega * centerOfRotation.getY(),
+                        desiredChassisSpeed.vyMetersPerSecond - omega * centerOfRotation.getX(),
+                        omega);
+        return generate(centered, prevSetpoint, dt);
+    }
 
     public SwerveSetpoint generate(
             ChassisSpeeds desiredChassisSpeed, SwerveSetpoint prevSetpoint, double dt) {
@@ -198,9 +228,14 @@ public class SwerveSetpointGenerator {
             sMin = Math.min(sMin, s);
         }
 
-        // Enforce drive wheel acceleration limits.
-        final double max_vel_step =
+        // Enforce drive wheel acceleration limits. A wheel that is slowing down (braking) is
+        // bounded by maxDriveDeceleration instead of maxDriveAcceleration, so the accel limit can
+        // stay near the traction/skid ceiling (protects wheel odometry) while braking is allowed to
+        // be crisper. Falls back to the symmetric accel limit when no decel limit is configured.
+        final double accel_vel_step =
                 dt * moduleLimit.maxDriveAcceleration().in(MetersPerSecondPerSecond);
+        final double decel_vel_step =
+                dt * moduleLimit.maxDriveDecelerationOrAccel().in(MetersPerSecondPerSecond);
         for (int i = 0; i < n; ++i) {
             if (sMin == 0.0) {
                 // No need to carry on.
@@ -208,6 +243,10 @@ public class SwerveSetpointGenerator {
             }
             double vx_min_s = sMin == 1.0 ? vxDes[i] : (vxDes[i] - vxPrev[i]) * sMin + vxPrev[i];
             double vy_min_s = sMin == 1.0 ? vyDes[i] : (vyDes[i] - vyPrev[i]) * sMin + vyPrev[i];
+            // Decelerating iff the (clamped) desired wheel speed is below the previous wheel speed.
+            double prevSpeed = Math.hypot(vxPrev[i], vyPrev[i]);
+            double desSpeed = Math.hypot(vx_min_s, vy_min_s);
+            double max_vel_step = desSpeed < prevSpeed ? decel_vel_step : accel_vel_step;
             // Find the max s for this drive wheel. Search on the interval between 0 and
             // min_s, because we already know we can't go
             // faster than that.
@@ -217,10 +256,10 @@ public class SwerveSetpointGenerator {
                             * findDriveMaxS(
                                     vxPrev[i],
                                     vyPrev[i],
-                                    Math.hypot(vxPrev[i], vyPrev[i]),
+                                    prevSpeed,
                                     vx_min_s,
                                     vy_min_s,
-                                    Math.hypot(vx_min_s, vy_min_s),
+                                    desSpeed,
                                     max_vel_step,
                                     kMaxIterations);
             sMin = Math.min(sMin, s);

@@ -35,9 +35,19 @@ public final class SwerveMK5Config {
             SwerveModuleLimit.builder()
                     // MK5n R1 defaults (drive ~= 6.03, steer = 287/11 ~= 26.09, wheel = 4.0in)
                     // v (mps) = 5800rpm (X60 with FOC) / 60 / 6.03 * pi * 4.0in
-                    .maxDriveVelocity(InchesPerSecond.of(5800 / 60.0 / 6.03 * Math.PI * 4.0))
-                    .maxDriveAcceleration(MetersPerSecondPerSecond.of(100))
-                    // omega (rps) = 7368rpm (X44 with FOC) / 60 / (287/11) ~= 4.707 rps
+                    .maxDriveVelocity(InchesPerSecond.of(5800 / 60.0 / 6.03 * Math.PI * 4.0))                    // Accel held near the carpet traction ceiling (~µg ≈ 10-12 m/s²) so wheels do
+                    // not slip while building speed — this is what keeps wheel odometry (and the
+                    // shoot-on-the-move velocity estimate) honest. Was 200, which was far above
+                    // traction and let the wheels slip on every hard input.
+                    .maxDriveAcceleration(MetersPerSecondPerSecond.of(15))
+                    // Braking is allowed to be crisper than accel: a stop ends motion, so brief
+                    // slip
+                    // in the final moments is acceptable (vision re-corrects once stopped) and we
+                    // do
+                    // not need to preserve a precise velocity estimate the way we do under accel.
+                    // In practice this is hardware-bound (~19 m/s² at the 100 A stator limit), so
+                    // this cap mainly removes the artificial low-rate glide. Bench-tune knob.
+                    .maxDriveDeceleration(MetersPerSecondPerSecond.of(25))
                     .maxSteerAngularVelocity(RotationsPerSecond.of(7368.0 / 60.0 / (287.0 / 11.0)))
                     // accelerate in 0.2s
                     .maxSteerAngularAcceleration(
@@ -45,14 +55,19 @@ public final class SwerveMK5Config {
                     .build();
     public static SwerveLimit kDefaultSwerveLimit =
             SwerveLimit.builder()
-                    .maxLinearVelocity(MetersPerSecond.of(3.9)) // theoretically 5.10
+                    .maxLinearVelocity(MetersPerSecond.of(4)) // theoretically 5.10
                     // prevents skidding, see orbit archive ytb channel open class for theory
-                    .maxSkidAcceleration(MetersPerSecondPerSecond.of(22)) // <maxDriveAcceleration
+                                        // prevents skidding, see orbit archive ytb channel open class for theory.
+                    // Kept near traction to protect tracking; was 200 (far above traction).
+                    .maxSkidAcceleration(MetersPerSecondPerSecond.of(20)) // <maxDriveAcceleration
+                    // Chassis-level brake cap; composes with the module maxDriveDeceleration (the
+                    // tighter one binds). Falls back to maxSkidAcceleration if unset.
+                    .maxBrakeAcceleration(MetersPerSecondPerSecond.of(25))
                     // omega_max ≈ vMax / r.
-                    .maxAngularVelocity(DegreesPerSecond.of(1000))
+                     .maxAngularVelocity(DegreesPerSecond.of(1000))
                     // accelerate in 0.32s, also must be smaller than the defined module limit to be
                     // actually effective
-                    .maxAngularAcceleration(DegreesPerSecondPerSecond.of(4000)) // 1000-1472
+                    .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
                     .build();
 
     // Module configs — encoder offsets are from the competition robot and will need re-tuning

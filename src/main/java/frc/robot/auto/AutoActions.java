@@ -58,7 +58,7 @@ import org.littletonrobotics.junction.Logger;
  */
 public class AutoActions {
     // ---- Start poses (robot begins here; used by resetOnPose in sim). ----
-    public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(90));
     public static final Pose2d kTrenchStartL = mirrorY(kTrenchStartR);
     // Bump start begins here (alliance side, 45 deg), then drives past the slope into neutral.
     public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.56, Rotation2d.fromDegrees(45));
@@ -389,6 +389,9 @@ public class AutoActions {
             String sweepPath, boolean isLeft, Command intakeBranch) {
         return Commands.sequence(
                 Commands.deadline(followPathFile(sweepPath, isLeft), intakeBranch),
+                // For the final second before crossing the bump, run the intake to its feed position
+                // (feedPosAngle, FEEDING mode). feed() reverts the mode when the second is up.
+                feed().withTimeout(1.0),
                 drivePastSlope(isLeft, false),
                 aimAndShootAtHub());
     }
