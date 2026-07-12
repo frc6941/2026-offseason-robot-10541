@@ -234,10 +234,11 @@ public class RobotContainer {
     }
 
     private Command shootAtHubCommand() {
-        return Commands.parallel(
-                holdHubTargetMode(),
-                shootingSuperstructure.aimAndShoot(),
-                intaker.holdRetractedFeedPosition());
+        return 
+                Commands.parallel(
+                        holdHubTargetMode(),
+                        shootingSuperstructure.aimAndShoot(),
+                        intaker.holdRetractedFeedPosition());
     }
 
     private Command autoTrenchCommand() {

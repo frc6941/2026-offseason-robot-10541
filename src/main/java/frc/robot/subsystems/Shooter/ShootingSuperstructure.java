@@ -1,7 +1,10 @@
 package frc.robot.subsystems.Shooter;
 
 import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Meters;
+import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
+import static edu.wpi.first.units.Units.Seconds;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.LinearFilter;
@@ -23,7 +26,6 @@ import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import java.util.function.Supplier;
-import lib.ironpulse.command.VisualizeProjectileShot;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -41,7 +43,7 @@ import org.littletonrobotics.junction.Logger;
  * the drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
-    private static final double HOPPER_FEED_DELAY_SECONDS = 0.1;
+    private static final double LOWER_AND_HOPPER_DELAY_SECONDS = 0.5;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
@@ -49,10 +51,6 @@ public class ShootingSuperstructure extends SubsystemBase {
     private final HopperSubsystem hopper;
     private final Swerve swerve;
     private final ShotCalculator calculator = new ShotCalculator();
-
-    // TODO: tune kRpsToMuzzleMps until the visualized arc lands in the hub at a known, stationary
-    // distance. Visualization only — does NOT affect aim (that comes from the ToF table).
-    private static final double kRpsToMuzzleMps = 0.11;
 
     public ShootingSuperstructure(
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
@@ -150,7 +148,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         Pose2d pose = robotPose();
         Rotation2d aimHeading = aimHeading();
         double errorDeg = Math.abs(pose.getRotation().minus(aimHeading).getDegrees());
-        return errorDeg <= ShotCalculator.ShootingParams.headingToleranceDeg;
+        return errorDeg <= calculator.headingToleranceDeg();
     }
 
     /** All three shot DOFs satisfied: chassis aimed, hood at angle, flywheel up to speed. */
@@ -197,8 +195,7 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     private AngularVelocity lowerSpeedFor(AngularVelocity upperSpeed) {
         return RotationsPerSecond.of(
-                upperSpeed.in(RotationsPerSecond)
-                        * ShotCalculator.ShootingParams.lowerShooterSpeedScale);
+                upperSpeed.in(RotationsPerSecond) * calculator.lowerShooterSpeedScale());
     }
 
     private Command runShooterAt(Supplier<AngularVelocity> upperSpeedSupplier) {
@@ -210,7 +207,10 @@ public class ShootingSuperstructure extends SubsystemBase {
             Supplier<AngularVelocity> lowerSpeedSupplier) {
         return Commands.parallel(
                 shooterUpper.runVelVolt(upperSpeedSupplier),
-                shooterLower.runVelVolt(lowerSpeedSupplier));
+                shooterLower
+                        .runVelVolt(RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS))
+                        .withTimeout(LOWER_AND_HOPPER_DELAY_SECONDS)
+                        .andThen(shooterLower.runVelVolt(lowerSpeedSupplier)));
     }
 
     private Command runShooterPrespin() {
@@ -222,7 +222,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     private Command feedAfterDelay() {
-        return Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS).andThen(hopper.shoot());
+        return hopper.idle().withTimeout(LOWER_AND_HOPPER_DELAY_SECONDS).andThen(hopper.shoot());
     }
 
     /**
@@ -242,7 +242,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
         Command readyWindow =
                 Commands.sequence(
-                        Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS),
+                        Commands.waitSeconds(LOWER_AND_HOPPER_DELAY_SECONDS),
                         Commands.waitSeconds(feedSeconds));
 
         return Commands.deadline(
@@ -254,7 +254,7 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public Command feedShotForSeconds(double seconds) {
         return Commands.deadline(
-                Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS + seconds),
+                Commands.waitSeconds(LOWER_AND_HOPPER_DELAY_SECONDS + seconds),
                 runShooterAt(() -> currentSolution().shooterSpeed()),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
                 feedAfterDelay());
@@ -332,8 +332,18 @@ public class ShootingSuperstructure extends SubsystemBase {
         Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
         Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
+        Logger.recordOutput("Shooting/physicsRawHoodDeg", solution.rawHoodAngle().in(Degrees));
+        Logger.recordOutput("Shooting/physicsLaunchAngleDeg", solution.launchAngle().in(Degrees));
+        Logger.recordOutput(
+                "Shooting/physicsLaunchSpeedMPS", solution.launchSpeed().in(MetersPerSecond));
+        Logger.recordOutput("Shooting/physicsTimeOfFlightSec", solution.timeOfFlight().in(Seconds));
+        Logger.recordOutput(
+                "Shooting/physicsModeledApexHeightMeters", solution.modeledApexHeight().in(Meters));
+        Logger.recordOutput("Shooting/physicsDragSolutionValid", solution.dragSolutionValid());
         Logger.recordOutput(
                 "Shooting/shooterUpperTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
+        Logger.recordOutput(
+                "Shooting/physicsRawShooterRPS", solution.rawShooterSpeed().in(RotationsPerSecond));
         Logger.recordOutput(
                 "Shooting/shooterLowerTargetRPS",
                 lowerSpeedFor(solution.shooterSpeed()).in(RotationsPerSecond));
@@ -363,20 +373,17 @@ public class ShootingSuperstructure extends SubsystemBase {
                 "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
         Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
 
-        // --- Ballistic arc overlay (3D Field: Commands/VisualizeProjectileShot/pathWorld) ---
+        // --- Quadratic-drag arc overlay (3D Field: Shooting/Viz/DragPath) ---
         // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
         Pose3d muzzle =
                 new Pose3d(pose).plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
-        VisualizeProjectileShot.logPath(
-                muzzle,
-                // TODO: verify the shooter fires off the back (-X); drop the +180 if it points
-                // forward.
-                pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
-                // TODO: verify hood angle sign/zero maps to up-positive launch pitch vs CAD.
-                Rotation2d.fromDegrees(hood.getCurrPos().in(Degrees)),
-                solution.shooterSpeed().in(RotationsPerSecond) * kRpsToMuzzleMps,
-                new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond),
-                true,
-                "");
+        Logger.recordOutput(
+                "Shooting/Viz/DragPath",
+                calculator.sampleDragPath(
+                        muzzle,
+                        // Shooter fires off the back of the robot.
+                        pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
+                        solution,
+                        new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond)));
     }
 }

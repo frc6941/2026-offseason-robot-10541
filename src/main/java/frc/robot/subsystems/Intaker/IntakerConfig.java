@@ -149,7 +149,7 @@ public class IntakerConfig {
         public static final double deployPosAngle = 15.0;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 20.0;
+        public static final double retractedfeedPosAngle = 45.0;
 
         public static PositionParamSources asPositionParamSources() {
             return new PositionParamSources() {
