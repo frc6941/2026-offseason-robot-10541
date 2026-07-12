@@ -118,13 +118,13 @@ public class ShooterConfig {
                     .build();
 
     public static final class ShooterUpperParams {
-        public static final double kP = 0.4;
+        public static final double kP = 0.3;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.1;
+        public static final double kV = 0.09;
         public static final double kA = 0.01;
-        public static final double kS = 0.0;
+        public static final double kS = 0.01;
 
         public static final double shootRPS = 80.0;
         public static final double idleRPS = 5.0;
@@ -141,11 +141,11 @@ public class ShooterConfig {
     }
 
     public static final class ShooterLowerParams {
-        public static final double kP = 0.4;
+        public static final double kP = 0.3;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.1;
+        public static final double kV = 0.08;
         public static final double kA = 0.01;
         public static final double kS = 0.0;
 

@@ -22,7 +22,7 @@ import lib.ntext.NTParameter;
 public class ShotCalculator {
     private static final double LAUNCH_HEIGHT_METERS = 0.500;
     private static final double TARGET_HEIGHT_METERS = 1.828;
-    private static final double APEX_HEIGHT_METERS = 2.328;
+    private static final double APEX_HEIGHT_METERS = 2.2;
     private static final double GRAVITY_METERS_PER_SECOND_SQUARED = 9.80665;
 
     private static final double FUEL_MASS_KG = 0.215;
@@ -49,10 +49,11 @@ public class ShotCalculator {
     private static final double LOWER_SHOOTER_SPEED_SCALE = 1.0;
     private static final double HEADING_TOLERANCE_DEG = 2.0;
     private static final double MIN_DISTANCE_METERS = 0.05;
+    private static final double POWER_SCALE_REFERENCE_DISTANCE_METERS = 4.0;
     private static final int DISTANCE_CACHE_BINS_PER_METER = 100;
     private static final int LOOKAHEAD_ITERATIONS = 10;
 
-    // The expensive drag solve is independent of the two live calibration values. Cache it at 1 cm
+    // The expensive drag solve is independent of the live calibration values. Cache it at 1 cm
     // distance resolution so periodic aiming remains comfortably inside the robot loop budget.
     private final Map<Integer, DragSolution> dragSolutionCache = new HashMap<>();
 
@@ -73,7 +74,7 @@ public class ShotCalculator {
         double rawShooterRps =
                 drag.launchSpeedMetersPerSecond()
                         / (Math.PI * SHOOTER_WHEEL_DIAMETER_METERS * NOMINAL_EXIT_EFFICIENCY)
-                        * Math.max(0.0, ShooterTuningParamsNT.shotPowerScale.getValue());
+                        * shotPowerScaleFor(distanceMeters);
         double shooterRps = MathUtil.clamp(rawShooterRps, 0.0, MAX_SHOOTER_RPS);
 
         return new ShotSolution(
@@ -110,6 +111,22 @@ public class ShotCalculator {
 
     public double headingToleranceDeg() {
         return HEADING_TOLERANCE_DEG;
+    }
+
+    public double shotPowerScaleFor(double distanceMeters) {
+        return calculatePowerScale(
+                distanceMeters,
+                ShooterTuningParamsNT.shotPowerScale.getValue(),
+                ShooterTuningParamsNT.shotPowerSlopePerMeter.getValue());
+    }
+
+    static double calculatePowerScale(
+            double distanceMeters, double scaleAtReference, double slopePerMeter) {
+        double distance = Math.max(MIN_DISTANCE_METERS, Math.abs(distanceMeters));
+        return Math.max(
+                0.0,
+                scaleAtReference
+                        + slopePerMeter * (distance - POWER_SCALE_REFERENCE_DISTANCE_METERS));
     }
 
     /** Samples a 3D quadratic-drag trajectory for AdvantageScope visualization. */
@@ -403,8 +420,11 @@ public class ShotCalculator {
 
     @NTParameter(tableName = "Params/ShooterTuning")
     public static final class ShooterTuningParams {
-        // Primary adjustment: shot too far -> decrease; shot too short -> increase.
-        public static final double shotPowerScale = 1.8;
+        // Power scale at 4 m. Adjust this first until a 4 m shot is correct.
+        public static final double shotPowerScale = 1.75;
+
+        // Distance correction around 4 m. More negative adds near power and removes far power.
+        public static final double shotPowerSlopePerMeter = -0.02;
 
         // Direct hood mechanism trim. Positive moves the hood toward its positive-angle limit.
         public static final double hoodTrimDeg = 0.0;

@@ -76,6 +76,13 @@ class ShotCalculatorTest {
         }
     }
 
+    @Test
+    void linearPowerScaleRaisesNearShotsAndLowersFarShots() {
+        assertEquals(1.90, ShotCalculator.calculatePowerScale(2.0, 1.8, -0.05), 1e-9);
+        assertEquals(1.80, ShotCalculator.calculatePowerScale(4.0, 1.8, -0.05), 1e-9);
+        assertEquals(1.70, ShotCalculator.calculatePowerScale(6.0, 1.8, -0.05), 1e-9);
+    }
+
     private static ShotCalculator.PhysicsSolution calculate(double distanceMeters) {
         return ShotCalculator.calculateIdeal(
                 distanceMeters,

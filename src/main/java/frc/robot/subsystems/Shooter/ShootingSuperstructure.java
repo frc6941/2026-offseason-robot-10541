@@ -43,8 +43,6 @@ import org.littletonrobotics.junction.Logger;
  * the drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
-    private static final double LOWER_AND_HOPPER_DELAY_SECONDS = 0.5;
-
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
@@ -209,8 +207,17 @@ public class ShootingSuperstructure extends SubsystemBase {
                 shooterUpper.runVelVolt(upperSpeedSupplier),
                 shooterLower
                         .runVelVolt(RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS))
-                        .withTimeout(LOWER_AND_HOPPER_DELAY_SECONDS)
+                        .until(() -> upperAtTarget(upperSpeedSupplier))
                         .andThen(shooterLower.runVelVolt(lowerSpeedSupplier)));
+    }
+
+    private boolean upperAtTarget(Supplier<AngularVelocity> upperSpeedSupplier) {
+        return shooterUpper
+                .getVelocity()
+                .isNear(
+                        upperSpeedSupplier.get(),
+                        RotationsPerSecond.of(
+                                ShooterConfig.ShooterUpperParams.velocityAtGoalToleranceRPS));
     }
 
     private Command runShooterPrespin() {
@@ -221,52 +228,63 @@ public class ShootingSuperstructure extends SubsystemBase {
                         RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
     }
 
-    private Command feedAfterDelay() {
-        return hopper.idle().withTimeout(LOWER_AND_HOPPER_DELAY_SECONDS).andThen(hopper.shoot());
+    private Command feedWhenUpperReady(Supplier<AngularVelocity> upperSpeedSupplier) {
+        return hopper.idle().until(() -> upperAtTarget(upperSpeedSupplier)).andThen(hopper.shoot());
     }
 
     /**
      * Spin the flywheel to the solution speed and drive the hood to the solution angle — both
-     * tracking distance continuously — then feed shortly after the shooter starts spinning.
+     * tracking distance continuously. The lower shooter and feed start only after the upper shooter
+     * reaches its target speed.
      *
      * <p>Requires shooter/hood/floor-roller, NOT swerve; run it in parallel with an {@link
      * AutoAimCommand} which owns chassis yaw.
      */
     public Command aimAndShoot() {
+        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         return Commands.parallel(
-                runShooterAt(() -> currentSolution().shooterSpeed()),
+                runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterDelay());
+                feedWhenUpperReady(upperSpeedSupplier));
     }
 
     public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
+        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         Command readyWindow =
-                Commands.sequence(
-                        Commands.waitSeconds(LOWER_AND_HOPPER_DELAY_SECONDS),
-                        Commands.waitSeconds(feedSeconds));
+                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                        .withTimeout(readyTimeoutSeconds)
+                        .andThen(
+                                Commands.either(
+                                        Commands.waitSeconds(feedSeconds),
+                                        Commands.none(),
+                                        () -> upperAtTarget(upperSpeedSupplier)));
 
         return Commands.deadline(
                 readyWindow,
-                runShooterAt(() -> currentSolution().shooterSpeed()),
+                runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterDelay());
+                feedWhenUpperReady(upperSpeedSupplier));
     }
 
     public Command feedShotForSeconds(double seconds) {
+        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         return Commands.deadline(
-                Commands.waitSeconds(LOWER_AND_HOPPER_DELAY_SECONDS + seconds),
-                runShooterAt(() -> currentSolution().shooterSpeed()),
+                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                        .andThen(Commands.waitSeconds(seconds)),
+                runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterDelay());
+                feedWhenUpperReady(upperSpeedSupplier));
     }
 
     public Command fixedShoot() {
+        Supplier<AngularVelocity> upperSpeedSupplier =
+                () -> RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.shootRPS);
         return Commands.parallel(
                 runShooterAt(
-                        () -> RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.shootRPS),
+                        upperSpeedSupplier,
                         () -> RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.shootRPS)),
                 hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
-                feedAfterDelay());
+                feedWhenUpperReady(upperSpeedSupplier));
     }
 
     /**
@@ -331,6 +349,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         Logger.recordOutput("Shooting/distanceMeters", geometric);
         Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
         Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
+        Logger.recordOutput("Shooting/appliedPowerScale", calculator.shotPowerScaleFor(effective));
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
         Logger.recordOutput("Shooting/physicsRawHoodDeg", solution.rawHoodAngle().in(Degrees));
         Logger.recordOutput("Shooting/physicsLaunchAngleDeg", solution.launchAngle().in(Degrees));

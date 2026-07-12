@@ -36,17 +36,17 @@ public class HopperConfig {
                     .build();
 
     public static final class HopperParams {
-        public static final double kP = 2;
-        public static final double kI = 0.01;
+        public static final double kP = 1;
+        public static final double kI = 0.1;
         public static final double kD = 0.0;
 
         public static final double kV = 0.15;
-        public static final double kA = 0.0;
-        public static final double kS = 3.4;
+        public static final double kA = 0.004;
+        public static final double kS = 0.252;
 
         public static final double feedRPS = 20;
         public static final double shootRPS = 40;
-        public static final double idleRPS = 4;
+        public static final double idleRPS = 0;
 
         public static VelocityParamSources asVelocityParamSources() {
             return new VelocityParamSources() {
