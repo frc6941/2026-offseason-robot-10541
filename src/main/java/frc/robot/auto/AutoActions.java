@@ -369,29 +369,26 @@ public class AutoActions {
     }
 
     /**
-     * One collect/score cycle: follow {@code sweepPath} with the intake on, drive back across the
-     * slope, then aim at the hub and empty the hopper.
+     * One collect/score cycle: follow {@code sweepPath} collecting; once the robot has driven out
+     * past x = 7 and come back inside it (blue frame) near the end of the path, retract the intake;
+     * then drive back across the slope and empty the hopper at the hub.
+     *
+     * <p>The out-first wait stops the retract firing at the start, where the robot begins at x ≈ 4.4
+     * (already inside 7). {@code intake()}/{@code retractIntake()} here only flip the intake mode —
+     * they actuate the pivot because {@link IntakerSubsystem#followModePivot()} runs in parallel for
+     * the whole auto (see {@link AutoRoutines#competitionAuto}); inside the auto command group the
+     * pivot's own default command is suppressed.
      */
     public static Command sweepCollectShoot(String sweepPath, boolean isLeft) {
-        return sweepCollectShoot(sweepPath, isLeft, intake());
-    }
-
-    /**
-     * As {@link #sweepCollectShoot(String, boolean)}, but runs {@code intakeBranch} alongside the
-     * sweep path instead of the plain intake. Lets the first sweep home the intake pivot on the
-     * move — pass {@code Commands.sequence(intake.zeroCommand(), intake())} so the path drives
-     * immediately while the pivot homes, and collecting only begins once it's zeroed. The path is
-     * the deadline, so {@code intakeBranch} must finish (or reach its collecting phase) before the
-     * path does, or it gets cancelled mid-home; the sweep path is seconds long and homing is
-     * sub-second, so keep that margin if you ever shorten the start path.
-     */
-    public static Command sweepCollectShoot(
-            String sweepPath, boolean isLeft, Command intakeBranch) {
         return Commands.sequence(
-                Commands.deadline(followPathFile(sweepPath, isLeft), intakeBranch),
-                // For the final second before crossing the bump, run the intake to its feed position
-                // (feedPosAngle, FEEDING mode). feed() reverts the mode when the second is up.
-                feed().withTimeout(1.0),
+                Commands.deadline(
+                        followPathFile(sweepPath, isLeft),
+                        intake(),
+                        Commands.waitUntil(() -> AllianceFlipUtil.applyX(getRobotX()) > 7.0)
+                                .andThen(
+                                        Commands.waitUntil(
+                                                () -> AllianceFlipUtil.applyX(getRobotX()) < 7.0))
+                                .andThen(feed())),
                 drivePastSlope(isLeft, false),
                 aimAndShootAtHub());
     }

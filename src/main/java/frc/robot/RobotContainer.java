@@ -27,6 +27,7 @@ import frc.robot.auto.AutoFile;
 import frc.robot.auto.AutoRoutines;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.AutoTrenchCommand;
+import frc.robot.commands.DriveToXCommand;
 import frc.robot.subsystems.Configs.LimeLightConfig;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
@@ -224,6 +225,10 @@ public class RobotContainer {
         // is initialized after configureBindings() runs, so it must not be constructed eagerly
         // here.
         driverController.leftBumper().whileTrue(testPathCommand());
+
+        // Test: bang-bang drive to field X = 7.5 m at full speed (Y/heading uncommanded), exits on
+        // crossing. Hold to run, release to abort.
+        driverController.rightBumper().whileTrue(new DriveToXCommand(swerve, 7.75));
 
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
         driverController

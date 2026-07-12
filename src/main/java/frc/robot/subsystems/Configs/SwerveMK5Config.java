@@ -70,6 +70,23 @@ public final class SwerveMK5Config {
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
                     .build();
 
+        public static SwerveLimit kUnlimitedLimit =
+            SwerveLimit.builder()
+                    .maxLinearVelocity(MetersPerSecond.of(99999)) // theoretically 5.10
+                    // prevents skidding, see orbit archive ytb channel open class for theory
+                                        // prevents skidding, see orbit archive ytb channel open class for theory.
+                    // Kept near traction to protect tracking; was 200 (far above traction).
+                    .maxSkidAcceleration(MetersPerSecondPerSecond.of(99999)) // <maxDriveAcceleration
+                    // Chassis-level brake cap; composes with the module maxDriveDeceleration (the
+                    // tighter one binds). Falls back to maxSkidAcceleration if unset.
+                    .maxBrakeAcceleration(MetersPerSecondPerSecond.of(25))
+                    // omega_max ≈ vMax / r.
+                     .maxAngularVelocity(DegreesPerSecond.of(1000))
+                    // accelerate in 0.32s, also must be smaller than the defined module limit to be
+                    // actually effective
+                    .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
+                    .build();
+
     // Module configs — encoder offsets are from the competition robot and will need re-tuning
     public static final SwerveConfig.SwerveModuleConfig kModuleFL =
             SwerveConfig.SwerveModuleConfig.builder()

@@ -170,6 +170,17 @@ public class IntakerSubsystem extends SubsystemBase {
                 () -> currentMode = IntakeMode.EXTENDED_REVERSE, () -> currentMode = fallbackMode);
     }
 
+    /**
+     * Continuously drive the pivot to the current intake mode's target angle. Run this in parallel
+     * with an autonomous routine (after homing) so intake-mode changes actuate the pivot even though
+     * the pivot's own default command is suppressed while the auto command group holds the pivot
+     * requirement (e.g. via {@link #zeroCommand()}). Without it, {@code runIntake()}/{@code
+     * runRetract()} only flip {@code currentMode} and never move the pivot during an auto.
+     */
+    public Command followModePivot() {
+        return runPivotTo(this::pivotTargetAngle);
+    }
+
     public Command zeroCommand() {
         Command simZero = pivot.zeroCommand().andThen(Commands.runOnce(this::finishPivotZeroing));
         return Commands.either(buildRealPivotZeroCommand(), simZero, RobotBase::isReal);
