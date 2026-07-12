@@ -69,11 +69,9 @@ public class AutoTrenchCommand extends Command {
     }
 
     /**
-     * Push the current {@link AutoTrenchParams} values into both profiled PID controllers. Called
-     * once in the constructor and again from {@link #execute()} whenever any param changes, so
-     * gains, constraints, and tolerances tune live (see {@code AutoTrenchParamsNT.isAnyChanged()}).
-     * Setters only swap the values used on the next {@code calculate()}; they don't reset the
-     * profile state, so re-applying mid-trench doesn't jerk the chassis.
+     * Push the {@link AutoTrenchParams} values into both profiled PID controllers. Called once from
+     * the constructor: this command is intentionally deterministic (see the field comment above),
+     * so the controllers are configured at build time and not re-read from NetworkTables per loop.
      */
     private void applyParams() {
         yController.setPID(
@@ -82,8 +80,8 @@ public class AutoTrenchCommand extends Command {
                 AutoTrenchParamsNT.lateralKD.getValue());
         yController.setConstraints(
                 new TrapezoidProfile.Constraints(
-                        AutoTrenchParamsNT.lateralMaxVel.getValue(),
-                        AutoTrenchParamsNT.lateralMaxAccel.getValue()));
+                        AutoTrenchParamsNT.lateralProfileMaxVel.getValue(),
+                        AutoTrenchParamsNT.lateralProfileMaxAccel.getValue()));
         yController.setTolerance(
                 AutoTrenchParamsNT.lateralToleranceMeters.getValue(),
                 AutoTrenchParamsNT.lateralVelocityToleranceMetersPerSec.getValue());
@@ -94,8 +92,8 @@ public class AutoTrenchCommand extends Command {
                 AutoTrenchParamsNT.headingKD.getValue());
         headingController.setConstraints(
                 new TrapezoidProfile.Constraints(
-                        AutoTrenchParamsNT.headingMaxVel.getValue(),
-                        AutoTrenchParamsNT.headingMaxAccel.getValue()));
+                        AutoTrenchParamsNT.headingProfileMaxVel.getValue(),
+                        AutoTrenchParamsNT.headingProfileMaxAccel.getValue()));
         headingController.setTolerance(
                 Math.toRadians(AutoTrenchParamsNT.headingToleranceDeg.getValue()),
                 AutoTrenchParamsNT.headingVelocityToleranceRadPerSec.getValue());
@@ -128,10 +126,7 @@ public class AutoTrenchCommand extends Command {
 
     @Override
     public void execute() {
-        // Live tuning: re-push gains/constraints/tolerances when the dashboard changes any param.
-        if (AutoTrenchParamsNT.isAnyChanged()) applyParams();
-
-        Pose2d pose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
+        Pose2d pose = swerve.getEstimatedPose().toPose2d();
         double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
 
         // Driver keeps only the through-trench axis. Forward on the stick is driver-station
@@ -145,7 +140,7 @@ public class AutoTrenchCommand extends Command {
         double vy =
                 yController.calculate(pose.getY(), new TrapezoidProfile.State(lockedTrenchY, 0.0))
                         + yController.getSetpoint().velocity;
-        double lateralMaxVel = AutoTrenchParamsNT.lateralMaxVel.getValue();
+        double lateralMaxVel = AutoTrenchParamsNT.lateralOutputMaxVel.getValue();
         vy = MathUtil.clamp(vy, -lateralMaxVel, lateralMaxVel);
         if (yController.atGoal()
                 || Math.abs(vy) < AutoTrenchParamsNT.lateralOutputDeadbandMetersPerSec.getValue()) {
@@ -158,7 +153,7 @@ public class AutoTrenchCommand extends Command {
                                 pose.getRotation().getRadians(),
                                 new TrapezoidProfile.State(lockedHeading.getRadians(), 0.0))
                         + headingController.getSetpoint().velocity;
-        double headingMaxVel = AutoTrenchParamsNT.headingMaxVel.getValue();
+        double headingMaxVel = AutoTrenchParamsNT.headingOutputMaxVel.getValue();
         omega = MathUtil.clamp(omega, -headingMaxVel, headingMaxVel);
         if (headingController.atGoal()
                 || Math.abs(omega) < AutoTrenchParamsNT.headingOutputDeadbandRadPerSec.getValue()) {

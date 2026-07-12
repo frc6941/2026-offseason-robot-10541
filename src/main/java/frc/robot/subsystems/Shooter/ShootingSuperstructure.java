@@ -21,7 +21,6 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.Robot;
 import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
@@ -417,17 +416,19 @@ public class ShootingSuperstructure extends SubsystemBase {
                     "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
             Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
 
-        // --- Quadratic-drag arc overlay (3D Field: Shooting/Viz/DragPath) ---
-        // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
-        Pose3d muzzle =
-                new Pose3d(pose).plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
-        Logger.recordOutput(
-                "Shooting/Viz/DragPath",
-                calculator.sampleDragPath(
-                        muzzle,
-                        // Shooter fires off the back of the robot.
-                        pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
-                        solution,
-                        new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond)));
+            // --- Quadratic-drag arc overlay (3D Field: Shooting/Viz/DragPath) ---
+            // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
+            Pose3d muzzle =
+                    new Pose3d(pose)
+                            .plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
+            Logger.recordOutput(
+                    "Shooting/Viz/DragPath",
+                    calculator.sampleDragPath(
+                            muzzle,
+                            // Shooter fires off the back of the robot.
+                            pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
+                            solution,
+                            new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond)));
+        }
     }
 }
