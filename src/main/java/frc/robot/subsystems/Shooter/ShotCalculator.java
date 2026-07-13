@@ -421,10 +421,10 @@ public class ShotCalculator {
     @NTParameter(tableName = "Params/ShooterTuning")
     public static final class ShooterTuningParams {
         // Power scale at 4 m. Adjust this first until a 4 m shot is correct.
-        public static final double shotPowerScale = 1.75;
+        public static final double shotPowerScale = 1.81;
 
         // Distance correction around 4 m. More negative adds near power and removes far power.
-        public static final double shotPowerSlopePerMeter = -0.02;
+        public static final double shotPowerSlopePerMeter = -0.01;
 
         // Direct hood mechanism trim. Positive moves the hood toward its positive-angle limit.
         public static final double hoodTrimDeg = 0.0;
