@@ -25,19 +25,19 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
     }
 
     public Command idle() {
-        return runVelTC(RotationsPerSecond.of(HopperConfig.HopperParams.idleRPS));
+        return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.idleRPS.getValue()));
     }
 
     public Command feed() {
-        return runVelTC(RotationsPerSecond.of(HopperConfig.HopperParams.feedRPS));
+        return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.feedRPS.getValue()));
     }
 
     public Command shoot() {
-        return runVelTC(RotationsPerSecond.of(HopperConfig.HopperParams.shootRPS));
+        return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.shootRPS.getValue()));
     }
 
     public Command reverse() {
-        return runVelTC(RotationsPerSecond.of(-HopperConfig.HopperParams.feedRPS));
+        return runVelTC(() -> RotationsPerSecond.of(-HopperParamsNT.feedRPS.getValue()));
     }
 
     /**
@@ -50,8 +50,8 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
                 () ->
                         RotationsPerSecond.of(
                                 gate.getAsBoolean()
-                                        ? HopperConfig.HopperParams.shootRPS
-                                        : HopperConfig.HopperParams.idleRPS));
+                                        ? HopperParamsNT.shootRPS.getValue()
+                                        : HopperParamsNT.idleRPS.getValue()));
     }
 
     public void configureDefaultCommand() {

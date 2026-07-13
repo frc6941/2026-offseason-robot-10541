@@ -201,7 +201,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         return shooterUpper.getCurrSetpoint().in(RotationsPerSecond)
                         > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
                 || shooterLower.getCurrSetpoint().in(RotationsPerSecond)
-                        > ShooterConfig.ShooterLowerParams.idleRPS + 1.0;
+                        > ShooterLowerParamsNT.idleRPS.getValue() + 1.0;
     }
 
     public double getUpperSetpointRPS() {
@@ -218,7 +218,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                         () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())));
         shooterLower.setDefaultCommand(
                 shooterLower.runVelVolt(
-                        RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
+                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
         hood.setDefaultCommand(hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE));
     }
 
@@ -241,7 +241,10 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.parallel(
                 shooterUpper.runVelVolt(upperSpeedSupplier),
                 shooterLower
-                        .runVelVolt(RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS))
+                        .runVelVolt(
+                                () ->
+                                        RotationsPerSecond.of(
+                                                ShooterLowerParamsNT.idleRPS.getValue()))
                         .until(() -> upperAtTarget(upperSpeedSupplier))
                         .andThen(shooterLower.runVelVolt(lowerSpeedSupplier)));
     }
@@ -260,7 +263,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                 shooterUpper.runVelVolt(
                         () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())),
                 shooterLower.runVelVolt(
-                        RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
+                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
     }
 
     /**
@@ -322,7 +325,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.parallel(
                 runShooterAt(
                         upperSpeedSupplier,
-                        () -> RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.shootRPS)),
+                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.shootRPS.getValue())),
                 hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
                 feedWhenUpperReady(upperSpeedSupplier));
     }
@@ -333,7 +336,7 @@ public class ShootingSuperstructure extends SubsystemBase {
      */
     public Command hoodToTestAngle() {
         return hood.runMotionMagic(
-                () -> clampHoodAngle(Degrees.of(ShooterConfig.HoodParams.testAngleDeg)));
+                () -> clampHoodAngle(Degrees.of(HoodParamsNT.testAngleDeg.getValue())));
     }
 
     /**
