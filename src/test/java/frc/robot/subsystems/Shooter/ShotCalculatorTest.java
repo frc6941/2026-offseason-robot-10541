@@ -1,101 +1,53 @@
 package frc.robot.subsystems.Shooter;
 
+import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import edu.wpi.first.math.geometry.Translation2d;
 import org.junit.jupiter.api.Test;
 
 class ShotCalculatorTest {
-    private static final double LAUNCH_HEIGHT_METERS = 0.500;
-    private static final double TARGET_HEIGHT_METERS = 1.828;
-    private static final double APEX_HEIGHT_METERS = 2.328;
-    private static final double GRAVITY_METERS_PER_SECOND_SQUARED = 9.80665;
+    private final ShotCalculator calculator = new ShotCalculator();
 
     @Test
-    void calculatedTrajectoryPassesThroughApexAndTarget() {
-        double distanceMeters = 4.0;
-        ShotCalculator.PhysicsSolution solution = calculate(distanceMeters);
+    void returnsExactValuesAtBreakpoints() {
+        ShotSolution solution = calculator.solve(4.0);
 
-        double timeToApex =
-                solution.verticalSpeedMetersPerSecond() / GRAVITY_METERS_PER_SECOND_SQUARED;
-        double apexX = solution.horizontalSpeedMetersPerSecond() * timeToApex;
-        double apexY =
-                heightAt(
-                        timeToApex,
-                        solution.verticalSpeedMetersPerSecond(),
-                        GRAVITY_METERS_PER_SECOND_SQUARED);
-        double targetY =
-                heightAt(
-                        solution.timeOfFlightSeconds(),
-                        solution.verticalSpeedMetersPerSecond(),
-                        GRAVITY_METERS_PER_SECOND_SQUARED);
-
-        assertEquals(solution.apexDistanceMeters(), apexX, 1e-9);
-        assertEquals(APEX_HEIGHT_METERS, apexY, 1e-9);
-        assertEquals(TARGET_HEIGHT_METERS, targetY, 1e-9);
-        assertEquals(
-                distanceMeters,
-                solution.horizontalSpeedMetersPerSecond() * solution.timeOfFlightSeconds(),
-                1e-9);
+        assertEquals(24.0, solution.hoodAngle().in(Degrees), 1e-9);
+        assertEquals(70.0, solution.shooterSpeed().in(RotationsPerSecond), 1e-9);
+        assertEquals(1.05, calculator.timeOfFlightFor(4.0), 1e-9);
     }
 
     @Test
-    void solutionsRemainFiniteAcrossExpectedFieldDistances() {
-        for (double distanceMeters = 1.0; distanceMeters <= 8.0; distanceMeters += 0.25) {
-            ShotCalculator.PhysicsSolution solution = calculate(distanceMeters);
-            assertTrue(Double.isFinite(solution.launchAngleRad()));
-            assertTrue(solution.launchAngleRad() > 0.0);
-            assertTrue(Double.isFinite(solution.launchSpeedMetersPerSecond()));
-            assertTrue(solution.launchSpeedMetersPerSecond() > 0.0);
-            assertTrue(Double.isFinite(solution.timeOfFlightSeconds()));
-            assertTrue(solution.timeOfFlightSeconds() > 0.0);
-        }
+    void linearlyInterpolatesBetweenBreakpoints() {
+        ShotSolution solution = calculator.solve(2.5);
+
+        assertEquals(14.0, solution.hoodAngle().in(Degrees), 1e-9);
+        assertEquals(58.5, solution.shooterSpeed().in(RotationsPerSecond), 1e-9);
+        assertEquals(0.90, calculator.timeOfFlightFor(2.5), 1e-9);
     }
 
     @Test
-    void quadraticDragCorrectionStillHitsTargetHeight() {
-        for (double distanceMeters : new double[] {2.0, 4.0, 6.0}) {
-            ShotCalculator.DragSolution drag =
-                    ShotCalculator.calculateWithDrag(
-                            distanceMeters,
-                            LAUNCH_HEIGHT_METERS,
-                            TARGET_HEIGHT_METERS,
-                            APEX_HEIGHT_METERS,
-                            GRAVITY_METERS_PER_SECOND_SQUARED,
-                            0.215,
-                            0.150,
-                            0.47,
-                            1.225,
-                            0.002);
-            ShotCalculator.PhysicsSolution ideal = calculate(distanceMeters);
+    void clampsDistancesOutsideTableRange() {
+        ShotSolution near = calculator.solve(0.5);
+        ShotSolution far = calculator.solve(8.0);
 
-            assertTrue(drag.valid());
-            assertEquals(TARGET_HEIGHT_METERS, drag.heightAtTargetMeters(), 1e-6);
-            assertTrue(drag.launchSpeedMetersPerSecond() > ideal.launchSpeedMetersPerSecond());
-            assertTrue(drag.timeOfFlightSeconds() > 0.0);
-        }
+        assertEquals(10.0, near.hoodAngle().in(Degrees), 1e-9);
+        assertEquals(55.0, near.shooterSpeed().in(RotationsPerSecond), 1e-9);
+        assertEquals(30.0, far.hoodAngle().in(Degrees), 1e-9);
+        assertEquals(85.0, far.shooterSpeed().in(RotationsPerSecond), 1e-9);
     }
 
     @Test
-    void linearPowerScaleRaisesNearShotsAndLowersFarShots() {
-        assertEquals(1.90, ShotCalculator.calculatePowerScale(2.0, 1.8, -0.05), 1e-9);
-        assertEquals(1.80, ShotCalculator.calculatePowerScale(4.0, 1.8, -0.05), 1e-9);
-        assertEquals(1.70, ShotCalculator.calculatePowerScale(6.0, 1.8, -0.05), 1e-9);
-    }
+    void stationaryLookaheadLeavesDistanceUnchanged() {
+        Translation2d shooter = new Translation2d(1.0, 2.0);
+        Translation2d target = new Translation2d(5.0, 5.0);
 
-    private static ShotCalculator.PhysicsSolution calculate(double distanceMeters) {
-        return ShotCalculator.calculateIdeal(
-                distanceMeters,
-                LAUNCH_HEIGHT_METERS,
-                TARGET_HEIGHT_METERS,
-                APEX_HEIGHT_METERS,
-                GRAVITY_METERS_PER_SECOND_SQUARED);
-    }
+        double effectiveDistance = calculator.effectiveDistance(shooter, target, 0.0, 0.0);
 
-    private static double heightAt(
-            double timeSeconds, double verticalSpeed, double gravityMetersPerSecondSquared) {
-        return LAUNCH_HEIGHT_METERS
-                + verticalSpeed * timeSeconds
-                - 0.5 * gravityMetersPerSecondSquared * timeSeconds * timeSeconds;
+        assertEquals(shooter.getDistance(target), effectiveDistance, 1e-9);
+        assertTrue(Double.isFinite(effectiveDistance));
     }
 }

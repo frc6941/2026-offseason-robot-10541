@@ -156,13 +156,65 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command holdRetractedFeedPosition() {
-        return Commands.runEnd(
-                () -> currentMode = IntakeMode.RETRACTED_FEEDING,
-                () -> {
-                    fallbackMode = IntakeMode.EXTENDED_IDLE;
-                    currentMode = IntakeMode.EXTENDED_IDLE;
-                },
-                this);
+        Command holdShootMode =
+                Commands.runEnd(
+                        () -> currentMode = IntakeMode.RETRACTED_FEEDING,
+                        () -> {
+                            fallbackMode = IntakeMode.EXTENDED_IDLE;
+                            currentMode = IntakeMode.EXTENDED_IDLE;
+                        },
+                        this);
+
+        return Commands.parallel(holdShootMode, raisePivotForShootSlowly());
+    }
+
+    public Command returnPivotToIdleFast() {
+        Command selectIdleMode =
+                Commands.runOnce(
+                        () -> {
+                            fallbackMode = IntakeMode.EXTENDED_IDLE;
+                            currentMode = IntakeMode.EXTENDED_IDLE;
+                        },
+                        this);
+        Command commandIdlePosition =
+                pivot.runPosition(Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle))
+                        .withTimeout(0.05);
+
+        return selectIdleMode.andThen(commandIdlePosition);
+    }
+
+    private Command raisePivotForShootSlowly() {
+        Timer timer = new Timer();
+        double[] commandedAngleDeg = {0.0};
+        double[] lastTimeSeconds = {0.0};
+
+        Command initializeRamp =
+                Commands.runOnce(
+                        () -> {
+                            commandedAngleDeg[0] = pivot.getCurrPos().in(Degrees);
+                            lastTimeSeconds[0] = 0.0;
+                            timer.restart();
+                        },
+                        pivot);
+        Command followRamp =
+                pivot.runPosition(
+                        () -> {
+                            double nowSeconds = timer.get();
+                            double maxStepDeg =
+                                    IntakerConfig.IntakerPivotParams.shootRaiseSpeedDegreesPerSecond
+                                            * Math.max(0.0, nowSeconds - lastTimeSeconds[0]);
+                            lastTimeSeconds[0] = nowSeconds;
+
+                            double targetDeg =
+                                    IntakerConfig.IntakerPivotParams.retractedfeedPosAngle;
+                            double errorDeg = targetDeg - commandedAngleDeg[0];
+                            commandedAngleDeg[0] +=
+                                    Math.copySign(
+                                            Math.min(Math.abs(errorDeg), maxStepDeg), errorDeg);
+                            return Degrees.of(commandedAngleDeg[0]);
+                        });
+
+        return initializeRamp.andThen(followRamp).finallyDo(interrupted -> timer.stop());
     }
 
     public Command runExtendedReverse() {

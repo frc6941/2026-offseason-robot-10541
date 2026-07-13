@@ -39,13 +39,13 @@ public class ShooterConfig {
     public static final Angle HOOD_MIN_ANGLE = Degrees.of(0.0);
     // Must equal the hood's true mechanical travel. ShotCalculator converts physical launch pitch
     // to this mechanism angle and clamps the result to this range.
-    public static final Angle HOOD_MAX_ANGLE = Degrees.of(30.0);
+    public static final Angle HOOD_MAX_ANGLE = Degrees.of(40.0);
     public static final Angle HOOD_STOW_ANGLE = HOOD_MIN_ANGLE;
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
     // SensorToMechanismRatio (below), NOT here — so this must be a bare 360, or the ratio gets
     // applied twice and the hood barely moves. See PositionMotorSubsystem doc ("Pivot: 360").
     public static final Angle HOOD_ANGLE_PER_ROTATION = Degrees.of(360.0);
-    public static final Angle HOOD_ZERO_OFFSET = Degrees.of(0.0);
+    public static final Angle HOOD_ZERO_OFFSET = Degrees.of(10.0);
 
     public static final SubsystemConfig SHOOTER_DRUM_CONFIG =
             SubsystemConfig.builder()
@@ -118,7 +118,7 @@ public class ShooterConfig {
 
     @NTParameter(tableName = "Params/" + SHOOTER_DRUM_NAME)
     public static final class ShooterUpperParams {
-        public static final double kP = 0.3;
+        public static final double kP = 0.6;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 

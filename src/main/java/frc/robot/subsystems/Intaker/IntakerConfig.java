@@ -98,7 +98,7 @@ public class IntakerConfig {
         public static final double kA = 0.0031438;
         public static final double kS = 0.2007;
 
-        public static final double intakeRPS = 100.0;
+        public static final double intakeRPS = 110.0;
         public static final double outtakeRPS = -15.0;
 
         private IntakerRollerParams() {}
@@ -121,10 +121,14 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 7.0;
+        public static final double deployPosAngle = 10.0;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 45.0;
+        public static final double retractedfeedPosAngle = 70.0;
+
+        // Shoot-only software position-ramp speed. The pivot still uses runPosition(), not Motion
+        // Magic.
+        public static final double shootRaiseSpeedDegreesPerSecond = 54.0;
 
         private IntakerPivotParams() {}
     }
