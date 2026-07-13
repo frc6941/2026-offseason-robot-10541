@@ -216,10 +216,12 @@ public class RobotContainer {
         driverController
                 .rightTrigger()
                 .onFalse(
-                        Commands.sequence(
-                                shootingSuperstructure.idle().withTimeout(0.02),
-                                indicator.indicateWithTimeout(
-                                        IndicatorIO.Patterns.AFTER_SHOOTING, 0.5)));
+                        Commands.parallel(
+                                intaker.returnPivotToIdleFast(),
+                                Commands.sequence(
+                                        shootingSuperstructure.idle().withTimeout(0.02),
+                                        indicator.indicateWithTimeout(
+                                                IndicatorIO.Patterns.AFTER_SHOOTING, 0.5))));
     }
 
     private Command aimAtHubCommand() {
