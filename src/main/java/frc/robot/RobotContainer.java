@@ -110,6 +110,7 @@ public class RobotContainer {
 
     // Replace with CommandPS4Controller or CommandJoystick if needed
     private final CommandXboxController driverController = new CommandXboxController(0);
+    private final CommandXboxController OperatorController = new CommandXboxController(1);
 
     private final AutoSelector autoSelector;
     private int hubTargetModeRequests = 0;
@@ -150,7 +151,8 @@ public class RobotContainer {
      */
     private void configureBindings() {
         // Manual intake pivot hard-stop zero.
-        driverController.povLeft().onTrue(intaker.zeroCommand());
+        OperatorController.povLeft().onTrue(intaker.zeroCommand());
+        OperatorController.povDown().whileTrue(intaker.runExtendedReverse());
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
