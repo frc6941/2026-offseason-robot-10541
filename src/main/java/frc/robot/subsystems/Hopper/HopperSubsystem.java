@@ -6,6 +6,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
+import java.util.function.BooleanSupplier;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.SubsystemConfig;
@@ -37,6 +38,20 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
 
     public Command reverse() {
         return runVelTC(RotationsPerSecond.of(-HopperConfig.HopperParams.feedRPS));
+    }
+
+    /**
+     * Shoot-speed while {@code gate} holds true (e.g. shooter up to speed AND heading on target),
+     * idle-speed otherwise. Re-evaluates every loop, so it drops back to idle immediately if the
+     * chassis swings off target mid-feed instead of latching once a shot starts.
+     */
+    public Command shootWhile(BooleanSupplier gate) {
+        return runVelTC(
+                () ->
+                        RotationsPerSecond.of(
+                                gate.getAsBoolean()
+                                        ? HopperConfig.HopperParams.shootRPS
+                                        : HopperConfig.HopperParams.idleRPS));
     }
 
     public void configureDefaultCommand() {

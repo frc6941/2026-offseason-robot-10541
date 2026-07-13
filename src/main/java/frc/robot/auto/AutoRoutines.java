@@ -89,13 +89,15 @@ public class AutoRoutines {
         steps.add(sweepCollectShoot(startPath, isLeft));
 
         // 2. Optional second sweep. BUMP_AGAIN repeats the bump cycle so it can follow any first
-        // attempt (trench or bump) without repositioning to the trench start: cross the bump again
-        // — holding the slope-end heading it already carries rather than spinning to the bump-start
-        // rotation — then follow the bumpstart path, drive back, aim + shoot. Otherwise reposition
-        // to the hardcoded start and run the trench second-sweep path.
+        // attempt (trench or bump) without repositioning to the trench start: reposition to the
+        // bump-start pose first (the first sweep ends at kSlopeEnd, not kBumpStart), then cross the
+        // bump the normal way (holding the bump-start heading), then follow the bumpstart path,
+        // drive back, aim + shoot. Otherwise reposition to the hardcoded start and run the trench
+        // second-sweep path.
         if (sweepTimes >= 2) {
             if (secondRunBumpAgain) {
-                steps.add(drivePastSlope(isLeft, true, slopeEndHeading(isLeft)));
+                steps.add(driveToPose(AllianceFlipUtil.apply(isLeft ? kBumpStartL : kBumpStartR)));
+                steps.add(drivePastSlope(isLeft, true));
                 steps.add(sweepCollectShoot(bumpPath, isLeft));
             } else {
                 // Reposition to the second-sweep start with Autopilot (straight beeline) rather

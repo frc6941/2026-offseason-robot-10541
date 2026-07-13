@@ -211,10 +211,11 @@ public class RobotContainer {
 
         driverController.a().onTrue(intaker.runRetract());
 
-        // Test: drive to the second-sweep start pose with the Autopilot point-to-point driver
-        // (straight beeline). Hold D-pad Down to run, release to abort. Tune Params/AutoPilot live
-        // and watch AutoPilot/* (DistanceToTarget, AtTarget, vx/vy/omega) in AdvantageScope.
-        driverController.povDown().whileTrue(driveToPoseAutoPilotTestCommand());
+        // Test: drive to the second-sweep start pose with the AutopilotDriveToPose point-to-point
+        // driver (straight beeline). Hold D-pad Down to run, release to abort. Tune
+        // Params/Commands/AutopilotDriveToPose live and watch Commands/AutopilotDriveToPose/* in
+        // AdvantageScope.
+        driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
 
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
         driverController
@@ -249,12 +250,13 @@ public class RobotContainer {
     }
 
     /**
-     * Drives to the (alliance-flipped) second-sweep start pose with the Autopilot point-to-point
-     * driver ({@link AutoActions#driveToPoseAutoPilot}). Gains/tolerances come from {@code
-     * Params/AutoPilot} and are re-read each press (deferred), so tune on the dashboard and
-     * re-press. Deferred also so it builds only after {@link AutoActions#init} has run.
+     * Drives to the (alliance-flipped) second-sweep start pose with {@link AutopilotDriveToPose}
+     * (via {@link AutoActions#driveToPoseAutoPilot}). Gains/tolerances come from {@code
+     * Params/Commands/AutopilotDriveToPose} and are re-read each press (deferred), so tune on the
+     * dashboard and re-press. Deferred also so it builds only after {@link AutoActions#init} has
+     * run.
      */
-    private Command driveToPoseAutoPilotTestCommand() {
+    private Command autopilotDriveToPoseTestCommand() {
         return Commands.deferredProxy(
                 () ->
                         AutoActions.driveToPoseAutoPilot(

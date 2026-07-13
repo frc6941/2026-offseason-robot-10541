@@ -244,8 +244,13 @@ public class ShootingSuperstructure extends SubsystemBase {
                         RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
     }
 
+    /**
+     * Feeds only while the shooter is up to speed AND the chassis is aimed at the hub; drops back
+     * to idle the instant either goes false (e.g. the chassis swings off target mid-feed), instead
+     * of latching into shoot() after the first ready check.
+     */
     private Command feedWhenUpperReady(Supplier<AngularVelocity> upperSpeedSupplier) {
-        return hopper.idle().until(() -> upperAtTarget(upperSpeedSupplier)).andThen(hopper.shoot());
+        return hopper.shootWhile(() -> upperAtTarget(upperSpeedSupplier) && headingAtGoal());
     }
 
     /**
