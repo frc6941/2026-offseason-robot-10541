@@ -14,7 +14,7 @@ import frc.robot.subsystems.Hopper.HopperConfig;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
-import frc.robot.subsystems.Shooter.ShooterConfig;
+import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
@@ -122,7 +122,7 @@ public class FieldCoreBridge extends SubsystemBase {
         return shooterUpper.getCurrSetpoint().in(RotationsPerSecond)
                         > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
                 || shooterLower.getCurrSetpoint().in(RotationsPerSecond)
-                        > ShooterConfig.ShooterLowerParams.idleRPS + 1.0;
+                        > ShooterLowerParamsNT.idleRPS.getValue() + 1.0;
     }
 
     private boolean isFeedActive() {

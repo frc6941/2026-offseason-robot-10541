@@ -52,12 +52,12 @@ public class IntakerSubsystem extends SubsystemBase {
                                                                 currentMode
                                                                                 == IntakeMode
                                                                                         .EXTENDED_REVERSE
-                                                                        ? IntakerConfig
-                                                                                .IntakerRollerParams
+                                                                        ? IntakerRollerParamsNT
                                                                                 .outtakeRPS
-                                                                        : IntakerConfig
-                                                                                .IntakerRollerParams
-                                                                                .intakeRPS))
+                                                                                .getValue()
+                                                                        : IntakerRollerParamsNT
+                                                                                .intakeRPS
+                                                                                .getValue()))
                                         .until(
                                                 () ->
                                                         currentMode
@@ -104,14 +104,14 @@ public class IntakerSubsystem extends SubsystemBase {
         }
 
         return switch (currentMode) {
-            case INTAKING -> Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle);
+            case INTAKING -> Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case EXTENDED_IDLE, EXTENDED_REVERSE ->
-                    Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle);
-            case RETRACTED -> Degrees.of(IntakerConfig.IntakerPivotParams.retractPosAngle);
-            case FEEDING -> Degrees.of(IntakerConfig.IntakerPivotParams.feedPosAngle);
+                    Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
+            case RETRACTED -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
+            case FEEDING -> Degrees.of(IntakerPivotParamsNT.feedPosAngle.getValue());
             case RETRACTED_FEEDING ->
-                    Degrees.of(IntakerConfig.IntakerPivotParams.retractedfeedPosAngle);
-            default -> Degrees.of(IntakerConfig.IntakerPivotParams.retractPosAngle);
+                    Degrees.of(IntakerPivotParamsNT.retractedfeedPosAngle.getValue());
+            default -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
         };
     }
 
@@ -177,7 +177,7 @@ public class IntakerSubsystem extends SubsystemBase {
                         },
                         this);
         Command commandIdlePosition =
-                pivot.runPosition(Degrees.of(IntakerConfig.IntakerPivotParams.deployPosAngle))
+                pivot.runPosition(() -> Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue()))
                         .withTimeout(0.05);
 
         return selectIdleMode.andThen(commandIdlePosition);
@@ -201,12 +201,12 @@ public class IntakerSubsystem extends SubsystemBase {
                         () -> {
                             double nowSeconds = timer.get();
                             double maxStepDeg =
-                                    IntakerConfig.IntakerPivotParams.shootRaiseSpeedDegreesPerSecond
+                                    IntakerPivotParamsNT.shootRaiseSpeedDegreesPerSecond.getValue()
                                             * Math.max(0.0, nowSeconds - lastTimeSeconds[0]);
                             lastTimeSeconds[0] = nowSeconds;
 
                             double targetDeg =
-                                    IntakerConfig.IntakerPivotParams.retractedfeedPosAngle;
+                                    IntakerPivotParamsNT.retractedfeedPosAngle.getValue();
                             double errorDeg = targetDeg - commandedAngleDeg[0];
                             commandedAngleDeg[0] +=
                                     Math.copySign(
