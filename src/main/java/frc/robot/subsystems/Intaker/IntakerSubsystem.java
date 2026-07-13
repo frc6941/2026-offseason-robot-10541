@@ -1,18 +1,12 @@
 package frc.robot.subsystems.Intaker;
 
-import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
-import static edu.wpi.first.units.Units.Volts;
 
-import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.FunctionalCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import lib.ironpulse.io.MotorIO;
@@ -118,7 +112,9 @@ public class IntakerSubsystem extends SubsystemBase {
     private void setIntakeMode(IntakeMode mode) {
         fallbackMode = mode;
 
-        if (currentMode != IntakeMode.FEEDING && currentMode != IntakeMode.EXTENDED_REVERSE) {
+        if (currentMode != IntakeMode.FEEDING
+                && currentMode != IntakeMode.EXTENDED_REVERSE
+                && currentMode != IntakeMode.RETRACTED_FEEDING) {
             currentMode = mode;
         }
     }
@@ -139,20 +135,12 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command runExtendedIdle() {
-        return Commands.runOnce(
-                () -> {
-                    fallbackMode = IntakeMode.EXTENDED_IDLE;
-
-                    if (currentMode != IntakeMode.FEEDING
-                            && currentMode != IntakeMode.EXTENDED_REVERSE) {
-                        currentMode = IntakeMode.EXTENDED_IDLE;
-                    }
-                });
+        return Commands.runOnce(() -> setIntakeMode(IntakeMode.EXTENDED_IDLE));
     }
 
     public Command runFeed() {
         return Commands.startEnd(
-                () -> currentMode = IntakeMode.FEEDING, () -> currentMode = fallbackMode);
+                () -> currentMode = IntakeMode.FEEDING, () -> currentMode = fallbackMode, this);
     }
 
     public Command holdRetractedFeedPosition() {
@@ -219,7 +207,9 @@ public class IntakerSubsystem extends SubsystemBase {
 
     public Command runExtendedReverse() {
         return Commands.startEnd(
-                () -> currentMode = IntakeMode.EXTENDED_REVERSE, () -> currentMode = fallbackMode);
+                () -> currentMode = IntakeMode.EXTENDED_REVERSE,
+                () -> currentMode = fallbackMode,
+                this);
     }
 
     /**
@@ -234,55 +224,9 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command zeroCommand() {
-        Command simZero = pivot.zeroCommand().andThen(Commands.runOnce(this::finishPivotZeroing));
-        return Commands.either(buildRealPivotZeroCommand(), simZero, RobotBase::isReal);
-    }
-
-    private Command buildRealPivotZeroCommand() {
-        Timer zeroingTimer = new Timer();
-        LinearFilter currentFilter =
-                LinearFilter.movingAverage(IntakerConfig.INTAKER_PIVOT_ZEROING_FILTER_SIZE);
-        boolean[] hardStopDetected = {false};
-
-        return new FunctionalCommand(
-                () -> {
-                    pivotZeroed = false;
-                    hardStopDetected[0] = false;
-                    currentFilter.reset();
-                    zeroingTimer.restart();
-                    pivot.setEnableSoftLimits(false, false);
-                },
-                () -> {
-                    pivot.setVoltage(Volts.of(IntakerConfig.INTAKER_PIVOT_ZEROING_VOLTAGE));
-                    double filteredCurrent =
-                            currentFilter.calculate(pivot.getStatorCurrent().in(Amps));
-                    hardStopDetected[0] =
-                            zeroingTimer.hasElapsed(
-                                            IntakerConfig.INTAKER_PIVOT_ZEROING_MIN_TIME_SECONDS)
-                                    && filteredCurrent
-                                            > IntakerConfig
-                                                    .INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS;
-                },
-                interrupted -> {
-                    pivot.setVoltage(Volts.zero());
-                    zeroingTimer.stop();
-
-                    if (!interrupted && hardStopDetected[0]) {
-                        pivot.setCurrPos(IntakerConfig.INTAKER_PIVOT_ZERO_OFFSET);
-                        finishPivotZeroing();
-                    } else if (!interrupted) {
-                        DriverStation.reportWarning(
-                                "Intaker pivot zeroing timed out; zero position was not changed.",
-                                false);
-                    }
-
-                    pivot.setEnableSoftLimits(true, true);
-                },
-                () ->
-                        hardStopDetected[0]
-                                || zeroingTimer.hasElapsed(
-                                        IntakerConfig.INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS),
-                pivot);
+        return Commands.runOnce(() -> pivotZeroed = false)
+                .andThen(pivot.zeroCommand())
+                .andThen(Commands.runOnce(this::finishPivotZeroing));
     }
 
     private void finishPivotZeroing() {

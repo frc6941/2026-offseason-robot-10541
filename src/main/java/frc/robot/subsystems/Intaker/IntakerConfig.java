@@ -40,8 +40,6 @@ public class IntakerConfig {
     // Must be above free-run current and below breaker / unsafe stall current.
     public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 60.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
-    public static final double INTAKER_PIVOT_ZEROING_MIN_TIME_SECONDS = 0.25;
-    public static final double INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS = 4.0;
 
     public enum IntakeMode {
         INTAKING, // Roller: Intake, Pivot: Extended
@@ -122,7 +120,7 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 13.0;
+        public static final double deployPosAngle = 7;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
         public static final double retractedfeedPosAngle = 70.0;
