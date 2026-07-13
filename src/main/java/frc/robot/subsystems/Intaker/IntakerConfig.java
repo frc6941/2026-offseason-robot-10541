@@ -21,7 +21,7 @@ public class IntakerConfig {
     public static final String INTAKER_ROLLER_NAME = "IntakerRoller";
     public static final String INTAKER_PIVOT_NAME = "IntakerPivot";
 
-    private static final double INTAKER_ROLLER_GEAR_RATIO = 20.0 / 35.0;
+    private static final double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0;
     private static final double INTAKER_PIVOT_GEAR_RATIO = 1.0 / 12 * 20 / 36 * 20 / 36 * 15 / 36;
 
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's

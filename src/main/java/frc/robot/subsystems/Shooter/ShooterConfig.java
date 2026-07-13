@@ -11,6 +11,7 @@ import edu.wpi.first.units.measure.Angle;
 import lib.ironpulse.subsystem.SubsystemConfig;
 import lib.ironpulse.subsystem.position.PositionParamSources;
 import lib.ironpulse.subsystem.velocity.VelocityParamSources;
+import lib.ntext.NTParameter;
 
 public class ShooterConfig {
     private static final CANBus CANBUS = ROBORIO_CAN_BUS;
@@ -117,6 +118,7 @@ public class ShooterConfig {
                     .zeroOffset(HOOD_ZERO_OFFSET)
                     .build();
 
+    @NTParameter(tableName = "Params/ShooterUpper")
     public static final class ShooterUpperParams {
         public static final double kP = 0.6;
         public static final double kI = 0.0;
@@ -134,7 +136,7 @@ public class ShooterConfig {
         public static final double testRPS = 40.0;
 
         public static VelocityParamSources asVelocityParamSources() {
-            return velocityParams(kP, kI, kD, kV, kA, kS, velocityAtGoalToleranceRPS);
+            return ShooterUpperParamsNT.asVelocityParamSources();
         }
 
         private ShooterUpperParams() {}

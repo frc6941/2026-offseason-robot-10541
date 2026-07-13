@@ -180,7 +180,7 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public boolean isShooterActive() {
         return shooterUpper.getCurrSetpoint().in(RotationsPerSecond)
-                        > ShooterConfig.ShooterUpperParams.idleRPS + 1.0
+                        > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
                 || shooterLower.getCurrSetpoint().in(RotationsPerSecond)
                         > ShooterConfig.ShooterLowerParams.idleRPS + 1.0;
     }
@@ -196,7 +196,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     public void configureDefaultCommands() {
         shooterUpper.setDefaultCommand(
                 shooterUpper.runVelVolt(
-                        RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.idleRPS)));
+                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())));
         shooterLower.setDefaultCommand(
                 shooterLower.runVelVolt(
                         RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
@@ -233,13 +233,13 @@ public class ShootingSuperstructure extends SubsystemBase {
                 .isNear(
                         upperSpeedSupplier.get(),
                         RotationsPerSecond.of(
-                                ShooterConfig.ShooterUpperParams.velocityAtGoalToleranceRPS));
+                                ShooterUpperParamsNT.velocityAtGoalToleranceRPS.getValue()));
     }
 
     private Command runShooterPrespin() {
         return Commands.parallel(
                 shooterUpper.runVelVolt(
-                        RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.idleRPS)),
+                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.idleRPS.getValue())),
                 shooterLower.runVelVolt(
                         RotationsPerSecond.of(ShooterConfig.ShooterLowerParams.idleRPS)));
     }
@@ -294,7 +294,7 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public Command fixedShoot() {
         Supplier<AngularVelocity> upperSpeedSupplier =
-                () -> RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.shootRPS);
+                () -> RotationsPerSecond.of(ShooterUpperParamsNT.shootRPS.getValue());
         return Commands.parallel(
                 runShooterAt(
                         upperSpeedSupplier,
@@ -318,7 +318,7 @@ public class ShootingSuperstructure extends SubsystemBase {
      */
     public Command spinDrumAtTestRPS() {
         return shooterUpper.runVelVolt(
-                RotationsPerSecond.of(ShooterConfig.ShooterUpperParams.testRPS));
+                () -> RotationsPerSecond.of(ShooterUpperParamsNT.testRPS.getValue()));
     }
 
     public void seedHoodPositionAtZero() {

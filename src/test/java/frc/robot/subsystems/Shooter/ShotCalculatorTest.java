@@ -15,18 +15,35 @@ class ShotCalculatorTest {
     void returnsExactValuesAtBreakpoints() {
         ShotSolution solution = calculator.solve(4.0);
 
-        assertEquals(24.0, solution.hoodAngle().in(Degrees), 1e-9);
-        assertEquals(70.0, solution.shooterSpeed().in(RotationsPerSecond), 1e-9);
-        assertEquals(1.05, calculator.timeOfFlightFor(4.0), 1e-9);
+        assertEquals(
+                ShootingParamsNT.hoodAngleDeg4m.getValue(), solution.hoodAngle().in(Degrees), 1e-9);
+        assertEquals(
+                ShootingParamsNT.shooterRps4m.getValue(),
+                solution.shooterSpeed().in(RotationsPerSecond),
+                1e-9);
+        assertEquals(ShootingParamsNT.tofSec4m.getValue(), calculator.timeOfFlightFor(4.0), 1e-9);
     }
 
     @Test
     void linearlyInterpolatesBetweenBreakpoints() {
         ShotSolution solution = calculator.solve(2.5);
 
-        assertEquals(14.0, solution.hoodAngle().in(Degrees), 1e-9);
-        assertEquals(58.5, solution.shooterSpeed().in(RotationsPerSecond), 1e-9);
-        assertEquals(0.90, calculator.timeOfFlightFor(2.5), 1e-9);
+        assertEquals(
+                (ShootingParamsNT.hoodAngleDeg2m.getValue()
+                                + ShootingParamsNT.hoodAngleDeg3m.getValue())
+                        * 0.5,
+                solution.hoodAngle().in(Degrees),
+                1e-9);
+        assertEquals(
+                (ShootingParamsNT.shooterRps2m.getValue()
+                                + ShootingParamsNT.shooterRps3m.getValue())
+                        * 0.5,
+                solution.shooterSpeed().in(RotationsPerSecond),
+                1e-9);
+        assertEquals(
+                (ShootingParamsNT.tofSec2m.getValue() + ShootingParamsNT.tofSec3m.getValue()) * 0.5,
+                calculator.timeOfFlightFor(2.5),
+                1e-9);
     }
 
     @Test
@@ -34,10 +51,17 @@ class ShotCalculatorTest {
         ShotSolution near = calculator.solve(0.5);
         ShotSolution far = calculator.solve(8.0);
 
-        assertEquals(10.0, near.hoodAngle().in(Degrees), 1e-9);
-        assertEquals(55.0, near.shooterSpeed().in(RotationsPerSecond), 1e-9);
-        assertEquals(30.0, far.hoodAngle().in(Degrees), 1e-9);
-        assertEquals(85.0, far.shooterSpeed().in(RotationsPerSecond), 1e-9);
+        assertEquals(
+                ShootingParamsNT.hoodAngleDeg2m.getValue(), near.hoodAngle().in(Degrees), 1e-9);
+        assertEquals(
+                ShootingParamsNT.shooterRps2m.getValue(),
+                near.shooterSpeed().in(RotationsPerSecond),
+                1e-9);
+        assertEquals(ShootingParamsNT.hoodAngleDeg6m.getValue(), far.hoodAngle().in(Degrees), 1e-9);
+        assertEquals(
+                ShootingParamsNT.shooterRps6m.getValue(),
+                far.shooterSpeed().in(RotationsPerSecond),
+                1e-9);
     }
 
     @Test
