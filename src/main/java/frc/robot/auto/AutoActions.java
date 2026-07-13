@@ -280,7 +280,8 @@ public class AutoActions {
         return Commands.defer(
                 () -> {
                     Pose2d targetPose = targetPoseSupplier.get();
-                    return new AutopilotDriveToPose(swerve, buildAutopilot(), new APTarget(targetPose))
+                    return new AutopilotDriveToPose(
+                                    swerve, buildAutopilot(), new APTarget(targetPose))
                             .beforeStarting(
                                     Commands.runOnce(
                                             () ->

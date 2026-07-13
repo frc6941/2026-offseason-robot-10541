@@ -55,21 +55,21 @@ public class ShotCalculator {
 
     private void rebuildTables() {
         hoodAngleDeg.clear();
-        hoodAngleDeg.put(BREAKPOINTS_METERS[0], ShootingParamsNT.hoodAngleDeg2m.getValue());//23
-        hoodAngleDeg.put(BREAKPOINTS_METERS[1], ShootingParamsNT.hoodAngleDeg3m.getValue());//29.5
-        hoodAngleDeg.put(BREAKPOINTS_METERS[2], ShootingParamsNT.hoodAngleDeg4m.getValue());//37
+        hoodAngleDeg.put(BREAKPOINTS_METERS[0], ShootingParamsNT.hoodAngleDeg2m.getValue()); // 23
+        hoodAngleDeg.put(BREAKPOINTS_METERS[1], ShootingParamsNT.hoodAngleDeg3m.getValue()); // 29.5
+        hoodAngleDeg.put(BREAKPOINTS_METERS[2], ShootingParamsNT.hoodAngleDeg4m.getValue()); // 37
         hoodAngleDeg.put(BREAKPOINTS_METERS[3], ShootingParamsNT.hoodAngleDeg5m.getValue());
         hoodAngleDeg.put(BREAKPOINTS_METERS[4], ShootingParamsNT.hoodAngleDeg6m.getValue());
 
         shooterRps.clear();
-        shooterRps.put(BREAKPOINTS_METERS[0], ShootingParamsNT.shooterRps2m.getValue());//55
-        shooterRps.put(BREAKPOINTS_METERS[1], ShootingParamsNT.shooterRps3m.getValue());//57.5
-        shooterRps.put(BREAKPOINTS_METERS[2], ShootingParamsNT.shooterRps4m.getValue());//59
+        shooterRps.put(BREAKPOINTS_METERS[0], ShootingParamsNT.shooterRps2m.getValue()); // 55
+        shooterRps.put(BREAKPOINTS_METERS[1], ShootingParamsNT.shooterRps3m.getValue()); // 57.5
+        shooterRps.put(BREAKPOINTS_METERS[2], ShootingParamsNT.shooterRps4m.getValue()); // 59
         shooterRps.put(BREAKPOINTS_METERS[3], ShootingParamsNT.shooterRps5m.getValue());
         shooterRps.put(BREAKPOINTS_METERS[4], ShootingParamsNT.shooterRps6m.getValue());
 
         timeOfFlightSec.clear();
-        timeOfFlightSec.put(BREAKPOINTS_METERS[0], ShootingParamsNT.tofSec2m.getValue());//1.1
+        timeOfFlightSec.put(BREAKPOINTS_METERS[0], ShootingParamsNT.tofSec2m.getValue()); // 1.1
         timeOfFlightSec.put(BREAKPOINTS_METERS[1], ShootingParamsNT.tofSec3m.getValue());
         timeOfFlightSec.put(BREAKPOINTS_METERS[2], ShootingParamsNT.tofSec4m.getValue());
         timeOfFlightSec.put(BREAKPOINTS_METERS[3], ShootingParamsNT.tofSec5m.getValue());
