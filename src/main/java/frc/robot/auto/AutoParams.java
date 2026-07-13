@@ -28,8 +28,8 @@ public final class AutoParams {
 
     /**
      * Gains + tolerances for point moves ({@code SwerveDriveToPose} / {@code SwerveAimToHeading}).
-     * Field names/defaults mirror {@code SwerveDriveToPose.SwerveDriveToPoseParams} so the two
-     * stay in lockstep at a glance.
+     * Field names/defaults mirror {@code SwerveDriveToPose.SwerveDriveToPoseParams} so the two stay
+     * in lockstep at a glance.
      */
     @NTParameter(tableName = "Params/AutoPose")
     public static final class AutoPoseParams {

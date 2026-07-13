@@ -3,7 +3,6 @@ package frc.robot.auto;
 import static edu.wpi.first.units.Units.*;
 
 import com.pathplanner.lib.commands.FollowPathCommand;
-import com.therekrab.autopilot.APTarget;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.controllers.PathFollowingController;
@@ -12,6 +11,7 @@ import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.path.PathPlannerPath;
 import com.pathplanner.lib.path.RotationTarget;
 import com.pathplanner.lib.path.Waypoint;
+import com.therekrab.autopilot.APTarget;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
@@ -403,10 +403,11 @@ public class AutoActions {
      * <p>The feed branch runs as a companion of {@code path + drivePastSlope} (both inside the
      * deadline), so feeding starts at x &lt; 7 and only reverts once the robot has driven past the
      * slope — not when the sweep path ends. The out-first wait stops it firing at the start, where
-     * the robot begins at x ≈ 4.4 (already inside 7). {@code intake()}/{@code feed()} here only flip
-     * the intake mode — they actuate the pivot because {@link IntakerSubsystem#followModePivot()}
-     * runs in parallel for the whole auto (see {@link AutoRoutines#competitionAuto}); inside the auto
-     * command group the pivot's own default command is suppressed.
+     * the robot begins at x ≈ 4.4 (already inside 7). {@code intake()}/{@code feed()} here only
+     * flip the intake mode — they actuate the pivot because {@link
+     * IntakerSubsystem#followModePivot()} runs in parallel for the whole auto (see {@link
+     * AutoRoutines#competitionAuto}); inside the auto command group the pivot's own default command
+     * is suppressed.
      */
     public static Command sweepCollectShoot(String sweepPath, boolean isLeft) {
         return Commands.sequence(

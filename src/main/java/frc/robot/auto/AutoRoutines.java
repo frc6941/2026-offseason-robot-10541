@@ -113,7 +113,8 @@ public class AutoRoutines {
         // this same zeroCommand), which suppresses the pivot's default command for the whole auto —
         // so without this, intake()/retractIntake() mode changes would flip the mode but never move
         // the pivot. Homing runs alongside the opening steps (home on the move), and the manager
-        // makes every deploy/retract in the sweeps actually actuate. The routine is the deadline, so
+        // makes every deploy/retract in the sweeps actually actuate. The routine is the deadline,
+        // so
         // when it ends the manager stops.
         return Commands.deadline(
                         Commands.sequence(steps.toArray(Command[]::new)),
