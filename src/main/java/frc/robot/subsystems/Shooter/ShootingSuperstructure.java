@@ -1,23 +1,18 @@
 package frc.robot.subsystems.Shooter;
 
 import static edu.wpi.first.units.Units.Degrees;
-import static edu.wpi.first.units.Units.Meters;
-import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
-import static edu.wpi.first.units.Units.Seconds;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -43,6 +38,10 @@ import org.littletonrobotics.junction.Logger;
  * the drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
+    private static final String MANUAL_OVERRIDE_KEY = "Shooter Tuning/Manual Override";
+    private static final String MANUAL_HOOD_ANGLE_KEY = "Shooter Tuning/Hood Angle Deg";
+    private static final String MANUAL_FLYWHEEL_RPS_KEY = "Shooter Tuning/Flywheel RPS";
+
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hood;
@@ -62,6 +61,10 @@ public class ShootingSuperstructure extends SubsystemBase {
         this.hopper = hopper;
         this.swerve = swerve;
         cachedAimHeading = AutoAimCommand.getShooterAimHeading(robotPose());
+
+        SmartDashboard.setDefaultBoolean(MANUAL_OVERRIDE_KEY, false);
+        SmartDashboard.setDefaultNumber(MANUAL_HOOD_ANGLE_KEY, 10.0);
+        SmartDashboard.setDefaultNumber(MANUAL_FLYWHEEL_RPS_KEY, 55.0);
     }
 
     private Pose2d robotPose() {
@@ -92,7 +95,20 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** The shot solution (hood angle + flywheel speed), shoot-on-move compensated. */
     public ShotSolution currentSolution() {
-        return calculator.solve(effectiveDistanceToTarget());
+        return solutionForDistance(effectiveDistanceToTarget());
+    }
+
+    private ShotSolution solutionForDistance(double effectiveDistanceMeters) {
+        if (SmartDashboard.getBoolean(MANUAL_OVERRIDE_KEY, false)) {
+            Angle hoodAngle =
+                    clampHoodAngle(
+                            Degrees.of(SmartDashboard.getNumber(MANUAL_HOOD_ANGLE_KEY, 10.0)));
+            AngularVelocity flywheelSpeed =
+                    RotationsPerSecond.of(
+                            Math.max(0.0, SmartDashboard.getNumber(MANUAL_FLYWHEEL_RPS_KEY, 55.0)));
+            return new ShotSolution(hoodAngle, flywheelSpeed);
+        }
+        return calculator.solve(effectiveDistanceMeters);
     }
 
     private Rotation2d computeAimHeading() {
@@ -331,7 +347,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     public void periodic() {
         double geometric = distanceToTarget();
         double effective = effectiveDistanceToTarget();
-        ShotSolution solution = calculator.solve(effective);
+        ShotSolution solution = solutionForDistance(effective);
         Rotation2d heading = computeAimHeading();
         double timestampSec = Timer.getFPGATimestamp();
         double dtSec = timestampSec - lastAimTimestampSec;
@@ -349,20 +365,11 @@ public class ShootingSuperstructure extends SubsystemBase {
         Logger.recordOutput("Shooting/distanceMeters", geometric);
         Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
         Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
-        Logger.recordOutput("Shooting/appliedPowerScale", calculator.shotPowerScaleFor(effective));
+        Logger.recordOutput(
+                "Shooting/manualOverride", SmartDashboard.getBoolean(MANUAL_OVERRIDE_KEY, false));
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
-        Logger.recordOutput("Shooting/physicsRawHoodDeg", solution.rawHoodAngle().in(Degrees));
-        Logger.recordOutput("Shooting/physicsLaunchAngleDeg", solution.launchAngle().in(Degrees));
-        Logger.recordOutput(
-                "Shooting/physicsLaunchSpeedMPS", solution.launchSpeed().in(MetersPerSecond));
-        Logger.recordOutput("Shooting/physicsTimeOfFlightSec", solution.timeOfFlight().in(Seconds));
-        Logger.recordOutput(
-                "Shooting/physicsModeledApexHeightMeters", solution.modeledApexHeight().in(Meters));
-        Logger.recordOutput("Shooting/physicsDragSolutionValid", solution.dragSolutionValid());
         Logger.recordOutput(
                 "Shooting/shooterUpperTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
-        Logger.recordOutput(
-                "Shooting/physicsRawShooterRPS", solution.rawShooterSpeed().in(RotationsPerSecond));
         Logger.recordOutput(
                 "Shooting/shooterLowerTargetRPS",
                 lowerSpeedFor(solution.shooterSpeed()).in(RotationsPerSecond));
@@ -391,18 +398,5 @@ public class ShootingSuperstructure extends SubsystemBase {
         Logger.recordOutput(
                 "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
         Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
-
-        // --- Quadratic-drag arc overlay (3D Field: Shooting/Viz/DragPath) ---
-        // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
-        Pose3d muzzle =
-                new Pose3d(pose).plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
-        Logger.recordOutput(
-                "Shooting/Viz/DragPath",
-                calculator.sampleDragPath(
-                        muzzle,
-                        // Shooter fires off the back of the robot.
-                        pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
-                        solution,
-                        new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond)));
     }
 }
