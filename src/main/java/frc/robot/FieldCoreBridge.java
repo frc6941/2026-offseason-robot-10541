@@ -11,6 +11,7 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.Hopper.HopperConfig;
+import frc.robot.subsystems.Hopper.HopperParamsNT;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
@@ -127,7 +128,7 @@ public class FieldCoreBridge extends SubsystemBase {
 
     private boolean isFeedActive() {
         return hopper.getCurrSetpoint().in(RotationsPerSecond)
-                > HopperConfig.HopperParams.idleRPS + 0.05;
+                > HopperParamsNT.idleRPS.getValue() + 0.05;
     }
 
     private static double[] poseToArray(Pose3d pose) {
