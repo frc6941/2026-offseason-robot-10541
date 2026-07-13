@@ -31,10 +31,10 @@ public final class AutoParams {
      */
     @NTParameter(tableName = "Params/AutoPose")
     public static final class AutoPoseParams {
-        public static final double kpStrave = 4.0;
+        public static final double kpStrave = 1.6;
         public static final double kiStrave = 0.0;
         public static final double kdStrave = 0.0;
-        public static final double kpSpin = 5.0;
+        public static final double kpSpin = 0.1;
         public static final double kiSpin = 0.0;
         public static final double kdSpin = 0.0;
         public static final double tolerancePositionM = 0.05;

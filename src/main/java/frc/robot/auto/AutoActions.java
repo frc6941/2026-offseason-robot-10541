@@ -3,6 +3,7 @@ package frc.robot.auto;
 import static edu.wpi.first.units.Units.*;
 
 import com.pathplanner.lib.commands.FollowPathCommand;
+import com.therekrab.autopilot.APTarget;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.controllers.PathFollowingController;
@@ -23,6 +24,8 @@ import frc.robot.Robot;
 import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
+import frc.robot.commands.AutoPilotCommand;
+import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import java.io.IOException;
@@ -61,16 +64,16 @@ public class AutoActions {
     public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(90));
     public static final Pose2d kTrenchStartL = mirrorY(kTrenchStartR);
     // Bump start begins here (alliance side, 45 deg), then drives past the slope into neutral.
-    public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.56, Rotation2d.fromDegrees(45));
+    public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.84, Rotation2d.fromDegrees(45));
     public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
 
     // ---- Second-sweep entry pose (drive here before the second sweep path). ----
-    public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.683, Rotation2d.fromDegrees(0));
+    public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.5, Rotation2d.fromDegrees(0));
     public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
 
     // ---- Slope crossing poses. Front = neutral side, End = alliance side (drive-back target).
     // ----
-    public static final Pose2d kSlopeFrontR = new Pose2d(5.84, 2.56, Rotation2d.fromDegrees(-135));
+    public static final Pose2d kSlopeFrontR = new Pose2d(5.84, 2.84, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeFrontL = mirrorY(kSlopeFrontR);
     public static final Pose2d kSlopeEndR = new Pose2d(3, 2.56, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeEndL = mirrorY(kSlopeEndR);
@@ -218,13 +221,13 @@ public class AutoActions {
                                     () -> new Pose3d(targetPose),
                                     RobotStateRecorder::getVelocityWorldRobotCurrent,
                                     new PIDController(
-                                            AutoPoseParamsNT.kpStrave.getValue(),
-                                            AutoPoseParamsNT.kiStrave.getValue(),
-                                            AutoPoseParamsNT.kdStrave.getValue()),
+                                            0,
+                                            0,
+                                            0),
                                     new PIDController(
-                                            AutoPoseParamsNT.kpSpin.getValue(),
-                                            AutoPoseParamsNT.kiSpin.getValue(),
-                                            AutoPoseParamsNT.kdSpin.getValue()),
+                                            0,
+                                            0,
+                                            0),
                                     Meters.of(AutoPoseParamsNT.tolerancePositionM.getValue()),
                                     Degrees.of(AutoPoseParamsNT.toleranceHeadingDeg.getValue()))
                             .beforeStarting(
@@ -238,6 +241,30 @@ public class AutoActions {
 
     public static Command driveToPose(Pose2d targetPose) {
         return driveToPose(() -> targetPose);
+    }
+
+    /**
+     * Drive to an <b>already alliance-flipped</b> pose using the Autopilot point-to-point driver
+     * ({@link AutoPilotCommand}) instead of the pose PID ({@link #driveToPose}). Autopilot is
+     * obstacle-unaware and drives a straight/beeline path, so only use it where the lane is known
+     * clear — e.g. repositioning to the second-sweep start on the open alliance side after a shot.
+     */
+    static Command driveToPoseAutoPilot(Supplier<Pose2d> targetPoseSupplier) {
+        return Commands.defer(
+                () -> {
+                    Pose2d targetPose = targetPoseSupplier.get();
+                    return new AutoPilotCommand(swerve, new APTarget(targetPose))
+                            .beforeStarting(
+                                    Commands.runOnce(
+                                            () ->
+                                                    Logger.recordOutput(
+                                                            "Auto/targetPose", targetPose)));
+                },
+                Set.of(swerve));
+    }
+
+    public static Command driveToPoseAutoPilot(Pose2d targetPose) {
+        return driveToPoseAutoPilot(() -> targetPose);
     }
 
     static Command driveToHeading(Supplier<Rotation2d> targetRotationSupplier) {
@@ -370,32 +397,44 @@ public class AutoActions {
 
     /**
      * One collect/score cycle: follow {@code sweepPath} collecting; once the robot has driven out
-     * past x = 7 and come back inside it (blue frame) near the end of the path, retract the intake;
-     * then drive back across the slope and empty the hopper at the hub.
+     * past x = 7 and come back inside it (blue frame) near the end of the path, switch to feed and
+     * <b>hold feed all the way through the slope crossing</b>; then empty the hopper at the hub.
      *
-     * <p>The out-first wait stops the retract firing at the start, where the robot begins at x ≈ 4.4
-     * (already inside 7). {@code intake()}/{@code retractIntake()} here only flip the intake mode —
-     * they actuate the pivot because {@link IntakerSubsystem#followModePivot()} runs in parallel for
-     * the whole auto (see {@link AutoRoutines#competitionAuto}); inside the auto command group the
-     * pivot's own default command is suppressed.
+     * <p>The feed branch runs as a companion of {@code path + drivePastSlope} (both inside the
+     * deadline), so feeding starts at x &lt; 7 and only reverts once the robot has driven past the
+     * slope — not when the sweep path ends. The out-first wait stops it firing at the start, where
+     * the robot begins at x ≈ 4.4 (already inside 7). {@code intake()}/{@code feed()} here only flip
+     * the intake mode — they actuate the pivot because {@link IntakerSubsystem#followModePivot()}
+     * runs in parallel for the whole auto (see {@link AutoRoutines#competitionAuto}); inside the auto
+     * command group the pivot's own default command is suppressed.
      */
     public static Command sweepCollectShoot(String sweepPath, boolean isLeft) {
         return Commands.sequence(
                 Commands.deadline(
-                        followPathFile(sweepPath, isLeft),
+                        Commands.sequence(
+                                followPathFile(sweepPath, isLeft), drivePastSlope(isLeft, false)),
                         intake(),
                         Commands.waitUntil(() -> AllianceFlipUtil.applyX(getRobotX()) > 7.0)
                                 .andThen(
                                         Commands.waitUntil(
                                                 () -> AllianceFlipUtil.applyX(getRobotX()) < 7.0))
                                 .andThen(feed())),
-                drivePastSlope(isLeft, false),
                 aimAndShootAtHub());
     }
 
     // =====================================================================================
     // Housekeeping
     // =====================================================================================
+
+    /** Lift the swerve speed cap for a fast unguarded dash (e.g. the trench-start opening move). */
+    public static Command setSwerveLimitUnlimited() {
+        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit));
+    }
+
+    /** Restore the normal swerve speed cap after an unlimited-speed segment. */
+    public static Command setSwerveLimitDefault() {
+        return Commands.runOnce(swerve::setSwerveLimitDefault);
+    }
 
     public static Command zeroEverything() {
         return Commands.parallel(shootingSuperstructure.zeroHoodHere(), intake.zeroCommand());

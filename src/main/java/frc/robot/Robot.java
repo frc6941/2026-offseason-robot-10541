@@ -164,6 +164,10 @@ public class Robot extends LoggedRobot {
         if (autonomousCommand != null) {
             autonomousCommand.cancel();
         }
+
+        // Safety net: guarantee teleop always starts at the default swerve speed cap, even if auto
+        // was interrupted mid-way through its unlimited-speed trench-start dash.
+        robotContainer.resetSwerveLimitForTeleop();
     }
 
     /** This function is called periodically during operator control. */

@@ -18,6 +18,8 @@ import lib.ironpulse.utils.AllianceFlipUtil;
  * <p>The one competition routine has this shape (see {@link #competitionAuto}):
  *
  * <ol>
+ *   <li>Trench starts (not bump) only: dash to the middle at an unlimited speed cap via {@code
+ *       RightTrenchToMiddle}, then drop back to the default limit.
  *   <li>Follow the <b>start</b> path with the intake running (collect on the way out).
  *   <li>{@code drivePastSlope} back across the bump.
  *   <li>Aim the chassis at the hub and empty the hopper.
@@ -73,6 +75,15 @@ public class AutoRoutines {
             steps.add(drivePastSlope(isLeft, true));
         }
 
+        // 0b. Trench starts (not bump) open with a fast unguarded dash to the middle before the
+        // actual trench sweep: lift the speed cap, run RightTrenchToMiddle, then drop back to the
+        // default limit so the sweep path itself runs at normal speed.
+        if (!startFromBump) {
+            steps.add(setSwerveLimitUnlimited());
+            steps.add(followPathFile("RightTrenchToMiddle", isLeft));
+            steps.add(setSwerveLimitDefault());
+        }
+
         // 1. First sweep: collect out, drive back, aim + shoot. (Pivot homing runs in parallel with
         // the whole routine — see the deadline at the end.)
         steps.add(sweepCollectShoot(startPath, isLeft));
@@ -87,7 +98,9 @@ public class AutoRoutines {
                 steps.add(drivePastSlope(isLeft, true, slopeEndHeading(isLeft)));
                 steps.add(sweepCollectShoot(bumpPath, isLeft));
             } else {
-                steps.add(driveToPose(AllianceFlipUtil.apply(blueSecondSweepStart)));
+                // Reposition to the second-sweep start with Autopilot (straight beeline) rather
+                // than the pose PID — the alliance-side lane here is clear after the shot.
+                steps.add(driveToPoseAutoPilot(AllianceFlipUtil.apply(blueSecondSweepStart)));
                 steps.add(sweepCollectShoot(secondSweepPath, isLeft));
             }
         }

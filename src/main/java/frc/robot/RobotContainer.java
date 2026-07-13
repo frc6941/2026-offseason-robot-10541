@@ -68,6 +68,13 @@ import org.littletonrobotics.junction.Logger;
  * subsystems, commands, and trigger mappings) should be declared here.
  */
 public class RobotContainer {
+
+    public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.401, Rotation2d.fromDegrees(0));
+    public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
+     private static Pose2d mirrorY(Pose2d p) {
+        return new Pose2d(
+                p.getX(), FieldConstants.fieldWidth - p.getY(), p.getRotation().unaryMinus());
+    }
     private boolean isReal = RobotBase.isReal();
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
@@ -228,7 +235,33 @@ public class RobotContainer {
 
         // Test: bang-bang drive to field X = 7.5 m at full speed (Y/heading uncommanded), exits on
         // crossing. Hold to run, release to abort.
-        driverController.rightBumper().whileTrue(new DriveToXCommand(swerve, 7.75));
+        
+        driverController
+                .rightBumper()
+                .whileTrue(new DriveToXCommand(swerve, 7.5));
+
+        // driverController
+        //         .rightBumper()
+        //         .whileTrue(
+        //                 Commands.runOnce(()->swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit))
+        //                         .andThen(
+        //                                 Commands.deferredProxy(
+        //                                         () ->
+        //                                                 AutoActions.followPathFile(
+        //                                   "New Path", true))));
+
+        driverController.back().onTrue(Commands.runOnce(()->swerve.setSwerveLimitDefault()));
+
+        // Test: drive to a fixed field pose with the SwerveDriveToPose PID. Hold D-pad Up to run,
+        // release to abort. Tune Params/AutoPose (kp/ki/kd strafe + spin, tolerances) live on the
+        // dashboard while watching SwerveDriveToPose/* and the estimator pose in AdvantageScope.
+        driverController.povUp().whileTrue(driveToPoseTestCommand());
+
+        // Test: drive to the same fixed field pose with the Autopilot point-to-point driver
+        // (straight beeline) instead of the PID. Hold D-pad Down to run, release to abort. Tune
+        // Params/AutoPilot live and watch AutoPilot/* (DistanceToTarget, AtTarget, vx/vy/omega) in
+        // AdvantageScope. Same target as povUp so you can A/B the two drivers back to back.
+        driverController.povDown().whileTrue(driveToPoseAutoPilotTestCommand());
 
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
         driverController
@@ -265,6 +298,32 @@ public class RobotContainer {
     /** Follows the "New Path" PathPlanner path for on-field testing (no alliance mirror). */
     private Command testPathCommand() {
         return Commands.deferredProxy(() -> AutoActions.followPathFile("RightTrenchStart", false));
+    }
+
+    /** Blue-frame target pose for the driveToPose PID test — edit to wherever you want to drive. */
+    private static final Pose2d kDriveToPoseTestBlue =
+            new Pose2d(7.5, 4.03, Rotation2d.fromDegrees(0));
+
+    /**
+     * Drives to {@link #kDriveToPoseTestBlue} (alliance-flipped) with the {@code SwerveDriveToPose}
+     * PID. The gains come from {@code Params/AutoPose} and are re-read each press (the command is
+     * deferred), so tune them on the dashboard and re-press. Deferred also so it builds only after
+     * {@link AutoActions#init} has run.
+     */
+    private Command driveToPoseTestCommand() {
+        return Commands.deferredProxy(
+                () -> AutoActions.driveToPose(AllianceFlipUtil.apply(kSecondSweepStartL)));
+    }
+
+    /**
+     * Same target as {@link #driveToPoseTestCommand} but driven by the Autopilot point-to-point
+     * driver ({@link AutoActions#driveToPoseAutoPilot}) instead of the PID. Gains/tolerances come
+     * from {@code Params/AutoPilot} and are re-read each press (deferred), so tune on the dashboard
+     * and re-press. Deferred also so it builds only after {@link AutoActions#init} has run.
+     */
+    private Command driveToPoseAutoPilotTestCommand() {
+        return Commands.deferredProxy(
+                () -> AutoActions.driveToPoseAutoPilot(AllianceFlipUtil.apply(kSecondSweepStartL)));
     }
 
     private Command holdHubTargetMode() {
@@ -322,6 +381,16 @@ public class RobotContainer {
 
     public String getAutoSelectionSummary() {
         return AutoFile.selectionSummary();
+    }
+
+    /**
+     * Safety net for {@link Robot#teleopInit}: autonomous's trench-start opening dash lifts the
+     * swerve speed cap to unlimited and normally restores it before finishing, but if auto is
+     * interrupted mid-dash (e.g. cancelled early) that restore step never runs. Force the default
+     * limit back here so teleop never inherits an unlimited cap.
+     */
+    public void resetSwerveLimitForTeleop() {
+        swerve.setSwerveLimitDefault();
     }
 
     /**

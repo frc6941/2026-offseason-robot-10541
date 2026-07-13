@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.MetersPerSecond;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.RobotStateRecorder;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
@@ -12,28 +13,36 @@ import lib.ironpulse.utils.AllianceFlipUtil;
 import org.littletonrobotics.junction.Logger;
 
 /**
- * Bang-bang drive to a field X coordinate at full linear velocity, holding nothing else.
+ * Bang-bang drive to a field X coordinate at full linear velocity, with a fixed horizontal (Y) jog.
  *
- * <p>Each loop it commands a field-relative velocity of {@code ±maxLinearVelocity} along world X —
- * the sign points at the target — with <b>zero Y velocity and zero omega</b>, so the robot drives
- * straight along X and its Y/heading are simply left uncommanded (they shouldn't change on a clean
- * straight push). It finishes the instant the robot crosses the target X (in the direction it
- * started driving) and then stops — no tolerance band, so expect coast/overshoot past the line.
+ * <p>Each loop it commands a field-relative velocity of {@code ±maxLinearVelocity} along world X (the
+ * sign points at the target) plus, until reached, a full-speed Y component toward a target {@link
+ * #DELTA_Y_METERS} from the start Y — a small sideways translation. Heading is left uncommanded. It
+ * finishes the instant the robot crosses the target X (in the direction it started driving) and then
+ * stops — no tolerance band, so expect coast/overshoot past the line.
  *
- * <p>This is intentionally a pure bang-bang test: it runs full speed right up to the tolerance band,
- * so expect some coast/overshoot past the target from momentum. For a smooth, decelerating approach
- * use {@code AutoActions.driveToPose} instead. Bind with {@code whileTrue} so releasing the button
- * aborts it.
+ * <p>Intentionally a pure bang-bang test (full speed right up to the crossing). For a smooth,
+ * decelerating approach use {@code AutoActions.driveToPose} instead. Bind with {@code whileTrue} so
+ * releasing the button aborts it.
  */
 public class DriveToXCommand extends Command {
+    // Fixed horizontal (field-Y) translation applied alongside the X drive, relative to the start Y.
+    private static final double DELTA_Y_METERS = 0.3;
+    // Delay after the command starts before the Y jog begins (X drives alone until then).
+    private static final double Y_DELAY_SECONDS = 0.3;
+
     private final Swerve swerve;
     private final double targetXMeters;
+    private final Timer timer = new Timer();
 
-    // Direction of travel latched at start: true if the target is ahead in +X. The command finishes
-    // as soon as the robot crosses the target in this direction (no tolerance band, no settling).
-    private boolean movingPositive;
-    // targetXMeters flipped into the world frame for the current alliance (latched at start).
+    // Directions of travel latched at start. The command finishes as soon as the robot crosses the X
+    // target in its direction (no tolerance band, no settling).
+    private boolean movingPositiveX;
+    private boolean movingPositiveY;
+    // targetXMeters flipped into the world frame for the current alliance, and the world Y target
+    // (start Y + delta) — both latched at start.
     private double worldTargetXMeters;
+    private double targetYMeters;
 
     public DriveToXCommand(Swerve swerve, double targetXMeters) {
         this.swerve = swerve;
@@ -45,7 +54,11 @@ public class DriveToXCommand extends Command {
     public void initialize() {
         // targetXMeters is a blue-frame X; flip it into the world frame for the current alliance.
         worldTargetXMeters = AllianceFlipUtil.applyX(targetXMeters);
-        movingPositive = worldTargetXMeters > currentX();
+        movingPositiveX = worldTargetXMeters > currentX();
+        // A fixed +0.3 m horizontal jog off the start Y (a delta, so no alliance flip).
+        targetYMeters = currentY() + DELTA_Y_METERS;
+        movingPositiveY = targetYMeters > currentY();
+        timer.restart();
         swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit);
     }
 
@@ -53,26 +66,42 @@ public class DriveToXCommand extends Command {
         return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d().getX();
     }
 
+    private double currentY() {
+        return RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d().getY();
+    }
+
+    private boolean crossedX() {
+        return movingPositiveX ? currentX() >= worldTargetXMeters : currentX() <= worldTargetXMeters;
+    }
+
+    private boolean crossedY() {
+        return movingPositiveY ? currentY() >= targetYMeters : currentY() <= targetYMeters;
+    }
+
     @Override
     public void execute() {
         Pose2d pose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
-        double error = worldTargetXMeters - pose.getX();
         double maxSpeed = swerve.getSwerveLimit().maxLinearVelocity().in(MetersPerSecond);
 
-        // Full speed in the latched direction along field +X; no Y, no rotation.
-        double vx = (movingPositive ? 1.0 : -1.0) * maxSpeed;
-        swerve.runTwist(ChassisSpeeds.fromFieldRelativeSpeeds(vx, 0.0, 0.0, pose.getRotation()));
+        // Full speed toward each target; zero an axis once it has crossed. The Y jog only starts
+        // once the start-up delay has elapsed, so X drives alone for the first second.
+        double vx = crossedX() ? 0.0 : (movingPositiveX ? 1.0 : -1.0) * maxSpeed;
+        boolean applyY = timer.hasElapsed(Y_DELAY_SECONDS) && !crossedY();
+        double vy = applyY ? (movingPositiveY ? 1.0 : -1.0) * 0.3 : 0.0;
+        swerve.runTwist(ChassisSpeeds.fromFieldRelativeSpeeds(vx, vy, 0.0, pose.getRotation()));
 
         Logger.recordOutput("DriveToX/targetXMeters", worldTargetXMeters);
         Logger.recordOutput("DriveToX/currentXMeters", pose.getX());
-        Logger.recordOutput("DriveToX/errorMeters", error);
+        Logger.recordOutput("DriveToX/targetYMeters", targetYMeters);
+        Logger.recordOutput("DriveToX/currentYMeters", pose.getY());
         Logger.recordOutput("DriveToX/vxCmd", vx);
+        Logger.recordOutput("DriveToX/vyCmd", vy);
     }
 
     @Override
     public boolean isFinished() {
         // Exit the moment the robot crosses the target X in the direction it started driving.
-        return movingPositive ? currentX() >= worldTargetXMeters : currentX() <= worldTargetXMeters;
+        return crossedX();
     }
 
     @Override

@@ -121,11 +121,11 @@ public class SwerveDriveToPose extends Command {
 
     @NTParameter(tableName = "Params/" + kTag)
     public static class SwerveDriveToPoseParams {
-        static final double translationKp = 4.5;
+        static final double translationKp = 2.7;
         static final double translationKi = 0.0;
         static final double translationKd = 0.0;
 
-        static final double rotationKp = 5.0;
+        static final double rotationKp = 1.2;
         static final double rotationKi = 0.0;
         static final double rotationKd = 0.0;
         static final double rotationVelocityMax = 5.0;

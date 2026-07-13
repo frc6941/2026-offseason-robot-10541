@@ -127,6 +127,7 @@ public class Swerve extends SubsystemBase implements Localizable {
         Logger.recordOutput(config.name + "/Mode", mode);
         Logger.recordOutput(config.name + "/ChassisSpeedCurr", getChassisSpeeds());
         Logger.recordOutput(config.name + "/SwerveModuleStateCurr", getModuleStates());
+        Logger.recordOutput(config.name + "/DriveAppliedVolts", getDriveAppliedVolts());
         Logger.recordOutput(config.name + "/SwerveModuleStateCmd", setpointCurr.moduleStates());
         Logger.recordOutput(config.name + "/ChassisSpeedCmd", setpointCurr.chassisSpeeds());
         Logger.recordOutput(config.name + "/CenterOfRotation", centerOfRotation);
@@ -236,6 +237,13 @@ public class Swerve extends SubsystemBase implements Localizable {
         for (int i = 0; i < modules.size(); i++)
             states[i] = modules.get(i).getSwerveModulePosition();
         return states;
+    }
+
+    /** Applied drive-motor voltage (volts) for each module, indexed by module order. */
+    public double[] getDriveAppliedVolts() {
+        double[] volts = new double[modules.size()];
+        for (int i = 0; i < modules.size(); i++) volts[i] = modules.get(i).getDriveVoltageVolt();
+        return volts;
     }
 
     public List<Pair<Double, SwerveModulePosition[]>> getSampledModulePositions() {
