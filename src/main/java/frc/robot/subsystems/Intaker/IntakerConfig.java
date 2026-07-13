@@ -98,7 +98,7 @@ public class IntakerConfig {
         public static final double kA = 0.0;
         public static final double kS = 3.0;
 
-        public static final double intakeRPS = 100.0;
+        public static final double intakeRPS = 150.0;
         public static final double outtakeRPS = -15.0;
 
         public static VelocityParamSources asVelocityParamSources() {
@@ -146,10 +146,15 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 7.0;
+        public static final double deployPosAngle = 10.0;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 45.0;
+        public static final double retractedfeedPosAngle = 70.0;
+
+        // Shoot-only Motion Magic limits. 0.15 mechanism RPS is about 54 deg/s.
+        public static final double shootRaiseVelRPS = 0.15;
+        public static final double shootRaiseAccelRPS2 = 0.30;
+        public static final double shootRaiseJerkRPS3 = 0.0;
 
         public static PositionParamSources asPositionParamSources() {
             return new PositionParamSources() {
