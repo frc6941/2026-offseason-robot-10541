@@ -21,13 +21,11 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.auto.AutoActions;
 import frc.robot.auto.AutoFile;
 import frc.robot.auto.AutoRoutines;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.AutoTrenchCommand;
-import frc.robot.commands.DriveToXCommand;
 import frc.robot.subsystems.Configs.LimeLightConfig;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
@@ -38,7 +36,6 @@ import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
-import lib.ironpulse.command.SysIdCommand;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -69,12 +66,6 @@ import org.littletonrobotics.junction.Logger;
  */
 public class RobotContainer {
 
-    public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.401, Rotation2d.fromDegrees(0));
-    public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
-     private static Pose2d mirrorY(Pose2d p) {
-        return new Pose2d(
-                p.getX(), FieldConstants.fieldWidth - p.getY(), p.getRotation().unaryMinus());
-    }
     private boolean isReal = RobotBase.isReal();
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
@@ -160,12 +151,6 @@ public class RobotContainer {
         // Manual intake pivot hard-stop zero.
         driverController.povLeft().onTrue(intaker.zeroCommand());
 
-        // SysIdCommand shooterSysId = new SysIdCommand(intakerRoller);
-        // driverController.povUp().whileTrue(shooterSysId.quasistatic(Direction.kForward));
-        // driverController.povDown().whileTrue(shooterSysId.quasistatic(Direction.kReverse));
-        // driverController.povRight().whileTrue(shooterSysId.dynamic(Direction.kForward));
-        // driverController.povLeft().whileTrue(shooterSysId.dynamic(Direction.kReverse));
-
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
         driverController.leftTrigger().whileTrue(intaker.runIntakeContinuous());
@@ -226,41 +211,9 @@ public class RobotContainer {
 
         driverController.a().onTrue(intaker.runRetract());
 
-        // Test path: follow the "New Path" PathPlanner path (deploy/pathplanner/paths/New
-        // Path.path)
-        // while the left bumper is held. Deferred so the command builds only on press — AutoActions
-        // is initialized after configureBindings() runs, so it must not be constructed eagerly
-        // here.
-        driverController.leftBumper().whileTrue(testPathCommand());
-
-        // Test: bang-bang drive to field X = 7.5 m at full speed (Y/heading uncommanded), exits on
-        // crossing. Hold to run, release to abort.
-        
-        driverController
-                .rightBumper()
-                .whileTrue(new DriveToXCommand(swerve, 7.5));
-
-        // driverController
-        //         .rightBumper()
-        //         .whileTrue(
-        //                 Commands.runOnce(()->swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit))
-        //                         .andThen(
-        //                                 Commands.deferredProxy(
-        //                                         () ->
-        //                                                 AutoActions.followPathFile(
-        //                                   "New Path", true))));
-
-        driverController.back().onTrue(Commands.runOnce(()->swerve.setSwerveLimitDefault()));
-
-        // Test: drive to a fixed field pose with the SwerveDriveToPose PID. Hold D-pad Up to run,
-        // release to abort. Tune Params/AutoPose (kp/ki/kd strafe + spin, tolerances) live on the
-        // dashboard while watching SwerveDriveToPose/* and the estimator pose in AdvantageScope.
-        driverController.povUp().whileTrue(driveToPoseTestCommand());
-
-        // Test: drive to the same fixed field pose with the Autopilot point-to-point driver
-        // (straight beeline) instead of the PID. Hold D-pad Down to run, release to abort. Tune
-        // Params/AutoPilot live and watch AutoPilot/* (DistanceToTarget, AtTarget, vx/vy/omega) in
-        // AdvantageScope. Same target as povUp so you can A/B the two drivers back to back.
+        // Test: drive to the second-sweep start pose with the Autopilot point-to-point driver
+        // (straight beeline). Hold D-pad Down to run, release to abort. Tune Params/AutoPilot live
+        // and watch AutoPilot/* (DistanceToTarget, AtTarget, vx/vy/omega) in AdvantageScope.
         driverController.povDown().whileTrue(driveToPoseAutoPilotTestCommand());
 
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
@@ -295,35 +248,17 @@ public class RobotContainer {
         return new AutoTrenchCommand(swerve, () -> -driverController.getLeftY());
     }
 
-    /** Follows the "New Path" PathPlanner path for on-field testing (no alliance mirror). */
-    private Command testPathCommand() {
-        return Commands.deferredProxy(() -> AutoActions.followPathFile("RightTrenchStart", false));
-    }
-
-    /** Blue-frame target pose for the driveToPose PID test — edit to wherever you want to drive. */
-    private static final Pose2d kDriveToPoseTestBlue =
-            new Pose2d(7.5, 4.03, Rotation2d.fromDegrees(0));
-
     /**
-     * Drives to {@link #kDriveToPoseTestBlue} (alliance-flipped) with the {@code SwerveDriveToPose}
-     * PID. The gains come from {@code Params/AutoPose} and are re-read each press (the command is
-     * deferred), so tune them on the dashboard and re-press. Deferred also so it builds only after
-     * {@link AutoActions#init} has run.
-     */
-    private Command driveToPoseTestCommand() {
-        return Commands.deferredProxy(
-                () -> AutoActions.driveToPose(AllianceFlipUtil.apply(kSecondSweepStartL)));
-    }
-
-    /**
-     * Same target as {@link #driveToPoseTestCommand} but driven by the Autopilot point-to-point
-     * driver ({@link AutoActions#driveToPoseAutoPilot}) instead of the PID. Gains/tolerances come
-     * from {@code Params/AutoPilot} and are re-read each press (deferred), so tune on the dashboard
-     * and re-press. Deferred also so it builds only after {@link AutoActions#init} has run.
+     * Drives to the (alliance-flipped) second-sweep start pose with the Autopilot point-to-point
+     * driver ({@link AutoActions#driveToPoseAutoPilot}). Gains/tolerances come from {@code
+     * Params/AutoPilot} and are re-read each press (deferred), so tune on the dashboard and
+     * re-press. Deferred also so it builds only after {@link AutoActions#init} has run.
      */
     private Command driveToPoseAutoPilotTestCommand() {
         return Commands.deferredProxy(
-                () -> AutoActions.driveToPoseAutoPilot(AllianceFlipUtil.apply(kSecondSweepStartL)));
+                () ->
+                        AutoActions.driveToPoseAutoPilot(
+                                AllianceFlipUtil.apply(AutoActions.kSecondSweepStartL)));
     }
 
     private Command holdHubTargetMode() {
