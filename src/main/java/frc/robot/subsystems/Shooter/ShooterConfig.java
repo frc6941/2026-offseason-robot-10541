@@ -118,11 +118,11 @@ public class ShooterConfig {
 
     @NTParameter(tableName = "Params/" + SHOOTER_DRUM_NAME)
     public static final class ShooterUpperParams {
-        public static final double kP = 0.6;
+        public static final double kP = 0.25;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.09;
+        public static final double kV = 0.092;
         public static final double kA = 0.01;
         public static final double kS = 0.01;
 

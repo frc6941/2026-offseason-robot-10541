@@ -92,13 +92,14 @@ public class IntakerConfig {
     public static final class IntakerRollerParams {
         public static final double kP = 0.2;
         public static final double kI = 0.0;
-        public static final double kD = 0.05;
+        public static final double kD = 0.0;
 
-        public static final double kV = 0.069267;
-        public static final double kA = 0.0031438;
-        public static final double kS = 0.2007;
+        public static final double kV = 0.105;
+        public static final double kA = 0.016835;
+        public static final double kS = 0.17085;
 
-        public static final double intakeRPS = 110.0;
+        public static final double intakeRPS = 50.0;
+
         public static final double outtakeRPS = -15.0;
 
         private IntakerRollerParams() {}
@@ -121,7 +122,7 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 10.0;
+        public static final double deployPosAngle = 13.0;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
         public static final double retractedfeedPosAngle = 70.0;

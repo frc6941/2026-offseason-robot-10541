@@ -354,6 +354,10 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.runOnce(this::seedHoodPositionAtZero, hood);
     }
 
+    public Command zeroCommand() {
+        return hood.zeroCommand();
+    }
+
     public Angle getHoodAngle() {
         return hood.getCurrPos();
     }

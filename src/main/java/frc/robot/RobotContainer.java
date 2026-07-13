@@ -26,6 +26,7 @@ import frc.robot.auto.AutoFile;
 import frc.robot.auto.AutoRoutines;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.AutoTrenchCommand;
+import frc.robot.commands.AutopilotDriveToPose;
 import frc.robot.subsystems.Configs.LimeLightConfig;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
@@ -149,9 +150,23 @@ public class RobotContainer {
      * joysticks}.
      */
     private void configureBindings() {
+        // SYSID/test
+        /*
+        SysIdCommand shooterSysId = new SysIdCommand(intakerRoller);
+        driverController.a().whileTrue(shooterSysId.quasistatic(Direction.kForward));
+        driverController.b().whileTrue(shooterSysId.quasistatic(Direction.kReverse));
+        driverController.x().whileTrue(shooterSysId.dynamic(Direction.kForward));
+        driverController.y().whileTrue(shooterSysId.dynamic(Direction.kReverse));
+        */
+
         // Manual intake pivot hard-stop zero.
         OperatorController.povLeft().onTrue(intaker.zeroCommand());
         OperatorController.povDown().whileTrue(intaker.runExtendedReverse());
+        OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
+
+        driverController.povLeft().onTrue(intaker.zeroCommand());
+        driverController.povDown().whileTrue(intaker.runExtendedReverse());
+        driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
@@ -406,7 +421,7 @@ public class RobotContainer {
         return new VelocityMotorSubsystem<>(
                 IntakerConfig.INTAKER_ROLLER_CONFIG,
                 new MotorInputsAutoLogged(),
-                false
+                isReal && RobotConstants.HAS_INTAKER_IO
                         ? new MotorIOTalonFX(IntakerConfig.INTAKER_ROLLER_CONFIG)
                         : new MotorIOSim(IntakerConfig.INTAKER_ROLLER_CONFIG),
                 IntakerRollerParamsNT.asVelocityParamSources());
