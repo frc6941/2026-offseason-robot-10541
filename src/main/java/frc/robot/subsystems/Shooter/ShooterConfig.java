@@ -9,11 +9,6 @@ import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.units.measure.Angle;
 import lib.ironpulse.subsystem.SubsystemConfig;
-<<<<<<< HEAD
-=======
-import lib.ironpulse.subsystem.position.PositionParamSources;
-import lib.ironpulse.subsystem.velocity.VelocityParamSources;
->>>>>>> newauto
 import lib.ntext.NTParameter;
 
 public class ShooterConfig {
