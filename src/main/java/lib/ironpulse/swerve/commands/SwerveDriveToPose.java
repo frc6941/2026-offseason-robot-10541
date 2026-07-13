@@ -54,6 +54,17 @@ public class SwerveDriveToPose extends Command {
 
     @Override
     public void initialize() {
+        applyParams();
+        translationController.reset();
+        rotationController.reset();
+    }
+
+    /**
+     * Push the current {@code Params/Commands/DriveToPose} NT values into the controllers. Called
+     * from {@link #initialize()} and again from {@link #execute()} whenever any param changes, so
+     * dashboard tuning takes effect immediately instead of only the next time this command starts.
+     */
+    private void applyParams() {
         translationController.setP(SwerveDriveToPoseParamsNT.translationKp.getValue());
         translationController.setI(SwerveDriveToPoseParamsNT.translationKi.getValue());
         translationController.setD(SwerveDriveToPoseParamsNT.translationKd.getValue());
@@ -61,13 +72,13 @@ public class SwerveDriveToPose extends Command {
         rotationController.setP(SwerveDriveToPoseParamsNT.rotationKp.getValue());
         rotationController.setI(SwerveDriveToPoseParamsNT.rotationKi.getValue());
         rotationController.setD(SwerveDriveToPoseParamsNT.rotationKd.getValue());
-
-        translationController.reset();
-        rotationController.reset();
     }
 
     @Override
     public void execute() {
+        // Live tuning: re-pull the gains the loop after any dashboard edit.
+        if (SwerveDriveToPoseParamsNT.isAnyChanged()) applyParams();
+
         // get from supplier
         Pose3d TWR = poseWorldRobotSupplier.get();
         Pose3d TWT = poseWorldTargetSupplier.get();

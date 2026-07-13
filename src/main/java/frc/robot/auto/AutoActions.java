@@ -221,13 +221,13 @@ public class AutoActions {
                                     () -> new Pose3d(targetPose),
                                     RobotStateRecorder::getVelocityWorldRobotCurrent,
                                     new PIDController(
-                                            0,
-                                            0,
-                                            0),
+                                            AutoPoseParamsNT.translationKp.getValue(),
+                                            AutoPoseParamsNT.translationKi.getValue(),
+                                            AutoPoseParamsNT.translationKd.getValue()),
                                     new PIDController(
-                                            0,
-                                            0,
-                                            0),
+                                            AutoPoseParamsNT.rotationKp.getValue(),
+                                            AutoPoseParamsNT.rotationKi.getValue(),
+                                            AutoPoseParamsNT.rotationKd.getValue()),
                                     Meters.of(AutoPoseParamsNT.tolerancePositionM.getValue()),
                                     Degrees.of(AutoPoseParamsNT.toleranceHeadingDeg.getValue()))
                             .beforeStarting(
@@ -275,9 +275,9 @@ public class AutoActions {
                                 RobotStateRecorder::getPoseWorldRobotCurrent,
                                 targetRotationSupplier,
                                 new PIDController(
-                                        AutoPoseParamsNT.kpSpin.getValue(),
-                                        AutoPoseParamsNT.kiSpin.getValue(),
-                                        AutoPoseParamsNT.kdSpin.getValue()),
+                                        AutoPoseParamsNT.rotationKp.getValue(),
+                                        AutoPoseParamsNT.rotationKi.getValue(),
+                                        AutoPoseParamsNT.rotationKd.getValue()),
                                 Degrees.of(AutoPoseParamsNT.toleranceHeadingDeg.getValue()),
                                 () -> DegreesPerSecond.of(80)),
                 Set.of(swerve));

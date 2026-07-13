@@ -28,15 +28,17 @@ public final class AutoParams {
 
     /**
      * Gains + tolerances for point moves ({@code SwerveDriveToPose} / {@code SwerveAimToHeading}).
+     * Field names/defaults mirror {@code SwerveDriveToPose.SwerveDriveToPoseParams} so the two
+     * stay in lockstep at a glance.
      */
     @NTParameter(tableName = "Params/AutoPose")
     public static final class AutoPoseParams {
-        public static final double kpStrave = 1.6;
-        public static final double kiStrave = 0.0;
-        public static final double kdStrave = 0.0;
-        public static final double kpSpin = 0.1;
-        public static final double kiSpin = 0.0;
-        public static final double kdSpin = 0.0;
+        public static final double translationKp = 2.7;
+        public static final double translationKi = 0.0;
+        public static final double translationKd = 0.0;
+        public static final double rotationKp = 1.2;
+        public static final double rotationKi = 0.0;
+        public static final double rotationKd = 0.0;
         public static final double tolerancePositionM = 0.05;
         public static final double toleranceHeadingDeg = 2.0;
 
