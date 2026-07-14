@@ -67,6 +67,9 @@ import org.littletonrobotics.junction.Logger;
  */
 public class RobotContainer {
 
+    private static final double INTAKE_TRIGGER_START_THRESHOLD = 0.1;
+    private static final double INTAKE_TRIGGER_MAX_THRESHOLD = 0.6;
+
     private boolean isReal = RobotBase.isReal();
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
@@ -167,7 +170,16 @@ public class RobotContainer {
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
-        driverController.leftTrigger().whileTrue(intaker.runIntakeContinuous());
+        Trigger maxIntakeTrigger =
+                new Trigger(
+                        () ->
+                                driverController.getLeftTriggerAxis()
+                                        >= INTAKE_TRIGGER_MAX_THRESHOLD);
+        driverController
+                .leftTrigger(INTAKE_TRIGGER_START_THRESHOLD)
+                .and(maxIntakeTrigger.negate())
+                .whileTrue(intaker.runIntakeContinuous());
+        maxIntakeTrigger.whileTrue(intaker.runMaxIntakeContinuous());
 
         // Swerve
         // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick
@@ -230,7 +242,6 @@ public class RobotContainer {
         // Params/Commands/AutopilotDriveToPose live and watch Commands/AutopilotDriveToPose/* in
         // AdvantageScope.
         driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
-
         driverController.rightTrigger().whileTrue(shootCommand());
         driverController
                 .rightTrigger()
@@ -388,6 +399,7 @@ public class RobotContainer {
         // --- 4. Intaker-deployed states ---
         var intakeMode = intaker.getCurrentMode();
         if (intakeMode == IntakerConfig.IntakeMode.INTAKING
+                || intakeMode == IntakerConfig.IntakeMode.MAX_INTAKING
                 || intakeMode == IntakerConfig.IntakeMode.FEEDING
                 || intakeMode == IntakerConfig.IntakeMode.EXTENDED_REVERSE
                 || intakeMode == IntakerConfig.IntakeMode.RETRACTED_FEEDING) {
