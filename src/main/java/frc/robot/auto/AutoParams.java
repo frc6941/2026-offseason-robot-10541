@@ -53,12 +53,9 @@ public final class AutoParams {
         // is pre-spun during the drive in (see ShootingSuperstructure.spinUpForShot), so there's no
         // spin-up wait. 1.5 keeps the whole shot within ~2s.
         public static final double feedSeconds = 1.5;
-        // Max time to wait for the shot to become READY (flywheel up to speed AND chassis aimed)
-        // before giving up and NOT feeding. With the flywheel pre-spun, this now budgets the aim
-        // ROTATION on arrival, not spin-up — so it must be long enough for the chassis to finish
-        // turning to the hub, or the hopper won't feed. It only caps the wait; a fast aim opens the
-        // feed window immediately, so a generous value doesn't slow a good shot.
-        public static final double readyTimeoutSeconds = 2.5;
+        // Max time to wait for the flywheel to reach speed before giving up and NOT feeding. With
+        // pre-spin the drum is at speed on arrival, so this is rarely used; it only caps the wait.
+        public static final double readyTimeoutSeconds = 1.5;
         // Delay after the shoot sequence starts before raising the intake to the retracted-feed
         // (shoot) pose, so it clears the shot path / helps feeding. Mirrors the teleop shot's
         // intake

@@ -302,43 +302,35 @@ public class AutoActions {
      * false} to come back to the alliance side after a sweep.
      */
     public static Command drivePastSlope(boolean isLeft, boolean isToNeutral) {
-        // Default cross out to neutral holds the bump-start heading (used by the initial bump
-        // start).
-        return drivePastSlope(
-                isLeft, isToNeutral, (isLeft ? kBumpStartL : kBumpStartR).getRotation());
+        // Default hold heading: crossing OUT to neutral holds the bump-start heading; coming BACK
+        // holds kSlopeEnd's rotation (the existing drive-back behavior).
+        Rotation2d defaultHoldHeading =
+                isToNeutral
+                        ? (isLeft ? kBumpStartL : kBumpStartR).getRotation()
+                        : (isLeft ? kSlopeEndL : kSlopeEndR).getRotation();
+        return drivePastSlope(isLeft, isToNeutral, defaultHoldHeading);
     }
 
     /**
-     * As {@link #drivePastSlope(boolean, boolean)}, but when crossing out to neutral the chassis
-     * holds {@code neutralHoldHeading} (blue frame) the whole way instead of the bump-start
-     * heading. Used by the bump-again second sweep, which crosses while keeping the slope-end
-     * heading it already carries rather than spinning back to the bump-start rotation.
+     * As {@link #drivePastSlope(boolean, boolean)}, but the chassis holds {@code holdHeading} (blue
+     * frame) the whole way across instead of the default. Applies to both directions: out to
+     * neutral (toward the slope front) and back to the alliance side (toward the slope end). The
+     * translation only sets the drive DIRECTION; the stop is the bump crossing, so the target
+     * rotation is what the chassis actually holds while crossing.
      */
     public static Command drivePastSlope(
-            boolean isLeft, boolean isToNeutral, Rotation2d neutralHoldHeading) {
-        if (isToNeutral) {
-            // Out to neutral: drive toward the slope front and stop once over the bump line and
-            // settled. The slope-front translation only sets DIRECTION; the stop is the bump
-            // crossing. Hold neutralHoldHeading the whole way across (not kSlopeFront's) so the
-            // chassis doesn't spin while climbing the slope.
-            Pose2d slopeFront = isLeft ? kSlopeFrontL : kSlopeFrontR;
-            Pose2d target = new Pose2d(slopeFront.getTranslation(), neutralHoldHeading);
-            return Commands.defer(
-                    () ->
-                            Commands.deadline(
-                                    waitCrossedBump(isToNeutral),
-                                    driveToPose(AllianceFlipUtil.apply(target))),
-                    Set.of(swerve));
-        } else {
-            return Commands.defer(
-                    () ->
-                            Commands.deadline(
-                                    waitCrossedBump(isToNeutral),
-                                    driveToPose(
-                                            AllianceFlipUtil.apply(
-                                                    isLeft ? kSlopeEndL : kSlopeEndR))),
-                    Set.of(swerve));
-        }
+            boolean isLeft, boolean isToNeutral, Rotation2d holdHeading) {
+        Pose2d anchor =
+                isToNeutral
+                        ? (isLeft ? kSlopeFrontL : kSlopeFrontR)
+                        : (isLeft ? kSlopeEndL : kSlopeEndR);
+        Pose2d target = new Pose2d(anchor.getTranslation(), holdHeading);
+        return Commands.defer(
+                () ->
+                        Commands.deadline(
+                                waitCrossedBump(isToNeutral),
+                                driveToPose(AllianceFlipUtil.apply(target))),
+                Set.of(swerve));
     }
 
     static Command waitCrossedBump(boolean isToNeutral) {
@@ -406,8 +398,12 @@ public class AutoActions {
                         aimAtHub(),
                         Commands.waitSeconds(AutoShootParamsNT.pivotRaiseDelaySeconds.getValue())
                                 .andThen(intake.holdRetractedFeedMode())),
-                // The auto is one big sequence that holds the shooter requirement, so its default
-                // idle can't run on its own — explicitly drop the drum to idle RPS after the shot.
+                // After the shot: force the intake to EXTENDED_IDLE so the hopper (whose speed is
+                // driven by the intake mode) actually STOPS — the shot can otherwise leave the mode
+                // in a feeding state (e.g. INTAKING carried over from the sweep). Then drop the drum
+                // to idle RPS (the auto sequence holds the shooter requirement, so its own default
+                // idle can't run on its own).
+                intake.forceExtendedIdle(),
                 shootingSuperstructure.idle().withTimeout(0.02));
     }
 
@@ -430,7 +426,22 @@ public class AutoActions {
      * is suppressed.
      */
     public static Command sweepCollectShoot(String sweepPath, boolean isLeft) {
+        return sweepCollectShoot(sweepPath, isLeft, null);
+    }
+
+    /**
+     * As {@link #sweepCollectShoot(String, boolean)}, but the drive-back across the slope holds
+     * {@code driveBackHeading} (blue frame) instead of kSlopeEnd's default rotation. Pass {@code
+     * null} for the default. Used e.g. to make the second sweep come back facing a specific angle.
+     */
+    public static Command sweepCollectShoot(
+            String sweepPath, boolean isLeft, Rotation2d driveBackHeading) {
+        Command driveBack =
+                driveBackHeading == null
+                        ? drivePastSlope(isLeft, false)
+                        : drivePastSlope(isLeft, false, driveBackHeading);
         return Commands.sequence(
+                
                 Commands.deadline(
                         Commands.sequence(
                                 followPathFile(sweepPath, isLeft),
@@ -443,8 +454,7 @@ public class AutoActions {
                                 // shots. If drivePastSlope is shorter than the spin-up time, the
                                 // shot's readyTimeout covers the small remainder.
                                 Commands.deadline(
-                                        drivePastSlope(isLeft, false),
-                                        shootingSuperstructure.spinUpForShot())),
+                                        driveBack, shootingSuperstructure.spinUpForShot())),
                         intake(),
                         Commands.waitUntil(() -> AllianceFlipUtil.applyX(getRobotX()) > 7.0)
                                 .andThen(
