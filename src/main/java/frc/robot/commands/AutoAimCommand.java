@@ -84,9 +84,9 @@ public class AutoAimCommand extends Command {
             new Transform2d(-0.15, 0.0, Rotation2d.fromRadians(Math.PI));
 
     /**
-     * The point the shooter should aim at, given where the robot is. Normally the hub, but once the
-     * robot crosses into the neutral zone we switch to passing: aim at a point near our own driver
-     * station so the ball is lobbed back to the alliance zone instead of contested at the hub.
+     * The point the shooter should aim at, given where the robot is. Inside our alliance zone it
+     * aims at the hub. Once the robot leaves that zone it switches to passing and aims near the
+     * matching corner of our own field.
      *
      * <p>Because the whole shot solution (hood angle + flywheel speed via {@link
      * frc.robot.subsystems.Shooter.ShootingSuperstructure}) is derived from this target, switching
@@ -95,7 +95,8 @@ public class AutoAimCommand extends Command {
      */
     public static Translation2d getTarget(Translation2d robotPos) {
         return switch (targetMode) {
-            case AUTO -> inNeutralZone(robotPos) ? getPassTarget(robotPos) : getHubTarget();
+            case AUTO ->
+                    isOutsideOwnAllianceZone(robotPos) ? getPassTarget(robotPos) : getHubTarget();
             case HUB -> getHubTarget();
             case PASS_LEFT -> getPassTargetLeft();
             case PASS_RIGHT -> getPassTargetRight();
@@ -126,6 +127,12 @@ public class AutoAimCommand extends Command {
                 && x <= FieldConstants.LinesVertical.neutralZoneFar;
     }
 
+    /** True once the robot center has crossed out of its own alliance zone. */
+    public static boolean isOutsideOwnAllianceZone(Translation2d robotPos) {
+        double allianceRelativeX = AllianceFlipUtil.applyX(robotPos.getX());
+        return allianceRelativeX > FieldConstants.LinesVertical.allianceZone;
+    }
+
     /**
      * The pass point on the robot's own Y-half. Both mirrored points are alliance-flipped into the
      * world frame first, then we pick the one nearer the robot in Y — so on either alliance the
@@ -149,7 +156,7 @@ public class AutoAimCommand extends Command {
 
     private static boolean isPassingTarget(Translation2d robotPos) {
         return switch (targetMode) {
-            case AUTO -> inNeutralZone(robotPos);
+            case AUTO -> isOutsideOwnAllianceZone(robotPos);
             case HUB -> false;
             case PASS_LEFT, PASS_RIGHT -> true;
         };
@@ -245,6 +252,7 @@ public class AutoAimCommand extends Command {
         // ---- 4. Logging ----
         Logger.recordOutput("AutoAim/targetHeadingDeg", target.getDegrees());
         Logger.recordOutput("AutoAim/errorDeg", Math.toDegrees(error));
+        Logger.recordOutput("AutoAim/isPassing", isPassingTarget(robotPose.getTranslation()));
         Logger.recordOutput(
                 "AutoAim/onTarget",
                 Math.abs(error) <= Math.toRadians(AutoAimParamsNT.toleranceDeg.getValue()));
