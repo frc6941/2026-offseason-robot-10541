@@ -329,13 +329,14 @@ public class AutoActions {
                                     waitCrossedBump(isToNeutral),
                                     driveToPose(AllianceFlipUtil.apply(target))),
                     Set.of(swerve));
-        }
-        else{
+        } else {
             return Commands.defer(
                     () ->
                             Commands.deadline(
                                     waitCrossedBump(isToNeutral),
-                                    driveToPose(AllianceFlipUtil.apply(isLeft ? kSlopeEndL : kSlopeEndR))),
+                                    driveToPose(
+                                            AllianceFlipUtil.apply(
+                                                    isLeft ? kSlopeEndL : kSlopeEndR))),
                     Set.of(swerve));
         }
     }
@@ -433,7 +434,8 @@ public class AutoActions {
                 Commands.deadline(
                         Commands.sequence(
                                 followPathFile(sweepPath, isLeft),
-                                // Pre-spin the flywheel to solution speed during the drive-back ONLY
+                                // Pre-spin the flywheel to solution speed during the drive-back
+                                // ONLY
                                 // (not the outbound collect), so it's at speed on arrival without
                                 // running the drum for the whole sweep. Inner deadline ends with
                                 // drivePastSlope; aimAndShootAtHub then re-commands the still-

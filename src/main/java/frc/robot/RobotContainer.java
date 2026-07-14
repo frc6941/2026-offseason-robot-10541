@@ -164,7 +164,7 @@ public class RobotContainer {
         OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
         driverController.povLeft().onTrue(intaker.zeroCommand());
-        // driverController.povDown().whileTrue(intaker.runExtendedReverse());
+        driverController.povDown().whileTrue(intaker.runExtendedReverse());
         driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
         // Intake: left trigger runs intake while held.
@@ -236,17 +236,14 @@ public class RobotContainer {
 
         driverController.a().onTrue(intaker.runRetract());
 
-        // Test: drive to the second-sweep start pose with the Autopilot point-to-point driver
-        // (straight beeline). Hold D-pad Down to run, release to abort. Tune Params/AutoPilot live
-        // and watch AutoPilot/* (DistanceToTarget, AtTarget, vx/vy/omega) in AdvantageScope.
-        driverController.povDown().whileTrue(driveToPoseAutoPilotTestCommand());
+        // Keep the Autopilot test helper unbound; D-pad Down is reserved for intake reverse.
 
         // driverController.rightTrigger().whileTrue(shootAtHubCommand());
         // Test: drive to the second-sweep start pose with the AutopilotDriveToPose point-to-point
         // driver (straight beeline). Hold D-pad Down to run, release to abort. Tune
         // Params/Commands/AutopilotDriveToPose live and watch Commands/AutopilotDriveToPose/* in
         // AdvantageScope.
-        //driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
+        // driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
         driverController.rightTrigger().whileTrue(shootCommand());
         driverController
                 .rightTrigger()

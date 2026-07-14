@@ -98,8 +98,10 @@ public class IntakerSubsystem extends SubsystemBase {
             return pivot.getCurrPos();
         }
 
-        // RETRACTED_FEEDING is the shoot pose. In auto the pivot is driven here by followModePivot's
-        // position PID, which would SNAP to the angle. To match the teleop raisePivotForShootSlowly()
+        // RETRACTED_FEEDING is the shoot pose. In auto the pivot is driven here by
+        // followModePivot's
+        // position PID, which would SNAP to the angle. To match the teleop
+        // raisePivotForShootSlowly()
         // gentle raise, rate-limit the commanded angle toward retractedfeedPosAngle at
         // shootRaiseSpeedDegreesPerSecond instead of jumping. (Teleop never reaches this branch —
         // holdRetractedFeedPosition() suppresses this default command and runs the ramp itself. We
@@ -183,14 +185,14 @@ public class IntakerSubsystem extends SubsystemBase {
 
     /**
      * Hold the {@link IntakeMode#RETRACTED_FEEDING} mode WITHOUT commanding the pivot directly —
-     * the pivot is moved by whatever is reading the mode (in auto, {@link #followModePivot()}). This
-     * exists because {@link #holdRetractedFeedPosition()} takes the pivot requirement via {@link
-     * #raisePivotForShootSlowly()}, which can't run in auto: {@code followModePivot()} already holds
-     * the pivot for the whole routine, and two commands can't require the same subsystem in one
-     * composition. Requires only the intake (mode) subsystem, so it's safe to run in parallel with
-     * {@code followModePivot()}. Because the pivot is driven by {@code pivotTargetAngle()}'s
-     * position PID here (not the {@code raisePivotForShootSlowly()} ramp), the raise is at PID
-     * speed, not the gentle teleop ramp.
+     * the pivot is moved by whatever is reading the mode (in auto, {@link #followModePivot()}).
+     * This exists because {@link #holdRetractedFeedPosition()} takes the pivot requirement via
+     * {@link #raisePivotForShootSlowly()}, which can't run in auto: {@code followModePivot()}
+     * already holds the pivot for the whole routine, and two commands can't require the same
+     * subsystem in one composition. Requires only the intake (mode) subsystem, so it's safe to run
+     * in parallel with {@code followModePivot()}. Because the pivot is driven by {@code
+     * pivotTargetAngle()}'s position PID here (not the {@code raisePivotForShootSlowly()} ramp),
+     * the raise is at PID speed, not the gentle teleop ramp.
      */
     public Command holdRetractedFeedMode() {
         return Commands.runEnd(

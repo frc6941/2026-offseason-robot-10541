@@ -111,7 +111,9 @@ public class AutoPilotCommand extends Command {
         // Internal D stays 0 — damping is applied explicitly in execute() against the measured gyro
         // rate (headingKD is that damping gain, not the PIDController's derivative term).
         headingController.setPID(
-                AutoPilotParamsNT.headingKP.getValue(), AutoPilotParamsNT.headingKI.getValue(), 0.0);
+                AutoPilotParamsNT.headingKP.getValue(),
+                AutoPilotParamsNT.headingKI.getValue(),
+                0.0);
         headingController.setTolerance(
                 Math.toRadians(AutoPilotParamsNT.errorThetaDegrees.getValue()));
         headingController.setConstraints(
@@ -151,7 +153,8 @@ public class AutoPilotCommand extends Command {
         // Autopilot only hands us a target heading — profile our way to it for omega.
         //
         // omega = P*(profilePos - heading)          // ProfiledPIDController, P only (I/D = 0)
-        //       + profileVel                        // velocity feedforward (drive at profile speed)
+        //       + profileVel                        // velocity feedforward (drive at profile
+        // speed)
         //       + kDamp*(profileVel - measuredRate) // damp actual rate toward the profile's rate
         //
         // The damping term is the fix for overshoot with no kI: a P(+FF) loop on an inertial axis
@@ -217,7 +220,8 @@ public class AutoPilotCommand extends Command {
         //      may go); kP/kD only track that profile.
         public static final double headingKP = 1.7;
         public static final double headingKI = 0.0;
-        // Damping gain on measured yaw rate (applied explicitly in execute(), NOT the PID's D term).
+        // Damping gain on measured yaw rate (applied explicitly in execute(), NOT the PID's D
+        // term).
         public static final double headingKD = 0.0;
 
         // Exit (drive-through) speed in m/s along the entry-angle direction; 0 = stop at the pose.

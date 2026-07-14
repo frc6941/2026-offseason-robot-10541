@@ -241,14 +241,18 @@ public class ShootingSuperstructure extends SubsystemBase {
             Supplier<AngularVelocity> lowerSpeedSupplier) {
         return Commands.parallel(
                 shooterUpper.runVelVolt(upperSpeedSupplier),
-                shooterLower
-                        .runVelVolt(
-                                () ->
-                                        RotationsPerSecond.of(
-                                                ShooterLowerParamsNT.idleRPS.getValue()))
+                runLowerIdle()
                         .until(() -> upperAtTarget(upperSpeedSupplier))
-                        .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS))
+                        .andThen(
+                                Commands.deadline(
+                                        Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS),
+                                        runLowerIdle()))
                         .andThen(shooterLower.runVelVolt(lowerSpeedSupplier)));
+    }
+
+    private Command runLowerIdle() {
+        return shooterLower.runVelVolt(
+                () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue()));
     }
 
     private boolean upperAtTarget(Supplier<AngularVelocity> upperSpeedSupplier) {
@@ -279,7 +283,8 @@ public class ShootingSuperstructure extends SubsystemBase {
                         .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
         return Commands.sequence(
                 Commands.deadline(waitForUpperAndDelay, hopper.idle()),
-                hopper.shootWhile(() -> upperAtTarget(upperSpeedSupplier)));
+                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                        .andThen(hopper.shoot()));
     }
 
     /**
@@ -319,10 +324,11 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     /**
-     * Spin the flywheel to the (distance-tracking) solution speed and pre-position the hood, WITHOUT
-     * feeding — run this in parallel with the drive into the shot pose so the flywheel is already at
-     * speed on arrival. That removes the spin-up wait (up to {@code readyTimeoutSeconds}) from the
-     * shot window, which is what lets the whole auto shot fit in ~2 s.
+     * Spin the flywheel to the (distance-tracking) solution speed and pre-position the hood,
+     * WITHOUT feeding — run this in parallel with the drive into the shot pose so the flywheel is
+     * already at speed on arrival. That removes the spin-up wait (up to {@code
+     * readyTimeoutSeconds}) from the shot window, which is what lets the whole auto shot fit in ~2
+     * s.
      *
      * <p>Deliberately does NOT run the lower shooter (feed) or hopper — those would push balls into
      * the already-spinning flywheel and shoot them out mid-drive. Only the upper drum + hood spin

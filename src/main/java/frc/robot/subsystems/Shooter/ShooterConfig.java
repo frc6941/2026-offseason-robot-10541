@@ -147,7 +147,7 @@ public class ShooterConfig {
         public static final double kS = 0.0;
 
         public static final double shootRPS = 80.0;
-        public static final double idleRPS = 0.0;
+        public static final double idleRPS = -2.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
         private ShooterLowerParams() {}

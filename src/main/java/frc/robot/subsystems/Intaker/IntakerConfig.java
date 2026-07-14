@@ -102,7 +102,7 @@ public class IntakerConfig {
 
         public static final double outtakeRPS = -15.0;
 
-        private IntakerRollerParams() {} 
+        private IntakerRollerParams() {}
     }
 
     @NTParameter(tableName = "Params/" + INTAKER_PIVOT_NAME)
@@ -122,7 +122,7 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 20;
+        public static final double deployPosAngle = 10;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
         public static final double retractedfeedPosAngle = 70.0;

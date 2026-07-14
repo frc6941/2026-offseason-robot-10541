@@ -60,7 +60,8 @@ public final class AutoParams {
         // feed window immediately, so a generous value doesn't slow a good shot.
         public static final double readyTimeoutSeconds = 2.5;
         // Delay after the shoot sequence starts before raising the intake to the retracted-feed
-        // (shoot) pose, so it clears the shot path / helps feeding. Mirrors the teleop shot's intake
+        // (shoot) pose, so it clears the shot path / helps feeding. Mirrors the teleop shot's
+        // intake
         // raise. In auto the pivot is ramped up gently via pivotTargetAngle's RETRACTED_FEEDING
         // rate limit (followModePivot reads the mode), matching raisePivotForShootSlowly().
         public static final double pivotRaiseDelaySeconds = 1.0;

@@ -82,18 +82,18 @@ public class ShotCalculator {
     /** Values between breakpoints are linearly interpolated and remain live-tunable over NT. */
     @NTParameter(tableName = "Params/Shooting")
     public static final class ShootingParams {
-        public static final double hoodAngleDeg2m = 22.0;
-        public static final double hoodAngleDeg3m = 38.0; // 39
+        public static final double hoodAngleDeg2m = 24.0;
+        public static final double hoodAngleDeg3m = 32.0; // 39
         public static final double hoodAngleDeg4m = 33.0; // 34
-        public static final double hoodAngleDeg5m = 34.0; // 35
+        public static final double hoodAngleDeg5m = 39.5; // 35
         public static final double hoodAngleDeg6m = 39.0; // 40
         public static final double hoodAngleDeg7m = 41.0; // 42
 
         public static final double shooterRps2m = 50.0; // 50
-        public static final double shooterRps3m = 51.0; // 51
-        public static final double shooterRps4m = 52.0; // 52
-        public static final double shooterRps5m = 56.0; // 56
-        public static final double shooterRps6m = 61.0; // 61
+        public static final double shooterRps3m = 52.2; // 51
+        public static final double shooterRps4m = 53.0; // 52
+        public static final double shooterRps5m = 59.53; // 56
+        public static final double shooterRps6m = 61.0; // 61-
         public static final double shooterRps7m = 63.0; // 63
         public static final double lowerShooterSpeedScale = 1.0;
 
