@@ -93,7 +93,7 @@ public class IntakerConfig {
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.105;
+        public static final double kV = 0.155;
         public static final double kA = 0.016835;
         public static final double kS = 0.17085;
 
@@ -122,7 +122,7 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 7;
+        public static final double deployPosAngle = 20;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
         public static final double retractedfeedPosAngle = 70.0;

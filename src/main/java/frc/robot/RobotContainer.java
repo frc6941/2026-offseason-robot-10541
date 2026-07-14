@@ -241,7 +241,7 @@ public class RobotContainer {
         // driver (straight beeline). Hold D-pad Down to run, release to abort. Tune
         // Params/Commands/AutopilotDriveToPose live and watch Commands/AutopilotDriveToPose/* in
         // AdvantageScope.
-        driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
+        //driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
         driverController.rightTrigger().whileTrue(shootCommand());
         driverController
                 .rightTrigger()
@@ -309,6 +309,11 @@ public class RobotContainer {
      */
     public Command getAutonomousCommand() {
         return AutoFile.buildAuto();
+    }
+
+    /** Hard-stop zero the intake pivot once when teleop starts. */
+    public Command getTeleopIntakeZeroCommand() {
+        return intaker.zeroCommand();
     }
 
     public void updateDashboard() {

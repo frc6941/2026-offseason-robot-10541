@@ -44,6 +44,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     private static final String MANUAL_OVERRIDE_KEY = "Shooter Tuning/Manual Override";
     private static final String MANUAL_HOOD_ANGLE_KEY = "Shooter Tuning/Hood Angle Deg";
     private static final String MANUAL_FLYWHEEL_RPS_KEY = "Shooter Tuning/Flywheel RPS";
+    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.5;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
@@ -246,6 +247,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                                         RotationsPerSecond.of(
                                                 ShooterLowerParamsNT.idleRPS.getValue()))
                         .until(() -> upperAtTarget(upperSpeedSupplier))
+                        .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS))
                         .andThen(shooterLower.runVelVolt(lowerSpeedSupplier)));
     }
 
@@ -271,14 +273,19 @@ public class ShootingSuperstructure extends SubsystemBase {
      * to idle the instant either goes false (e.g. the chassis swings off target mid-feed), instead
      * of latching into shoot() after the first ready check.
      */
-    private Command feedWhenUpperReady(Supplier<AngularVelocity> upperSpeedSupplier) {
-        return hopper.shootWhile(() -> upperAtTarget(upperSpeedSupplier) && headingAtGoal());
+    private Command feedAfterUpperReadyDelay(Supplier<AngularVelocity> upperSpeedSupplier) {
+        Command waitForUpperAndDelay =
+                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                        .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
+        return Commands.sequence(
+                Commands.deadline(waitForUpperAndDelay, hopper.idle()),
+                hopper.shootWhile(() -> upperAtTarget(upperSpeedSupplier) && headingAtGoal()));
     }
 
     /**
      * Spin the flywheel to the solution speed and drive the hood to the solution angle — both
      * tracking distance continuously. The lower shooter and feed start only after the upper shooter
-     * reaches its target speed.
+     * reaches its target speed and the feed delay has elapsed.
      *
      * <p>Requires shooter/hood/floor-roller, NOT swerve; run it in parallel with an {@link
      * AutoAimCommand} which owns chassis yaw.
@@ -288,7 +295,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.parallel(
                 runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedWhenUpperReady(upperSpeedSupplier));
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
     public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
@@ -298,7 +305,8 @@ public class ShootingSuperstructure extends SubsystemBase {
                         .withTimeout(readyTimeoutSeconds)
                         .andThen(
                                 Commands.either(
-                                        Commands.waitSeconds(feedSeconds),
+                                        Commands.waitSeconds(
+                                                FEED_DELAY_AFTER_UPPER_READY_SECONDS + feedSeconds),
                                         Commands.none(),
                                         () -> upperAtTarget(upperSpeedSupplier)));
 
@@ -306,17 +314,19 @@ public class ShootingSuperstructure extends SubsystemBase {
                 readyWindow,
                 runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedWhenUpperReady(upperSpeedSupplier));
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
     public Command feedShotForSeconds(double seconds) {
         Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         return Commands.deadline(
                 Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
-                        .andThen(Commands.waitSeconds(seconds)),
+                        .andThen(
+                                Commands.waitSeconds(
+                                        FEED_DELAY_AFTER_UPPER_READY_SECONDS + seconds)),
                 runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedWhenUpperReady(upperSpeedSupplier));
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
     public Command fixedShoot() {
@@ -327,7 +337,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                         upperSpeedSupplier,
                         () -> RotationsPerSecond.of(ShooterLowerParamsNT.shootRPS.getValue())),
                 hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
-                feedWhenUpperReady(upperSpeedSupplier));
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
     /**
