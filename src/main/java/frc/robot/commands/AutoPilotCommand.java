@@ -234,24 +234,24 @@ public class AutoPilotCommand extends Command {
         //      error for I to fix; it would only wind up and re-introduce overshoot.
         //   4. If it's not fast enough, raise the profile limits below (they cap how fast the turn
         //      may go); kP/kD only track that profile.
-        public static final double headingKP = 1.7;
-        public static final double headingKI = 0.0;
+        public static final double headingKP = 4;
+        public static final double headingKI = 0.12;
         // Damping gain on measured yaw rate (applied explicitly in execute(), NOT the PID's D
         // term).
-        public static final double headingKD = 0.0;
+        public static final double headingKD = 0.1;
 
         // Exit (drive-through) speed in m/s along the entry-angle direction; 0 = stop at the pose.
         // Autopilot adds this along the direction of travel, so with an entry angle set it is vx in
         // the target frame with vy = 0. The command finishes (atTarget) while still moving at this
         // speed — only use a nonzero value when something runs right after to take over the motion.
-        public static final double exitVelocityMps = 2;
+        public static final double exitVelocityMps = 0;
 
         // Heading trapezoid-profile limits — deliberately independent of the full swerve chassis
         // angular limits (which are fast enough to make any turn finish near-instantly). Slow these
         // down until the turn takes roughly as long as the translational move, so the two blend
         // instead of looking like "rotate, then translate."
         public static final double headingMaxVelocityDegps = 110;
-        public static final double headingMaxAccelDegps2 = 700;
+        public static final double headingMaxAccelDegps2 = 400.000000;
 
         // Profile tolerances / end behavior for the translational path (see APProfile).
         public static final double errorXYMeters = 0.08;
