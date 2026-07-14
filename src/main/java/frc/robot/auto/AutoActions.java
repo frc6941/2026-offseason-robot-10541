@@ -69,7 +69,7 @@ public class AutoActions {
     public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
 
     // ---- Second-sweep entry pose (drive here before the second sweep path). ----
-    public static final Pose2d kSecondSweepStartR = new Pose2d(2.3, 1, Rotation2d.fromDegrees(0));
+    public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.562, Rotation2d.fromDegrees(0));
     public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
 
     // ---- Slope crossing poses. Front = neutral side, End = alliance side (drive-back target).
@@ -341,7 +341,7 @@ public class AutoActions {
         return isToNeutral
                 ? AllianceFlipUtil.applyX(getRobotX())
                         > FieldConstants.LinesVertical.neutralZoneNear
-                : AllianceFlipUtil.applyX(getRobotX()) < 3.9;
+                : AllianceFlipUtil.applyX(getRobotX()) < 3.4;
     }
 
     public static boolean isPitchStable() {

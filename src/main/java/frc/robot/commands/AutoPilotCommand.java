@@ -18,6 +18,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.RobotStateRecorder;
+import frc.robot.subsystems.Configs.SwerveMK5Config;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveLimit;
 import lib.ntext.NTParameter;
@@ -124,6 +125,12 @@ public class AutoPilotCommand extends Command {
 
     @Override
     public void initialize() {
+        // Use the tighter Autopilot chassis limit while this command drives; end() restores the
+        // default. applyParams() below rebuilds the APConstraints from this just-applied limit (the
+        // constructor built them from whatever limit was live then).
+        swerve.setSwerveLimit(SwerveMK5Config.kAutoPiloLimit);
+        applyParams();
+
         // Seed the heading profile with the current heading + yaw rate so engaging mid-motion
         // doesn't
         // command a velocity discontinuity.
@@ -192,7 +199,16 @@ public class AutoPilotCommand extends Command {
     }
 
     @Override
-    public void end(boolean interrupted) {}
+    public void end(boolean interrupted) {
+        // Do NOT stop on a normal finish: the robot arrives still moving at exitVelocityMps (the
+        // APTarget end velocity), and the next command carries it — PathPlanner's FollowPathCommand
+        // generates its trajectory from the CURRENT chassis speeds, so a moving handoff continues
+        // with no dead stop. Setting a twist here is pointless (the next command overwrites it next
+        // loop). Only stop when aborted.
+            swerve.runTwist(new ChassisSpeeds());
+        // Restore the default chassis limit now that Autopilot is no longer driving.
+        swerve.setSwerveLimitDefault();
+    }
 
     @Override
     public boolean isFinished() {

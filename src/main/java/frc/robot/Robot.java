@@ -4,6 +4,7 @@
 
 package frc.robot;
 
+import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
@@ -48,6 +49,10 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void robotInit() {
+        // Stop the CTRE Phoenix signal logger. It auto-starts on the roboRIO and writes .hoot files
+        // (roboRIO disk + CPU) even though we log everything through AdvantageKit instead.
+        SignalLogger.stop();
+
         // Push the NT live-tuning gate into the ntext framework once, before any refresh() runs.
         NTParameterRegistry.setEnabled(RobotConstants.ENABLE_NT_PARAMS);
 

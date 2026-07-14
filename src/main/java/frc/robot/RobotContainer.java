@@ -167,6 +167,8 @@ public class RobotContainer {
         driverController.povDown().whileTrue(intaker.runExtendedReverse());
         driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
+        driverController.povUp().whileTrue(driveToPoseAutoPilotTestCommand());
+
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
         Trigger maxIntakeTrigger =
@@ -294,7 +296,9 @@ public class RobotContainer {
         return Commands.deferredProxy(
                 () ->
                         AutoActions.driveToPoseAutoPilot(
-                                AllianceFlipUtil.apply(AutoActions.kSecondSweepStartR)));
+                                AllianceFlipUtil.apply(AutoActions.kSecondSweepStartL)).andThen(
+                                        AutoActions.sweepCollectShoot(
+                                                "RightTrenchSecondMiddle", true)));
     }
 
     private Command holdAutomaticTargetMode() {
