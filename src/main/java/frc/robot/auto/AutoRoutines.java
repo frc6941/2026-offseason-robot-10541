@@ -3,6 +3,7 @@ package frc.robot.auto;
 import static frc.robot.auto.AutoActions.*;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
@@ -100,9 +101,15 @@ public class AutoRoutines {
                 steps.add(sweepCollectShoot(bumpPath, isLeft));
             } else {
                 // Reposition to the second-sweep start with Autopilot (straight beeline) rather
-                // than the pose PID — the alliance-side lane here is clear after the shot.
+                // than the pose PID — the alliance-side lane here is clear after the shot. The
+                // drive-back after this sweep holds -90 deg (blue-right frame; mirrored to +90 on
+                // the left) instead of kSlopeEnd's default rotation.
                 steps.add(driveToPoseAutoPilot(AllianceFlipUtil.apply(blueSecondSweepStart)));
-                steps.add(sweepCollectShoot(secondSweepPath, isLeft));
+                steps.add(
+                        sweepCollectShoot(
+                                secondSweepPath,
+                                isLeft,
+                                Rotation2d.fromDegrees(isLeft ? 90.0 : -90.0)));
             }
         }
 

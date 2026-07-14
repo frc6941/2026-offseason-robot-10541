@@ -393,12 +393,16 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     /**
-     * Park the shot mechanisms: stop the flywheel and flatten the hood. The floor roller is left to
-     * its own default command. Bind to {@code onFalse} of the aim trigger.
+     * Park the shot mechanisms: stop the flywheel, flatten the hood, and STOP THE HOPPER. The hopper
+     * is commanded to idle (0 RPS) directly here so it actually stops when the shot ends, instead of
+     * being left to its default command (which keeps it spinning off the intake mode). Bind to
+     * {@code onFalse} of the aim trigger.
      */
     public Command idle() {
         return Commands.parallel(
-                runShooterPrespin(), hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE));
+                runShooterPrespin(),
+                hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE),
+                hopper.idle());
     }
 
     @Override

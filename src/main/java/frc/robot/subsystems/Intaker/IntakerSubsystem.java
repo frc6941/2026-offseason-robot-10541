@@ -176,6 +176,20 @@ public class IntakerSubsystem extends SubsystemBase {
         return Commands.runOnce(() -> setIntakeMode(IntakeMode.EXTENDED_IDLE));
     }
 
+    /**
+     * Unconditionally drop to EXTENDED_IDLE (bypassing the setIntakeMode guard that protects
+     * FEEDING/EXTENDED_REVERSE/RETRACTED_FEEDING). Used to guarantee the intake — and therefore the
+     * hopper, whose default speed is driven by the intake mode — actually stops after an auto shot,
+     * regardless of what mode the shot left behind.
+     */
+    public Command forceExtendedIdle() {
+        return Commands.runOnce(
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                });
+    }
+
     public Command runFeed() {
         return Commands.startEnd(
                 () -> currentMode = IntakeMode.FEEDING, () -> currentMode = fallbackMode, this);
