@@ -41,6 +41,10 @@ public class AutoPilotCommand extends Command {
     private final APTarget target;
     // Rebuilt from NT params on change (Autopilot has no live setters), so not final.
     private Autopilot autopilot;
+    // target + the NT exit velocity, rebuilt whenever params change. Autopilot adds this scalar
+    // along the direction of travel, so with an entry angle set it becomes vx=exitVel, vy=0 in the
+    // target frame (the robot arrives still moving, e.g. to hand off to the next path).
+    private APTarget activeTarget;
 
     // Heading is motion-profiled the same way AutoAimCommand does it: the trapezoid plans the
     // deceleration so the chassis arrives at the target heading at zero angular velocity.
@@ -99,10 +103,15 @@ public class AutoPilotCommand extends Command {
                                 Meters.of(AutoPilotParamsNT.beelineRadiusMeters.getValue()));
         this.autopilot = new Autopilot(profile);
 
+        // Exit velocity: scalar magnitude Autopilot adds along the direction of travel. With the
+        // entry angle set (see AutoActions.driveToPoseAutoPilot) that direction is the entry-angle
+        // line, so this is effectively vx in the target frame with vy = 0.
+        this.activeTarget = target.withVelocity(AutoPilotParamsNT.exitVelocityMps.getValue());
+
+        // Internal D stays 0 — damping is applied explicitly in execute() against the measured gyro
+        // rate (headingKD is that damping gain, not the PIDController's derivative term).
         headingController.setPID(
-                AutoPilotParamsNT.headingKP.getValue(),
-                AutoPilotParamsNT.headingKI.getValue(),
-                AutoPilotParamsNT.headingKD.getValue());
+                AutoPilotParamsNT.headingKP.getValue(), AutoPilotParamsNT.headingKI.getValue(), 0.0);
         headingController.setTolerance(
                 Math.toRadians(AutoPilotParamsNT.errorThetaDegrees.getValue()));
         headingController.setConstraints(
@@ -133,27 +142,43 @@ public class AutoPilotCommand extends Command {
         // the current pose internally).
         ChassisSpeeds robotRelativeSpeeds = RobotStateRecorder.getChassisSpeeds();
 
-        APResult result = autopilot.calculate(currentPose, robotRelativeSpeeds, target);
+        APResult result = autopilot.calculate(currentPose, robotRelativeSpeeds, activeTarget);
 
         // Translational velocity comes back field-relative.
         double vx = result.vx().in(MetersPerSecond);
         double vy = result.vy().in(MetersPerSecond);
 
         // Autopilot only hands us a target heading — profile our way to it for omega.
+        //
+        // omega = P*(profilePos - heading)          // ProfiledPIDController, P only (I/D = 0)
+        //       + profileVel                        // velocity feedforward (drive at profile speed)
+        //       + kDamp*(profileVel - measuredRate) // damp actual rate toward the profile's rate
+        //
+        // The damping term is the fix for overshoot with no kI: a P(+FF) loop on an inertial axis
+        // overshoots at any kP because nothing brakes based on how fast the chassis is ACTUALLY
+        // turning. Damping toward the profile velocity brakes it — at the end profileVel -> 0, so
+        // it becomes pure -kDamp*measuredRate braking. We damp against the measured gyro rate
+        // directly (not the PIDController's own D term) so a scheduler overrun can't amplify it —
+        // same reasoning as AutoAimCommand.
         Rotation2d targetAngle = result.targetAngle();
-        double omega =
+        double pTerm =
                 headingController.calculate(
                         currentPose.getRotation().getRadians(),
                         new TrapezoidProfile.State(targetAngle.getRadians(), 0.0));
-        omega += headingController.getSetpoint().velocity; // feedforward at profile speed
+        double profileVel = headingController.getSetpoint().velocity;
+        double measuredOmega = swerve.getYawVelocityRadPerSec();
+        double omega =
+                pTerm
+                        + profileVel
+                        + AutoPilotParamsNT.headingKD.getValue() * (profileVel - measuredOmega);
 
         // Field-relative (vx, vy, omega) -> robot-relative twist for runTwist.
         ChassisSpeeds speeds =
                 ChassisSpeeds.fromFieldRelativeSpeeds(vx, vy, omega, currentPose.getRotation());
         swerve.runTwist(speeds);
 
-        Logger.recordOutput("AutoPilot/TargetPose", target.getReference());
-        Logger.recordOutput("AutoPilot/AtTarget", autopilot.atTarget(currentPose, target));
+        Logger.recordOutput("AutoPilot/TargetPose", activeTarget.getReference());
+        Logger.recordOutput("AutoPilot/AtTarget", autopilot.atTarget(currentPose, activeTarget));
         Logger.recordOutput(
                 "AutoPilot/DistanceToTarget",
                 currentPose.getTranslation().getDistance(target.getReference().getTranslation()));
@@ -168,18 +193,38 @@ public class AutoPilotCommand extends Command {
 
     @Override
     public boolean isFinished() {
-        // Done once Autopilot reports the pose within the profile's XY + theta tolerances.
-        return autopilot.atTarget(RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(), target);
+        // Done once Autopilot reports the pose within the profile's XY + theta tolerances. Note:
+        // atTarget only checks position/heading, so a nonzero exit velocity means we finish while
+        // still moving (a drive-through), handing the motion off to whatever runs next.
+        return autopilot.atTarget(
+                RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d(), activeTarget);
     }
 
     @NTParameter(tableName = "Params/AutoPilot")
     public static final class AutoPilotParams {
         // Heading-control gains for the rotational axis. Autopilot owns translation; this only
-        // steers
-        // yaw toward the target angle. Tune on the real robot.
+        // steers yaw toward the target angle.
+        //
+        // Tuning for fast response with NO overshoot (overshoot here comes from missing damping,
+        // not from kI):
+        //   1. Start headingKD = 0, headingKI = 0. Raise headingKP until it turns crisply and just
+        //      begins to overshoot / ring at the end.
+        //   2. Raise headingKD (measured-gyro-rate damping, applied in execute()) until the
+        //      overshoot is gone. kD REMOVES overshoot; more kP without kD only makes it worse.
+        //   3. Leave headingKI = 0. With the profile + velocity feedforward there's no steady-state
+        //      error for I to fix; it would only wind up and re-introduce overshoot.
+        //   4. If it's not fast enough, raise the profile limits below (they cap how fast the turn
+        //      may go); kP/kD only track that profile.
         public static final double headingKP = 1.7;
-        public static final double headingKI = 7;
+        public static final double headingKI = 0.0;
+        // Damping gain on measured yaw rate (applied explicitly in execute(), NOT the PID's D term).
         public static final double headingKD = 0.0;
+
+        // Exit (drive-through) speed in m/s along the entry-angle direction; 0 = stop at the pose.
+        // Autopilot adds this along the direction of travel, so with an entry angle set it is vx in
+        // the target frame with vy = 0. The command finishes (atTarget) while still moving at this
+        // speed — only use a nonzero value when something runs right after to take over the motion.
+        public static final double exitVelocityMps = 2;
 
         // Heading trapezoid-profile limits — deliberately independent of the full swerve chassis
         // angular limits (which are fast enough to make any turn finish near-instantly). Slow these
@@ -189,7 +234,7 @@ public class AutoPilotCommand extends Command {
         public static final double headingMaxAccelDegps2 = 700;
 
         // Profile tolerances / end behavior for the translational path (see APProfile).
-        public static final double errorXYMeters = 0.03;
+        public static final double errorXYMeters = 0.08;
         public static final double errorThetaDegrees = 5;
         // Under this distance Autopilot drives straight at the target and stops respecting entry
         // angle, so a small overshoot doesn't send it arcing all the way back around.

@@ -8,6 +8,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.RobotConstants;
 import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
@@ -86,11 +87,38 @@ public class IntakerSubsystem extends SubsystemBase {
         return pivot.runPosition(target);
     }
 
+    // Rate-limit state for the RETRACTED_FEEDING (shoot) raise, so followModePivot ramps up gently
+    // instead of snapping. Only used in auto — see pivotTargetAngle().
+    private double shootRampAngleDeg = 0.0;
+    private boolean shootRampActive = false;
+
     private Angle pivotTargetAngle() {
         if (!pivotZeroed) {
+            shootRampActive = false;
             return pivot.getCurrPos();
         }
 
+        // RETRACTED_FEEDING is the shoot pose. In auto the pivot is driven here by followModePivot's
+        // position PID, which would SNAP to the angle. To match the teleop raisePivotForShootSlowly()
+        // gentle raise, rate-limit the commanded angle toward retractedfeedPosAngle at
+        // shootRaiseSpeedDegreesPerSecond instead of jumping. (Teleop never reaches this branch —
+        // holdRetractedFeedPosition() suppresses this default command and runs the ramp itself. We
+        // can't run that ramp in auto because followModePivot already holds the pivot requirement.)
+        if (currentMode == IntakeMode.RETRACTED_FEEDING) {
+            double targetDeg = IntakerPivotParamsNT.retractedfeedPosAngle.getValue();
+            if (!shootRampActive) {
+                shootRampAngleDeg = pivot.getCurrPos().in(Degrees);
+                shootRampActive = true;
+            }
+            double stepDeg =
+                    IntakerPivotParamsNT.shootRaiseSpeedDegreesPerSecond.getValue()
+                            * RobotConstants.LOOPER_DT;
+            double errDeg = targetDeg - shootRampAngleDeg;
+            shootRampAngleDeg += Math.copySign(Math.min(Math.abs(errDeg), stepDeg), errDeg);
+            return Degrees.of(shootRampAngleDeg);
+        }
+
+        shootRampActive = false;
         return switch (currentMode) {
             case INTAKING, MAX_INTAKING ->
                     Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
@@ -98,8 +126,6 @@ public class IntakerSubsystem extends SubsystemBase {
                     Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case RETRACTED -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
             case FEEDING -> Degrees.of(IntakerPivotParamsNT.feedPosAngle.getValue());
-            case RETRACTED_FEEDING ->
-                    Degrees.of(IntakerPivotParamsNT.retractedfeedPosAngle.getValue());
             default -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
         };
     }
@@ -155,6 +181,27 @@ public class IntakerSubsystem extends SubsystemBase {
                 () -> currentMode = IntakeMode.FEEDING, () -> currentMode = fallbackMode, this);
     }
 
+    /**
+     * Hold the {@link IntakeMode#RETRACTED_FEEDING} mode WITHOUT commanding the pivot directly —
+     * the pivot is moved by whatever is reading the mode (in auto, {@link #followModePivot()}). This
+     * exists because {@link #holdRetractedFeedPosition()} takes the pivot requirement via {@link
+     * #raisePivotForShootSlowly()}, which can't run in auto: {@code followModePivot()} already holds
+     * the pivot for the whole routine, and two commands can't require the same subsystem in one
+     * composition. Requires only the intake (mode) subsystem, so it's safe to run in parallel with
+     * {@code followModePivot()}. Because the pivot is driven by {@code pivotTargetAngle()}'s
+     * position PID here (not the {@code raisePivotForShootSlowly()} ramp), the raise is at PID
+     * speed, not the gentle teleop ramp.
+     */
+    public Command holdRetractedFeedMode() {
+        return Commands.runEnd(
+                () -> currentMode = IntakeMode.RETRACTED_FEEDING,
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                },
+                this);
+    }
+
     public Command holdRetractedFeedPosition() {
         Command holdShootMode =
                 Commands.runEnd(
@@ -183,7 +230,7 @@ public class IntakerSubsystem extends SubsystemBase {
         return selectIdleMode.andThen(commandIdlePosition);
     }
 
-    private Command raisePivotForShootSlowly() {
+    public Command raisePivotForShootSlowly() {
         Timer timer = new Timer();
         double[] commandedAngleDeg = {0.0};
         double[] lastTimeSeconds = {0.0};

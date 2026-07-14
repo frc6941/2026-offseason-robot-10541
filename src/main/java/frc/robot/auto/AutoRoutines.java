@@ -133,12 +133,18 @@ public class AutoRoutines {
                 // Depot options: drive/collect the depot, then aim at the hub and empty the hopper.
             case DEPOT ->
                     Commands.sequence(
-                            Commands.deadline(followPathFile("LeftDriveDepot", false), intake()),
+                            Commands.deadline(
+                                    followPathFile("LeftDriveDepot", false),
+                                    intake(),
+                                    // Pre-spin during the depot drive so the shot needs no spin-up.
+                                    shootingSuperstructure.spinUpForShot()),
                             aimAndShootAtHub());
             case DEPOT_DRIVE_THROUGH ->
                     Commands.sequence(
                             Commands.deadline(
-                                    followPathFile("LeftDriveDepotDriveThrough", false), intake()),
+                                    followPathFile("LeftDriveDepotDriveThrough", false),
+                                    intake(),
+                                    shootingSuperstructure.spinUpForShot()),
                             aimAndShootAtHub());
         };
     }

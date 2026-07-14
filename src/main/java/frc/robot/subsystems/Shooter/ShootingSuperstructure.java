@@ -44,7 +44,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     private static final String MANUAL_OVERRIDE_KEY = "Shooter Tuning/Manual Override";
     private static final String MANUAL_HOOD_ANGLE_KEY = "Shooter Tuning/Hood Angle Deg";
     private static final String MANUAL_FLYWHEEL_RPS_KEY = "Shooter Tuning/Flywheel RPS";
-    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.5;
+    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.4;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
@@ -269,9 +269,9 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     /**
-     * Feeds only while the shooter is up to speed AND the chassis is aimed at the hub; drops back
-     * to idle the instant either goes false (e.g. the chassis swings off target mid-feed), instead
-     * of latching into shoot() after the first ready check.
+     * Feeds while the shooter is up to speed; drops back to idle the instant it falls below speed,
+     * instead of latching into shoot() after the first ready check. Feeding is gated on flywheel
+     * speed only (NOT chassis aim) — the hopper runs as soon as the shooter is at velocity.
      */
     private Command feedAfterUpperReadyDelay(Supplier<AngularVelocity> upperSpeedSupplier) {
         Command waitForUpperAndDelay =
@@ -279,7 +279,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                         .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
         return Commands.sequence(
                 Commands.deadline(waitForUpperAndDelay, hopper.idle()),
-                hopper.shootWhile(() -> upperAtTarget(upperSpeedSupplier) && headingAtGoal()));
+                hopper.shootWhile(() -> upperAtTarget(upperSpeedSupplier)));
     }
 
     /**
@@ -300,7 +300,12 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
         Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
-        Command readyWindow =
+        // Time bound for the shot: wait until the flywheel is up to speed (cap readyTimeout), then
+        // run for FEED_DELAY + feedSeconds. The shot itself is exactly aimAndShoot() — spin drum +
+        // hood + feed-once-at-velocity (hopper runs as soon as the shooter is at speed, no aim
+        // gate). When this window ends aimAndShoot() is cancelled, so the shooter, hood, and hopper
+        // all stop and fall back to their idle default commands.
+        Command shotWindow =
                 Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
                         .withTimeout(readyTimeoutSeconds)
                         .andThen(
@@ -310,11 +315,23 @@ public class ShootingSuperstructure extends SubsystemBase {
                                         Commands.none(),
                                         () -> upperAtTarget(upperSpeedSupplier)));
 
-        return Commands.deadline(
-                readyWindow,
-                runShooterAt(upperSpeedSupplier),
-                hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterUpperReadyDelay(upperSpeedSupplier));
+        return Commands.deadline(shotWindow, aimAndShoot());
+    }
+
+    /**
+     * Spin the flywheel to the (distance-tracking) solution speed and pre-position the hood, WITHOUT
+     * feeding — run this in parallel with the drive into the shot pose so the flywheel is already at
+     * speed on arrival. That removes the spin-up wait (up to {@code readyTimeoutSeconds}) from the
+     * shot window, which is what lets the whole auto shot fit in ~2 s.
+     *
+     * <p>Deliberately does NOT run the lower shooter (feed) or hopper — those would push balls into
+     * the already-spinning flywheel and shoot them out mid-drive. Only the upper drum + hood spin
+     * up here; the actual feed still waits for the shot command.
+     */
+    public Command spinUpForShot() {
+        return Commands.parallel(
+                shooterUpper.runVelVolt(() -> currentSolution().shooterSpeed()),
+                hood.runMotionMagic(this::clampHoodAngleForSolution));
     }
 
     public Command feedShotForSeconds(double seconds) {

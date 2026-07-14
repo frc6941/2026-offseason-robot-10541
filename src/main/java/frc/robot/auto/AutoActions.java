@@ -390,10 +390,21 @@ public class AutoActions {
 
     /**
      * Hold the chassis aimed at the hub while emptying the hopper, then spin the drum back to idle.
+     *
+     * <p>{@code pivotRaiseDelaySeconds} after the shot starts, the intake is put into
+     * RETRACTED_FEEDING mode ({@link IntakerSubsystem#holdRetractedFeedMode()}) so the pivot raises
+     * to the shoot pose — the auto equivalent of the teleop shot's intake raise. The pivot is
+     * actuated by {@link IntakerSubsystem#followModePivot()} (running for the whole routine), which
+     * is why this only flips the mode instead of commanding the pivot: the pivot requirement is
+     * already taken.
      */
     public static Command aimAndShootAtHub(double feedSeconds) {
         return Commands.sequence(
-                Commands.deadline(shootAtHub(feedSeconds), aimAtHub()),
+                Commands.deadline(
+                        shootAtHub(feedSeconds),
+                        aimAtHub(),
+                        Commands.waitSeconds(AutoShootParamsNT.pivotRaiseDelaySeconds.getValue())
+                                .andThen(intake.holdRetractedFeedMode())),
                 // The auto is one big sequence that holds the shooter requirement, so its default
                 // idle can't run on its own — explicitly drop the drum to idle RPS after the shot.
                 shootingSuperstructure.idle().withTimeout(0.02));
@@ -421,7 +432,17 @@ public class AutoActions {
         return Commands.sequence(
                 Commands.deadline(
                         Commands.sequence(
-                                followPathFile(sweepPath, isLeft), drivePastSlope(isLeft, false)),
+                                followPathFile(sweepPath, isLeft),
+                                // Pre-spin the flywheel to solution speed during the drive-back ONLY
+                                // (not the outbound collect), so it's at speed on arrival without
+                                // running the drum for the whole sweep. Inner deadline ends with
+                                // drivePastSlope; aimAndShootAtHub then re-commands the still-
+                                // spinning drum and feeds immediately. Feed only — no premature
+                                // shots. If drivePastSlope is shorter than the spin-up time, the
+                                // shot's readyTimeout covers the small remainder.
+                                Commands.deadline(
+                                        drivePastSlope(isLeft, false),
+                                        shootingSuperstructure.spinUpForShot())),
                         intake(),
                         Commands.waitUntil(() -> AllianceFlipUtil.applyX(getRobotX()) > 7.0)
                                 .andThen(
