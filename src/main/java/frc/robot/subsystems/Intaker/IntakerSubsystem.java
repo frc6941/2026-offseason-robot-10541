@@ -202,7 +202,8 @@ public class IntakerSubsystem extends SubsystemBase {
                             return Degrees.of(commandedAngleDeg[0]);
                         });
 
-        return initializeRamp.andThen(followRamp).finallyDo(interrupted -> timer.stop());
+        return Commands.waitSeconds(1.6)
+                .andThen(initializeRamp.andThen(followRamp).finallyDo(interrupted -> timer.stop()));
     }
 
     public Command runExtendedReverse() {

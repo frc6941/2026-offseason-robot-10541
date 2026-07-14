@@ -5,7 +5,6 @@ import static edu.wpi.first.units.Units.Meters;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecondPerSecond;
 import static edu.wpi.first.units.Units.RadiansPerSecond;
-import static edu.wpi.first.units.Units.RadiansPerSecondPerSecond;
 
 import com.therekrab.autopilot.APConstraints;
 import com.therekrab.autopilot.APProfile;
@@ -56,19 +55,14 @@ public class AutoPilotCommand extends Command {
         this.swerve = swerve;
         this.target = target;
 
-        // Rotational constraints come from the swerve angular limits (not NT), set once here.
-        SwerveLimit limit = swerve.getSwerveLimit();
+        // Constraints placeholder; applyParams() below fills in the real (NT-tunable) values
+        // before this is ever used.
         headingController =
                 new ProfiledPIDController(
-                        0.0,
-                        0.0,
-                        0.0,
-                        new TrapezoidProfile.Constraints(
-                                limit.maxAngularVelocity().in(RadiansPerSecond),
-                                limit.maxAngularAcceleration().in(RadiansPerSecondPerSecond)));
+                        0.0, 0.0, 0.0, new TrapezoidProfile.Constraints(0.0, 0.0));
         headingController.enableContinuousInput(-Math.PI, Math.PI);
 
-        // Build the Autopilot profile + heading gains from the current NT params.
+        // Build the Autopilot profile + heading gains/profile from the current NT params.
         applyParams();
 
         addRequirements(swerve);
@@ -76,11 +70,19 @@ public class AutoPilotCommand extends Command {
 
     /**
      * (Re)build the {@link Autopilot} from the current {@link AutoPilotParams} and push the heading
-     * gains/tolerance into the controller. Called in the constructor and from {@link #execute()}
-     * whenever any param changes, so the profile and gains tune live. Autopilot itself is
-     * stateless, so swapping the instance mid-run is safe; the heading controller's setters only
+     * gains/profile/tolerance into the controller. Called in the constructor and from {@link
+     * #execute()} whenever any param changes, so the profile and gains tune live. Autopilot itself
+     * is stateless, so swapping the instance mid-run is safe; the heading controller's setters only
      * affect the next {@code calculate()}, not the profile state. The translational constraints
      * still pull from the live swerve limit each rebuild.
+     *
+     * <p>The heading profile's max velocity/acceleration are deliberately <b>not</b> the full
+     * swerve angular limits — those are fast enough (e.g. 1000 deg/s, 5000 deg/s^2) that any turn
+     * finishes in a fraction of a second, long before the translational move (which ramps up over
+     * the whole remaining distance) becomes visually significant. That makes a move that's actually
+     * commanded concurrently every loop look like "rotate, then translate." Tune {@code
+     * headingMaxVelocityDegps}/{@code headingMaxAccelDegps2} down so the turn takes about as long
+     * as the drive, and the two blend together instead.
      */
     private void applyParams() {
         SwerveLimit limit = swerve.getSwerveLimit();
@@ -103,6 +105,10 @@ public class AutoPilotCommand extends Command {
                 AutoPilotParamsNT.headingKD.getValue());
         headingController.setTolerance(
                 Math.toRadians(AutoPilotParamsNT.errorThetaDegrees.getValue()));
+        headingController.setConstraints(
+                new TrapezoidProfile.Constraints(
+                        Math.toRadians(AutoPilotParamsNT.headingMaxVelocityDegps.getValue()),
+                        Math.toRadians(AutoPilotParamsNT.headingMaxAccelDegps2.getValue())));
     }
 
     @Override
@@ -158,9 +164,7 @@ public class AutoPilotCommand extends Command {
     }
 
     @Override
-    public void end(boolean interrupted) {
-        swerve.runStop();
-    }
+    public void end(boolean interrupted) {}
 
     @Override
     public boolean isFinished() {
@@ -173,18 +177,33 @@ public class AutoPilotCommand extends Command {
         // Heading-control gains for the rotational axis. Autopilot owns translation; this only
         // steers
         // yaw toward the target angle. Tune on the real robot.
-        public static final double headingKP = 5.0;
-        public static final double headingKI = 0.0;
+        public static final double headingKP = 1.7;
+        public static final double headingKI = 7;
         public static final double headingKD = 0.0;
+
+        // Heading trapezoid-profile limits — deliberately independent of the full swerve chassis
+        // angular limits (which are fast enough to make any turn finish near-instantly). Slow these
+        // down until the turn takes roughly as long as the translational move, so the two blend
+        // instead of looking like "rotate, then translate."
+        public static final double headingMaxVelocityDegps = 110;
+        public static final double headingMaxAccelDegps2 = 700;
 
         // Profile tolerances / end behavior for the translational path (see APProfile).
         public static final double errorXYMeters = 0.03;
-        public static final double errorThetaDegrees = 2.0;
+        public static final double errorThetaDegrees = 5;
         // Under this distance Autopilot drives straight at the target and stops respecting entry
-        // angle,
-        // so a small overshoot doesn't send it arcing all the way back around.
-        public static final double beelineRadiusMeters = 0.30;
+        // angle, so a small overshoot doesn't send it arcing all the way back around.
+        public static final double beelineRadiusMeters = 0.5;
+
         // End-of-path deceleration aggressiveness (m/s^3). Higher = later, harder braking.
-        public static final double jerk = 8.0;
+        public static final double jerk = 3.0;
+
+        // Field-relative direction of travel Autopilot targets on arrival (independent of the
+        // robot's final heading, which is the target pose's own rotation). Autopilot has no
+        // explicit "curve left/right" knob — the swirl path bulges toward whichever side of this
+        // entry-angle line the robot's current position falls on (bearing-to-target minus this
+        // angle). If the default straight-line/curve sweeps through an obstacle, rotate this value
+        // so the robot approaches on the other side instead.
+        public static final double entryAngleDegrees = 180;
     }
 }

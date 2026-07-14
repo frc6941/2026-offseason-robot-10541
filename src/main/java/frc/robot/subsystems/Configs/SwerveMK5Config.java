@@ -23,10 +23,10 @@ public final class SwerveMK5Config {
     // robot)
     public static final ImuPigeonConfig pigeonConfig =
             ImuPigeonConfig.builder()
-                    .mountPoseYaw(-24.29374389648438)
-                    .mountPosePitch(-0.0090445756912231)
-                    .mountPoseRoll(-4.7371618461608887)
-                    .gyroScalarZ(-3.5)
+                    .mountPoseYaw(-90.76828002929688)
+                    .mountPosePitch(-0.39588314294815063)
+                    .mountPoseRoll(-3.5150318145751953)
+                    .gyroScalarZ(-0.6)
                     .build();
 
     // Per-module physical limits (MK5n R1 + Kraken X60/X44 with FOC)

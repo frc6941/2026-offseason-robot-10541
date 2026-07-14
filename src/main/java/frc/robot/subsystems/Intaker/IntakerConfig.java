@@ -36,7 +36,7 @@ public class IntakerConfig {
     public static final Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
     // Placeholder template values for homing. These MUST be verified on the real robot.
     // Sign must drive the intake pivot toward the zero hard stop.
-    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -3;
+    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -2;
     // Must be above free-run current and below breaker / unsafe stall current.
     public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 60.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
@@ -88,11 +88,11 @@ public class IntakerConfig {
 
     @NTParameter(tableName = "Params/" + INTAKER_ROLLER_NAME)
     public static final class IntakerRollerParams {
-        public static final double kP = 0.2;
+        public static final double kP = 1;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.105;
+        public static final double kV = 0.9;
         public static final double kA = 0.016835;
         public static final double kS = 0.17085;
 
@@ -100,7 +100,7 @@ public class IntakerConfig {
 
         public static final double outtakeRPS = -15.0;
 
-        private IntakerRollerParams() {}
+        private IntakerRollerParams() {} 
     }
 
     @NTParameter(tableName = "Params/" + INTAKER_PIVOT_NAME)
@@ -120,7 +120,7 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 7;
+        public static final double deployPosAngle = 20;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
         public static final double retractedfeedPosAngle = 70.0;

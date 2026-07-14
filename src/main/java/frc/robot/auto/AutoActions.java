@@ -11,10 +11,7 @@ import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.path.PathPlannerPath;
 import com.pathplanner.lib.path.RotationTarget;
 import com.pathplanner.lib.path.Waypoint;
-import com.therekrab.autopilot.APConstraints;
-import com.therekrab.autopilot.APProfile;
 import com.therekrab.autopilot.APTarget;
-import com.therekrab.autopilot.Autopilot;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
@@ -27,8 +24,8 @@ import frc.robot.Robot;
 import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
+import frc.robot.commands.AutoPilotCommand;
 import frc.robot.commands.AutoPilotParamsNT;
-import frc.robot.commands.AutopilotDriveToPose;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
@@ -40,7 +37,6 @@ import java.util.function.Supplier;
 import lib.ironpulse.math.rbd.TransformRecorder;
 import lib.ironpulse.swerve.Swerve;
 import lib.ironpulse.swerve.SwerveCommands;
-import lib.ironpulse.swerve.SwerveLimit;
 import lib.ironpulse.swerve.commands.SwerveAimToHeading;
 import lib.ironpulse.swerve.commands.SwerveDriveToPose;
 import lib.ironpulse.utils.AllianceFlipUtil;
@@ -73,14 +69,14 @@ public class AutoActions {
     public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
 
     // ---- Second-sweep entry pose (drive here before the second sweep path). ----
-    public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.5, Rotation2d.fromDegrees(0));
+    public static final Pose2d kSecondSweepStartR = new Pose2d(2.3, 1, Rotation2d.fromDegrees(0));
     public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
 
     // ---- Slope crossing poses. Front = neutral side, End = alliance side (drive-back target).
     // ----
     public static final Pose2d kSlopeFrontR = new Pose2d(5.84, 2.84, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeFrontL = mirrorY(kSlopeFrontR);
-    public static final Pose2d kSlopeEndR = new Pose2d(3, 2.56, Rotation2d.fromDegrees(-135));
+    public static final Pose2d kSlopeEndR = new Pose2d(3, 2.84, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeEndL = mirrorY(kSlopeEndR);
 
     private static Swerve swerve;
@@ -249,39 +245,24 @@ public class AutoActions {
     }
 
     /**
-     * Builds an {@link Autopilot} from the current swerve linear/skid limits and the (still shared)
-     * {@code Params/AutoPilot} NT tunables. {@link AutopilotDriveToPose} only owns its heading
-     * controller — the translational profile/tolerances live in this {@link APProfile}, so it must
-     * be (re)built here before each drive.
-     */
-    private static Autopilot buildAutopilot() {
-        SwerveLimit limit = swerve.getSwerveLimit();
-        APConstraints constraints =
-                new APConstraints(
-                        limit.maxLinearVelocity().in(MetersPerSecond),
-                        limit.maxSkidAcceleration().in(MetersPerSecondPerSecond),
-                        AutoPilotParamsNT.jerk.getValue());
-        APProfile profile =
-                new APProfile(constraints)
-                        .withErrorXY(Meters.of(AutoPilotParamsNT.errorXYMeters.getValue()))
-                        .withErrorTheta(Degrees.of(AutoPilotParamsNT.errorThetaDegrees.getValue()))
-                        .withBeelineRadius(
-                                Meters.of(AutoPilotParamsNT.beelineRadiusMeters.getValue()));
-        return new Autopilot(profile);
-    }
-
-    /**
-     * Drive to an <b>already alliance-flipped</b> pose using the {@link AutopilotDriveToPose}
+     * Drive to an <b>already alliance-flipped</b> pose using the {@link AutoPilotCommand}
      * point-to-point driver instead of the pose PID ({@link #driveToPose}). Autopilot is
-     * obstacle-unaware and drives a straight/beeline path, so only use it where the lane is known
-     * clear — e.g. repositioning to the second-sweep start on the open alliance side after a shot.
+     * obstacle-unaware; the entry angle ({@code Params/AutoPilot/entryAngleDegrees}) shapes which
+     * side the approach curve bulges toward, so tune it to route around anything in the lane — see
+     * {@link AutoPilotCommand.AutoPilotParams#entryAngleDegrees}. Re-read each call (deferred), so
+     * tune on the dashboard and re-run/re-press to see the new curve.
      */
     static Command driveToPoseAutoPilot(Supplier<Pose2d> targetPoseSupplier) {
         return Commands.defer(
                 () -> {
                     Pose2d targetPose = targetPoseSupplier.get();
-                    return new AutopilotDriveToPose(
-                                    swerve, buildAutopilot(), new APTarget(targetPose))
+                    APTarget target =
+                            new APTarget(targetPose)
+                                    .withEntryAngle(
+                                            Rotation2d.fromDegrees(
+                                                    AutoPilotParamsNT.entryAngleDegrees
+                                                            .getValue()));
+                    return new AutoPilotCommand(swerve, target)
                             .beforeStarting(
                                     Commands.runOnce(
                                             () ->
@@ -345,14 +326,18 @@ public class AutoActions {
             return Commands.defer(
                     () ->
                             Commands.deadline(
-                                    waitCrossedBump(true),
+                                    waitCrossedBump(isToNeutral),
                                     driveToPose(AllianceFlipUtil.apply(target))),
                     Set.of(swerve));
         }
-        // Back: actually drive TO kSlopeEnd (so editing that pose moves where we end up). Timeout
-        // so it can't stall if SwerveDriveToPose never nails the position + heading tolerance.
-        return driveToPose(() -> AllianceFlipUtil.apply(isLeft ? kSlopeEndL : kSlopeEndR))
-                .withTimeout(3.0);
+        else{
+            return Commands.defer(
+                    () ->
+                            Commands.deadline(
+                                    waitCrossedBump(isToNeutral),
+                                    driveToPose(AllianceFlipUtil.apply(isLeft ? kSlopeEndL : kSlopeEndR))),
+                    Set.of(swerve));
+        }
     }
 
     static Command waitCrossedBump(boolean isToNeutral) {
@@ -363,7 +348,7 @@ public class AutoActions {
         return isToNeutral
                 ? AllianceFlipUtil.applyX(getRobotX())
                         > FieldConstants.LinesVertical.neutralZoneNear
-                : AllianceFlipUtil.applyX(getRobotX()) < 3.3;
+                : AllianceFlipUtil.applyX(getRobotX()) < 3.9;
     }
 
     public static boolean isPitchStable() {
@@ -452,7 +437,7 @@ public class AutoActions {
 
     /** Lift the swerve speed cap for a fast unguarded dash (e.g. the trench-start opening move). */
     public static Command setSwerveLimitUnlimited() {
-        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit));
+        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kDefaultSwerveLimit));
     }
 
     /** Restore the normal swerve speed cap after an unlimited-speed segment. */

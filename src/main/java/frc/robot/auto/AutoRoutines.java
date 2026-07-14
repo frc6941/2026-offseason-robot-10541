@@ -84,8 +84,7 @@ public class AutoRoutines {
             steps.add(setSwerveLimitDefault());
         }
 
-        // 1. First sweep: collect out, drive back, aim + shoot. (Pivot homing runs in parallel with
-        // the whole routine — see the deadline at the end.)
+        // 1. First sweep: collect out, drive back, aim + shoot.
         steps.add(sweepCollectShoot(startPath, isLeft));
 
         // 2. Optional second sweep. BUMP_AGAIN repeats the bump cycle so it can follow any first
@@ -110,17 +109,16 @@ public class AutoRoutines {
         // 3. End behaviour (intake running throughout).
         steps.add(endBehaviour(endBehaviour, isLeft));
 
-        // Run the routine with a pivot manager in parallel: home the pivot once, then continuously
-        // drive it to the current intake mode's angle. The routine holds the pivot requirement (via
-        // this same zeroCommand), which suppresses the pivot's default command for the whole auto —
-        // so without this, intake()/retractIntake() mode changes would flip the mode but never move
-        // the pivot. Homing runs alongside the opening steps (home on the move), and the manager
-        // makes every deploy/retract in the sweeps actually actuate. The routine is the deadline,
-        // so
-        // when it ends the manager stops.
+        // Run the routine with a pivot manager in parallel: continuously drive the pivot to the
+        // current intake mode's angle. The routine holds the pivot requirement (via this same
+        // followModePivot), which suppresses the pivot's default command for the whole auto — so
+        // without this, intake()/retractIntake() mode changes would flip the mode but never move
+        // the pivot. Intake zeroing is manual-only (D-pad Left, pre-match) — NOT run here — so this
+        // assumes the pivot is already zeroed before auto starts; if it isn't, pivotTargetAngle()
+        // holds the current (unzeroed) position instead of actuating. The routine is the deadline,
+        // so when it ends the manager stops.
         return Commands.deadline(
-                        Commands.sequence(steps.toArray(Command[]::new)),
-                        Commands.sequence(intake.zeroCommand(), intake.followModePivot()))
+                        Commands.sequence(steps.toArray(Command[]::new)), intake.followModePivot())
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 

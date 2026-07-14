@@ -26,7 +26,6 @@ import frc.robot.auto.AutoFile;
 import frc.robot.auto.AutoRoutines;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.commands.AutoTrenchCommand;
-import frc.robot.commands.AutopilotDriveToPose;
 import frc.robot.subsystems.Configs.LimeLightConfig;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Hopper.HopperConfig;
@@ -165,7 +164,7 @@ public class RobotContainer {
         OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
         driverController.povLeft().onTrue(intaker.zeroCommand());
-        driverController.povDown().whileTrue(intaker.runExtendedReverse());
+        // driverController.povDown().whileTrue(intaker.runExtendedReverse());
         driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
         // Intake: left trigger runs intake while held.
@@ -228,11 +227,10 @@ public class RobotContainer {
 
         driverController.a().onTrue(intaker.runRetract());
 
-        // Test: drive to the second-sweep start pose with the AutopilotDriveToPose point-to-point
-        // driver (straight beeline). Hold D-pad Down to run, release to abort. Tune
-        // Params/Commands/AutopilotDriveToPose live and watch Commands/AutopilotDriveToPose/* in
-        // AdvantageScope.
-        driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
+        // Test: drive to the second-sweep start pose with the Autopilot point-to-point driver
+        // (straight beeline). Hold D-pad Down to run, release to abort. Tune Params/AutoPilot live
+        // and watch AutoPilot/* (DistanceToTarget, AtTarget, vx/vy/omega) in AdvantageScope.
+        driverController.povDown().whileTrue(driveToPoseAutoPilotTestCommand());
 
         driverController.rightTrigger().whileTrue(shootAtHubCommand());
         driverController
@@ -269,17 +267,16 @@ public class RobotContainer {
     }
 
     /**
-     * Drives to the (alliance-flipped) second-sweep start pose with {@link AutopilotDriveToPose}
-     * (via {@link AutoActions#driveToPoseAutoPilot}). Gains/tolerances come from {@code
-     * Params/Commands/AutopilotDriveToPose} and are re-read each press (deferred), so tune on the
-     * dashboard and re-press. Deferred also so it builds only after {@link AutoActions#init} has
-     * run.
+     * Drives to the (alliance-flipped) second-sweep start pose with the Autopilot point-to-point
+     * driver ({@link AutoActions#driveToPoseAutoPilot}). Gains/tolerances come from {@code
+     * Params/AutoPilot} and are re-read each press (deferred), so tune on the dashboard and
+     * re-press. Deferred also so it builds only after {@link AutoActions#init} has run.
      */
-    private Command autopilotDriveToPoseTestCommand() {
+    private Command driveToPoseAutoPilotTestCommand() {
         return Commands.deferredProxy(
                 () ->
                         AutoActions.driveToPoseAutoPilot(
-                                AllianceFlipUtil.apply(AutoActions.kSecondSweepStartL)));
+                                AllianceFlipUtil.apply(AutoActions.kSecondSweepStartR)));
     }
 
     private Command holdHubTargetMode() {
