@@ -282,10 +282,13 @@ public class IntakerSubsystem extends SubsystemBase {
     }
 
     public Command runExtendedReverse() {
-        return Commands.startEnd(
-                () -> currentMode = IntakeMode.EXTENDED_REVERSE,
-                () -> currentMode = fallbackMode,
-                this);
+        return Commands.parallel(
+                Commands.startEnd(
+                        () -> currentMode = IntakeMode.EXTENDED_REVERSE,
+                        () -> currentMode = fallbackMode,
+                        this),
+                roller.runVelTC(
+                        () -> RotationsPerSecond.of(IntakerRollerParamsNT.outtakeRPS.getValue())));
     }
 
     /**
