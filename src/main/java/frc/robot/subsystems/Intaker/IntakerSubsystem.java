@@ -40,23 +40,14 @@ public class IntakerSubsystem extends SubsystemBase {
     public void setDefaultCommand() {
         roller.setDefaultCommand(
                 Commands.either(
-                                roller.runVelTC(
-                                                () ->
-                                                        RotationsPerSecond.of(
-                                                                currentMode
-                                                                                == IntakeMode
-                                                                                        .EXTENDED_REVERSE
-                                                                        ? IntakerRollerParamsNT
-                                                                                .outtakeRPS
-                                                                                .getValue()
-                                                                        : IntakerRollerParamsNT
-                                                                                .intakeRPS
-                                                                                .getValue()))
+                                roller.runVelTC(() -> RotationsPerSecond.of(rollerTargetRps()))
                                         .until(
                                                 () ->
                                                         currentMode
                                                                         != IntakerConfig.IntakeMode
                                                                                 .INTAKING
+                                                                && currentMode
+                                                                        != IntakeMode.MAX_INTAKING
                                                                 && currentMode != IntakeMode.FEEDING
                                                                 && currentMode
                                                                         != IntakeMode
@@ -68,6 +59,8 @@ public class IntakerSubsystem extends SubsystemBase {
                                         .until(
                                                 () ->
                                                         currentMode == IntakeMode.INTAKING
+                                                                || currentMode
+                                                                        == IntakeMode.MAX_INTAKING
                                                                 || currentMode == IntakeMode.FEEDING
                                                                 || currentMode
                                                                         == IntakeMode
@@ -77,6 +70,7 @@ public class IntakerSubsystem extends SubsystemBase {
                                                                                 .RETRACTED_FEEDING),
                                 () ->
                                         currentMode == IntakeMode.INTAKING
+                                                || currentMode == IntakeMode.MAX_INTAKING
                                                 || currentMode == IntakeMode.FEEDING
                                                 || currentMode == IntakeMode.EXTENDED_REVERSE
                                                 || currentMode == IntakeMode.RETRACTED_FEEDING)
@@ -98,7 +92,8 @@ public class IntakerSubsystem extends SubsystemBase {
         }
 
         return switch (currentMode) {
-            case INTAKING -> Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
+            case INTAKING, MAX_INTAKING ->
+                    Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case EXTENDED_IDLE, EXTENDED_REVERSE ->
                     Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case RETRACTED -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
@@ -119,6 +114,16 @@ public class IntakerSubsystem extends SubsystemBase {
         }
     }
 
+    private double rollerTargetRps() {
+        if (currentMode == IntakeMode.EXTENDED_REVERSE) {
+            return IntakerRollerParamsNT.outtakeRPS.getValue();
+        }
+        if (currentMode == IntakeMode.MAX_INTAKING) {
+            return IntakerRollerParamsNT.intakeRPSmax.getValue();
+        }
+        return IntakerRollerParamsNT.intakeRPS.getValue();
+    }
+
     public Command runIntake() {
         return Commands.runOnce(() -> setIntakeMode(IntakeMode.INTAKING));
     }
@@ -126,6 +131,13 @@ public class IntakerSubsystem extends SubsystemBase {
     public Command runIntakeContinuous() {
         return Commands.startEnd(
                 () -> setIntakeMode(IntakeMode.INTAKING),
+                () -> setIntakeMode(IntakeMode.EXTENDED_IDLE),
+                this);
+    }
+
+    public Command runMaxIntakeContinuous() {
+        return Commands.startEnd(
+                () -> setIntakeMode(IntakeMode.MAX_INTAKING),
                 () -> setIntakeMode(IntakeMode.EXTENDED_IDLE),
                 this);
     }

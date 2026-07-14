@@ -39,7 +39,7 @@ public class ShooterConfig {
     public static final Angle HOOD_MIN_ANGLE = Degrees.of(0.0);
     // Must equal the hood's true mechanical travel. ShotCalculator converts physical launch pitch
     // to this mechanism angle and clamps the result to this range.
-    public static final Angle HOOD_MAX_ANGLE = Degrees.of(40.0);
+    public static final Angle HOOD_MAX_ANGLE = Degrees.of(50.0);
     public static final Angle HOOD_STOW_ANGLE = HOOD_MIN_ANGLE;
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
     // SensorToMechanismRatio (below), NOT here — so this must be a bare 360, or the ratio gets

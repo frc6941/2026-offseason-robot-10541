@@ -9,7 +9,7 @@ import lib.ntext.NTParameter;
 
 /** Resolves hood angle, shooter speed, and time of flight from live interpolation tables. */
 public class ShotCalculator {
-    private static final double[] BREAKPOINTS_METERS = {2.0, 3.0, 4.0, 5.0, 6.0};
+    private static final double[] BREAKPOINTS_METERS = {2.0, 2.5, 3.0, 3.5, 4.0, 4.5};
     private static final int LOOKAHEAD_ITERATIONS = 10;
 
     private final InterpolatingDoubleTreeMap hoodAngleDeg = new InterpolatingDoubleTreeMap();
@@ -60,6 +60,7 @@ public class ShotCalculator {
         hoodAngleDeg.put(BREAKPOINTS_METERS[2], ShootingParamsNT.hoodAngleDeg4m.getValue()); // 37
         hoodAngleDeg.put(BREAKPOINTS_METERS[3], ShootingParamsNT.hoodAngleDeg5m.getValue());
         hoodAngleDeg.put(BREAKPOINTS_METERS[4], ShootingParamsNT.hoodAngleDeg6m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_METERS[5], ShootingParamsNT.hoodAngleDeg7m.getValue());
 
         shooterRps.clear();
         shooterRps.put(BREAKPOINTS_METERS[0], ShootingParamsNT.shooterRps2m.getValue()); // 55
@@ -67,6 +68,7 @@ public class ShotCalculator {
         shooterRps.put(BREAKPOINTS_METERS[2], ShootingParamsNT.shooterRps4m.getValue()); // 59
         shooterRps.put(BREAKPOINTS_METERS[3], ShootingParamsNT.shooterRps5m.getValue());
         shooterRps.put(BREAKPOINTS_METERS[4], ShootingParamsNT.shooterRps6m.getValue());
+        shooterRps.put(BREAKPOINTS_METERS[5], ShootingParamsNT.shooterRps7m.getValue());
 
         timeOfFlightSec.clear();
         timeOfFlightSec.put(BREAKPOINTS_METERS[0], ShootingParamsNT.tofSec2m.getValue()); // 1.1
@@ -74,22 +76,25 @@ public class ShotCalculator {
         timeOfFlightSec.put(BREAKPOINTS_METERS[2], ShootingParamsNT.tofSec4m.getValue());
         timeOfFlightSec.put(BREAKPOINTS_METERS[3], ShootingParamsNT.tofSec5m.getValue());
         timeOfFlightSec.put(BREAKPOINTS_METERS[4], ShootingParamsNT.tofSec6m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[5], ShootingParamsNT.tofSec7m.getValue());
     }
 
     /** Values between breakpoints are linearly interpolated and remain live-tunable over NT. */
     @NTParameter(tableName = "Params/Shooting")
     public static final class ShootingParams {
-        public static final double hoodAngleDeg2m = 23.0;
-        public static final double hoodAngleDeg3m = 29.5;
-        public static final double hoodAngleDeg4m = 37.;
-        public static final double hoodAngleDeg5m = 40.0;
-        public static final double hoodAngleDeg6m = 37.0;
+        public static final double hoodAngleDeg2m = 22.0;
+        public static final double hoodAngleDeg3m = 38.0; // 39
+        public static final double hoodAngleDeg4m = 33.0; // 34
+        public static final double hoodAngleDeg5m = 34.0; // 35
+        public static final double hoodAngleDeg6m = 39.0; // 40
+        public static final double hoodAngleDeg7m = 41.0; // 42
 
-        public static final double shooterRps2m = 55.0;
-        public static final double shooterRps3m = 57.5;
-        public static final double shooterRps4m = 59.0;
-        public static final double shooterRps5m = 67.0;
-        public static final double shooterRps6m = 60.0;
+        public static final double shooterRps2m = 50.0; // 50
+        public static final double shooterRps3m = 51.0; // 51
+        public static final double shooterRps4m = 52.0; // 52
+        public static final double shooterRps5m = 56.0; // 56
+        public static final double shooterRps6m = 61.0; // 61
+        public static final double shooterRps7m = 63.0; // 63
         public static final double lowerShooterSpeedScale = 1.0;
 
         public static final double tofSec2m = 0.85;
@@ -97,6 +102,7 @@ public class ShotCalculator {
         public static final double tofSec4m = 1.05;
         public static final double tofSec5m = 1.15;
         public static final double tofSec6m = 1.25;
+        public static final double tofSec7m = 1.30;
 
         public static final double headingToleranceDeg = 2.0;
 

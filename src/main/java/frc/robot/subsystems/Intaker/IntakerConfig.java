@@ -43,6 +43,7 @@ public class IntakerConfig {
 
     public enum IntakeMode {
         INTAKING, // Roller: Intake, Pivot: Extended
+        MAX_INTAKING, // Roller: Max intake, Pivot: Extended
         RETRACTED, // Roller: Stop,   Pivot: Retracted
         FEEDING, // Roller: Intake, Pivot: Extended
         EXTENDED_REVERSE, // Roller: Outtake,Pivot: Extended
@@ -97,6 +98,7 @@ public class IntakerConfig {
         public static final double kS = 0.17085;
 
         public static final double intakeRPS = 50.0;
+        public static final double intakeRPSmax = 70.0;
 
         public static final double outtakeRPS = -15.0;
 

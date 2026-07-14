@@ -124,7 +124,7 @@ public class SubsystemConfig {
     @AllArgsConstructor
     public static class ZeroingConfig {
         @Default public double zeroingCurrentLimit = 40.0;
-        @Default public double zeroingVoltage = -2.0;
+        @Default public double zeroingVoltage = -1.5;
         @Default public int zeroingFilterSize = 5;
     }
 

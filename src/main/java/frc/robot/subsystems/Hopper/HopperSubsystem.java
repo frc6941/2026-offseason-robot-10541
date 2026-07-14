@@ -3,8 +3,6 @@ package frc.robot.subsystems.Hopper;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.Commands;
-import frc.robot.subsystems.Intaker.IntakerConfig.IntakeMode;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
 import java.util.function.BooleanSupplier;
 import lib.ironpulse.io.MotorIO;
@@ -55,15 +53,14 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
     }
 
     public void configureDefaultCommand() {
-        setDefaultCommand(
-                Commands.select(
-                        java.util.Map.of(
-                                IntakeMode.INTAKING, feed(),
-                                IntakeMode.FEEDING, feed(),
-                                IntakeMode.RETRACTED_FEEDING, reverse(),
-                                IntakeMode.EXTENDED_REVERSE, reverse(),
-                                IntakeMode.EXTENDED_IDLE, idle(),
-                                IntakeMode.RETRACTED, idle()),
-                        intaker::getCurrentMode));
+        setDefaultCommand(runVelTC(() -> RotationsPerSecond.of(defaultTargetRps())));
+    }
+
+    private double defaultTargetRps() {
+        return switch (intaker.getCurrentMode()) {
+            case INTAKING, MAX_INTAKING, FEEDING -> HopperParamsNT.feedRPS.getValue();
+            case RETRACTED_FEEDING, EXTENDED_REVERSE -> -HopperParamsNT.feedRPS.getValue();
+            case EXTENDED_IDLE, RETRACTED -> HopperParamsNT.idleRPS.getValue();
+        };
     }
 }

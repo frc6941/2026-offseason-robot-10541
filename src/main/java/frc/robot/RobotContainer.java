@@ -66,6 +66,9 @@ import org.littletonrobotics.junction.Logger;
  */
 public class RobotContainer {
 
+    private static final double INTAKE_TRIGGER_START_THRESHOLD = 0.1;
+    private static final double INTAKE_TRIGGER_MAX_THRESHOLD = 0.6;
+
     private boolean isReal = RobotBase.isReal();
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
@@ -109,9 +112,6 @@ public class RobotContainer {
     // Replace with CommandPS4Controller or CommandJoystick if needed
     private final CommandXboxController driverController = new CommandXboxController(0);
     private final CommandXboxController OperatorController = new CommandXboxController(1);
-
-    private int hubTargetModeRequests = 0;
-    private AutoAimCommand.TargetMode targetModeBeforeHubRequests = AutoAimCommand.TargetMode.AUTO;
 
     /** The container for the robot. Contains subsystems, OI devices, and commands. */
     public RobotContainer() {
@@ -169,7 +169,16 @@ public class RobotContainer {
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
-        driverController.leftTrigger().whileTrue(intaker.runIntakeContinuous());
+        Trigger maxIntakeTrigger =
+                new Trigger(
+                        () ->
+                                driverController.getLeftTriggerAxis()
+                                        >= INTAKE_TRIGGER_MAX_THRESHOLD);
+        driverController
+                .leftTrigger(INTAKE_TRIGGER_START_THRESHOLD)
+                .and(maxIntakeTrigger.negate())
+                .whileTrue(intaker.runIntakeContinuous());
+        maxIntakeTrigger.whileTrue(intaker.runMaxIntakeContinuous());
 
         // Swerve
         // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick
@@ -218,9 +227,9 @@ public class RobotContainer {
                                         indicator.indicateWithTimeout(
                                                 IndicatorIO.Patterns.RESET_ODOM, 1)));
 
-        // Y aims the drivetrain at the hub. X/B temporarily run AutoTrench. RT shoots only, so
-        // drivers can hold Y + RT together for the old aim-and-shoot behavior.
-        driverController.y().whileTrue(aimAtHubCommand());
+        // Y aims without shooting; RT aims and shoots. Both select the hub inside our alliance
+        // zone, or the matching pass corner after crossing out of it.
+        driverController.y().whileTrue(aimCommand());
 
         driverController.x().whileTrue(autoTrenchCommand());
         driverController.b().whileTrue(autoTrenchCommand());
@@ -232,7 +241,13 @@ public class RobotContainer {
         // and watch AutoPilot/* (DistanceToTarget, AtTarget, vx/vy/omega) in AdvantageScope.
         driverController.povDown().whileTrue(driveToPoseAutoPilotTestCommand());
 
-        driverController.rightTrigger().whileTrue(shootAtHubCommand());
+        // driverController.rightTrigger().whileTrue(shootAtHubCommand());
+        // Test: drive to the second-sweep start pose with the AutopilotDriveToPose point-to-point
+        // driver (straight beeline). Hold D-pad Down to run, release to abort. Tune
+        // Params/Commands/AutopilotDriveToPose live and watch Commands/AutopilotDriveToPose/* in
+        // AdvantageScope.
+        //driverController.povDown().whileTrue(autopilotDriveToPoseTestCommand());
+        driverController.rightTrigger().whileTrue(shootCommand());
         driverController
                 .rightTrigger()
                 .onFalse(
@@ -244,9 +259,9 @@ public class RobotContainer {
                                                 IndicatorIO.Patterns.AFTER_SHOOTING, 0.5))));
     }
 
-    private Command aimAtHubCommand() {
+    private Command aimCommand() {
         return Commands.parallel(
-                holdHubTargetMode(),
+                holdAutomaticTargetMode(),
                 new AutoAimCommand(
                         swerve,
                         () -> -driverController.getLeftY(),
@@ -255,9 +270,15 @@ public class RobotContainer {
                         shootingSuperstructure::aimHeadingRateRadPerSec));
     }
 
-    private Command shootAtHubCommand() {
+    private Command shootCommand() {
         return Commands.parallel(
-                holdHubTargetMode(),
+                holdAutomaticTargetMode(),
+                new AutoAimCommand(
+                        swerve,
+                        () -> -driverController.getLeftY(),
+                        () -> -driverController.getLeftX(),
+                        shootingSuperstructure::aimHeading,
+                        shootingSuperstructure::aimHeadingRateRadPerSec),
                 shootingSuperstructure.aimAndShoot(),
                 intaker.holdRetractedFeedPosition());
     }
@@ -279,21 +300,10 @@ public class RobotContainer {
                                 AllianceFlipUtil.apply(AutoActions.kSecondSweepStartR)));
     }
 
-    private Command holdHubTargetMode() {
+    private Command holdAutomaticTargetMode() {
         return Commands.startEnd(
-                () -> {
-                    if (hubTargetModeRequests == 0) {
-                        targetModeBeforeHubRequests = AutoAimCommand.getTargetMode();
-                        AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.HUB);
-                    }
-                    hubTargetModeRequests++;
-                },
-                () -> {
-                    hubTargetModeRequests = Math.max(0, hubTargetModeRequests - 1);
-                    if (hubTargetModeRequests == 0) {
-                        AutoAimCommand.setTargetMode(targetModeBeforeHubRequests);
-                    }
-                });
+                () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.AUTO),
+                () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.AUTO));
     }
 
     /**
@@ -303,6 +313,11 @@ public class RobotContainer {
      */
     public Command getAutonomousCommand() {
         return AutoFile.buildAuto();
+    }
+
+    /** Hard-stop zero the intake pivot once when teleop starts. */
+    public Command getTeleopIntakeZeroCommand() {
+        return intaker.zeroCommand();
     }
 
     public void updateDashboard() {
@@ -393,6 +408,7 @@ public class RobotContainer {
         // --- 4. Intaker-deployed states ---
         var intakeMode = intaker.getCurrentMode();
         if (intakeMode == IntakerConfig.IntakeMode.INTAKING
+                || intakeMode == IntakerConfig.IntakeMode.MAX_INTAKING
                 || intakeMode == IntakerConfig.IntakeMode.FEEDING
                 || intakeMode == IntakerConfig.IntakeMode.EXTENDED_REVERSE
                 || intakeMode == IntakerConfig.IntakeMode.RETRACTED_FEEDING) {
