@@ -16,7 +16,9 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -327,6 +329,9 @@ public class RobotContainer {
     }
 
     public void updateDashboard() {
+        SmartDashboard.putNumber("Match Time", DriverStation.getMatchTime());
+        SmartDashboard.putNumber("Robot Voltage", RobotController.getBatteryVoltage());
+
         // Feed the swerve pose into the transform tree (World->Robot). This is the single place the
         // robot's world pose enters RobotStateRecorder; everything alliance-aware (driver-relative
         // driving, flipped targets) derives from here. Runs every loop incl. disabled.
