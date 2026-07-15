@@ -45,7 +45,12 @@ public class ShooterConfig {
     // SensorToMechanismRatio (below), NOT here — so this must be a bare 360, or the ratio gets
     // applied twice and the hood barely moves. See PositionMotorSubsystem doc ("Pivot: 360").
     public static final Angle HOOD_ANGLE_PER_ROTATION = Degrees.of(360.0);
-    public static final Angle HOOD_ZERO_OFFSET = Degrees.of(10.0);
+    // The hood zeroes against its reverse/stow hard stop, so the raw motor zero IS mechanism 0.
+    // zeroOffset is ONLY for CTRE arm-cosine gravity (see SubsystemConfig.zeroOffset) and the hood
+    // uses Elevator_Static gravity, so it must be 0 here — any nonzero value shifts the whole
+    // coordinate frame, making getCurrPos report the stop as 10 deg and putting stow (0 deg) below
+    // the hard stop where the mechanism can never reach it (hood zeroes, then won't move to angle).
+    public static final Angle HOOD_ZERO_OFFSET = Degrees.of(0.0);
 
     public static final SubsystemConfig SHOOTER_DRUM_CONFIG =
             SubsystemConfig.builder()

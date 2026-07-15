@@ -26,7 +26,7 @@ public final class SwerveMK5Config {
                     .mountPoseYaw(-90.76828002929688)
                     .mountPosePitch(-0.39588314294815063)
                     .mountPoseRoll(-3.5150318145751953)
-                    .gyroScalarZ(-0.6)
+                    .gyroScalarZ(-0)
                     .build();
 
     // Per-module physical limits (MK5n R1 + Kraken X60/X44 with FOC)
@@ -73,6 +73,25 @@ public final class SwerveMK5Config {
                     // actually effective
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
                     .build();
+
+    public static SwerveLimit kAutoPiloLimit =
+            SwerveLimit.builder()
+                    .maxLinearVelocity(MetersPerSecond.of(3)) // theoretically 5.10
+                    // prevents skidding, see orbit archive ytb channel open class for theory
+                    // prevents skidding, see orbit archive ytb channel open class for theory.
+                    // Kept near traction to protect tracking; was 200 (far above traction).
+                    .maxSkidAcceleration(
+                            MetersPerSecondPerSecond.of(10)) // <maxDriveAcceleration
+                    // Chassis-level brake cap; composes with the module maxDriveDeceleration (the
+                    // tighter one binds). Falls back to maxSkidAcceleration if unset.
+                    .maxBrakeAcceleration(MetersPerSecondPerSecond.of(25))
+                    // omega_max ≈ vMax / r.
+                    .maxAngularVelocity(DegreesPerSecond.of(600))
+                    // accelerate in 0.32s, also must be smaller than the defined module limit to be
+                    // actually effective
+                    .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
+                    .build();
+
 
     public static SwerveLimit kUnlimitedLimit =
             SwerveLimit.builder()

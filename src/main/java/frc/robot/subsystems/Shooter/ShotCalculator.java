@@ -85,16 +85,16 @@ public class ShotCalculator {
         public static final double hoodAngleDeg2m = 24.0;
         public static final double hoodAngleDeg3m = 32.0; // 39
         public static final double hoodAngleDeg4m = 33.0; // 34
-        public static final double hoodAngleDeg5m = 39.5; // 35
-        public static final double hoodAngleDeg6m = 39.0; // 40
-        public static final double hoodAngleDeg7m = 41.0; // 42
+        public static final double hoodAngleDeg5m = 39.0; // 35
+        public static final double hoodAngleDeg6m = 41.0; // 40-
+        public static final double hoodAngleDeg7m = 40.0; // 42
 
         public static final double shooterRps2m = 50.0; // 50
         public static final double shooterRps3m = 52.2; // 51
         public static final double shooterRps4m = 53.0; // 52
-        public static final double shooterRps5m = 59.53; // 56
-        public static final double shooterRps6m = 61.0; // 61-
-        public static final double shooterRps7m = 63.0; // 63
+        public static final double shooterRps5m = 58.2; // 56
+        public static final double shooterRps6m = 60.0; // 61-
+        public static final double shooterRps7m = 64.5; // 63
         public static final double lowerShooterSpeedScale = 1.0;
 
         public static final double tofSec2m = 0.85;
