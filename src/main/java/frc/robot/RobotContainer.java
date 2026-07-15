@@ -176,6 +176,7 @@ public class RobotContainer {
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
+        /*
         Trigger maxIntakeTrigger =
                 new Trigger(
                         () ->
@@ -186,6 +187,8 @@ public class RobotContainer {
                 .and(maxIntakeTrigger.negate())
                 .whileTrue(intaker.runIntakeContinuous());
         maxIntakeTrigger.whileTrue(intaker.runMaxIntakeContinuous());
+        */
+       driverController.leftTrigger().whileTrue(intaker.runMaxIntakeContinuous());
 
         // Swerve
         // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick
