@@ -256,12 +256,19 @@ public class AutoActions {
         return Commands.defer(
                 () -> {
                     Pose2d targetPose = targetPoseSupplier.get();
-                    APTarget target =
-                            new APTarget(targetPose)
-                                    .withEntryAngle(
-                                            Rotation2d.fromDegrees(
-                                                    AutoPilotParamsNT.entryAngleDegrees
-                                                            .getValue()));
+                    // Entry angle is an absolute FIELD-relative direction of travel, authored in
+                    // blue-field terms. On red it is mirrored across the field centerline
+                    // (180 deg - angle), NOT rotated 180 deg, so the approach curve/radius enters
+                    // from the correct side on the opposite alliance. Without this the entry
+                    // direction is wrong when running on the mirrored alliance. (The APTarget's
+                    // scalars — exit velocity, beeline radius — are magnitudes and are NOT flipped.)
+                    double entryAngleDeg = AutoPilotParamsNT.entryAngleDegrees.getValue();
+                    Rotation2d entryAngle =
+                            Rotation2d.fromDegrees(
+                                    AllianceFlipUtil.shouldFlip()
+                                            ? entryAngleDeg
+                                            : entryAngleDeg - 180.0);
+                    APTarget target = new APTarget(targetPose).withEntryAngle(entryAngle);
                     return new AutoPilotCommand(swerve, target)
                             .beforeStarting(
                                     Commands.runOnce(
