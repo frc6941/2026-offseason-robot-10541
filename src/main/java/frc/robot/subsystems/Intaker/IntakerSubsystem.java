@@ -231,6 +231,16 @@ public class IntakerSubsystem extends SubsystemBase {
         return Commands.parallel(holdShootMode, raisePivotForShootSlowly());
     }
 
+    public Command holdFeedMode() {
+        return Commands.runEnd(
+                () -> currentMode = IntakeMode.FEEDING,
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                },
+                this);
+    }
+
     public Command returnPivotToIdleFast() {
         Command selectIdleMode =
                 Commands.runOnce(

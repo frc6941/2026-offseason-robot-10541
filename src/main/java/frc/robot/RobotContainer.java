@@ -166,7 +166,8 @@ public class RobotContainer {
         OperatorController.povDown().whileTrue(intaker.runExtendedReverse());
         OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
         OperatorController.povUp().whileTrue(intaker.holdRetractedFeedPosition());
-        
+        OperatorController.y().whileTrue(intaker.holdFeedMode());
+
         driverController.povLeft().onTrue(intaker.zeroCommand());
         driverController.povDown().whileTrue(intaker.runExtendedReverse());
         driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
