@@ -12,7 +12,7 @@
             "x": 256.0,
             "y": 0.0,
             "width": 1152.0,
-            "height": 768.0,
+            "height": 512.0,
             "type": "Field",
             "properties": {
               "topic": "/SmartDashboard/Field",
@@ -95,8 +95,8 @@
           },
           {
             "title": "Show Auto Preview",
-            "x": 0.0,
-            "y": 640.0,
+            "x": 256.0,
+            "y": 512.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Toggle Switch",
@@ -116,10 +116,10 @@
         "containers": [
           {
             "title": "Field",
-            "x": 512.0,
+            "x": 768.0,
             "y": 0.0,
             "width": 896.0,
-            "height": 640.0,
+            "height": 384.0,
             "type": "Field",
             "properties": {
               "topic": "/SmartDashboard/Field",
@@ -137,8 +137,8 @@
           },
           {
             "title": "Pattern",
-            "x": 0.0,
-            "y": 256.0,
+            "x": 512.0,
+            "y": 384.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Text Display",
@@ -151,7 +151,7 @@
           },
           {
             "title": "limelight-aalive",
-            "x": 0.0,
+            "x": 1408.0,
             "y": 384.0,
             "width": 256.0,
             "height": 128.0,
@@ -168,7 +168,7 @@
           },
           {
             "title": "Enabled",
-            "x": 256.0,
+            "x": 512.0,
             "y": 256.0,
             "width": 256.0,
             "height": 128.0,
@@ -185,7 +185,7 @@
           },
           {
             "title": "IntakeEnabled",
-            "x": 256.0,
+            "x": 896.0,
             "y": 384.0,
             "width": 256.0,
             "height": 128.0,
@@ -202,8 +202,8 @@
           },
           {
             "title": "ShooterEnabled",
-            "x": 0.0,
-            "y": 512.0,
+            "x": 1152.0,
+            "y": 384.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Boolean Box",
@@ -219,9 +219,9 @@
           },
           {
             "title": "Match Time",
-            "x": 0.0,
+            "x": 384.0,
             "y": 0.0,
-            "width": 512.0,
+            "width": 384.0,
             "height": 256.0,
             "type": "Match Time",
             "properties": {
@@ -235,9 +235,9 @@
           },
           {
             "title": "Voltage",
-            "x": 256.0,
-            "y": 512.0,
-            "width": 256.0,
+            "x": 384.0,
+            "y": 384.0,
+            "width": 128.0,
             "height": 128.0,
             "type": "Voltage View",
             "properties": {
@@ -254,13 +254,59 @@
           {
             "title": "FMSInfo",
             "x": 0.0,
-            "y": 640.0,
-            "width": 512.0,
+            "y": 384.0,
+            "width": 384.0,
             "height": 128.0,
             "type": "FMSInfo",
             "properties": {
               "topic": "/FMSInfo",
               "period": 0.06
+            }
+          },
+          {
+            "title": "Hub Remaining",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 384.0,
+            "height": 256.0,
+            "type": "Match Time",
+            "properties": {
+              "topic": "/SmartDashboard/Competition/Hub Remaining",
+              "period": 0.06,
+              "data_type": "double",
+              "time_display_mode": "Seconds Only",
+              "red_start_time": 5,
+              "yellow_start_time": 10
+            }
+          },
+          {
+            "title": "Hub Phase",
+            "x": 0.0,
+            "y": 256.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Large Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Competition/Hub Phase",
+              "period": 0.06,
+              "data_type": "string"
+            }
+          },
+          {
+            "title": "isHubActive",
+            "x": 256.0,
+            "y": 256.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/SmartDashboard/Competition/isHubActive",
+              "period": 0.06,
+              "data_type": "boolean",
+              "true_color": 4283215696,
+              "false_color": 4294198070,
+              "true_icon": "None",
+              "false_icon": "None"
             }
           }
         ]

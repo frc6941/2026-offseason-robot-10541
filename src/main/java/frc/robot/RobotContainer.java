@@ -38,6 +38,7 @@ import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import frc.robot.utils.HubShiftUtil;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -329,6 +330,13 @@ public class RobotContainer {
     public void updateDashboard() {
         SmartDashboard.putNumber("Match Time", DriverStation.getMatchTime());
         SmartDashboard.putNumber("Robot Voltage", RobotController.getBatteryVoltage());
+        HubShiftUtil.ShiftInfo hubShift = HubShiftUtil.getShiftInfo();
+        Logger.recordOutput("Competition/isHubActive", hubShift.active());
+        Logger.recordOutput("Competition/Hub Phase", hubShift.phase().toString());
+        Logger.recordOutput("Competition/Hub Remaining", hubShift.remainingTimeSeconds());
+        SmartDashboard.putBoolean("Competition/isHubActive", hubShift.active());
+        SmartDashboard.putString("Competition/Hub Phase", hubShift.phase().toString());
+        SmartDashboard.putNumber("Competition/Hub Remaining", hubShift.remainingTimeSeconds());
 
         // Feed the swerve pose into the transform tree (World->Robot). This is the single place the
         // robot's world pose enters RobotStateRecorder; everything alliance-aware (driver-relative
