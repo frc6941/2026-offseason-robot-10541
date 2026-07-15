@@ -4,6 +4,7 @@ import com.pathplanner.lib.util.PathPlannerLogging;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import java.util.List;
 
 /**
  * Publishes a {@link Field2d} (NT key "Field") for Elastic's Field widget: the robot pose plus the
@@ -38,6 +39,11 @@ public final class FieldPublisher {
     /** Update the robot's pose on the field. Call every loop. */
     public static void setRobotPose(Pose2d pose) {
         field.setRobotPose(pose);
+    }
+
+    /** Show the Limelight pose as one secondary robot, or remove it when vision is invalid. */
+    public static void setVisionGhost(Pose2d pose, boolean visible) {
+        field.getObject("VisionGhost").setPoses(visible ? List.of(pose) : List.of());
     }
 
     /** Draw the selected auto's target waypoints (preview, before the auto runs). */

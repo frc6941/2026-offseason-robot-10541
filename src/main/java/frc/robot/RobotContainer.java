@@ -352,9 +352,10 @@ public class RobotContainer {
         // doesn't snap to the field origin. Bind a translucent robot to Vision/Ghost in
         // AdvantageScope.
         Pose2d visionPose = limelightSubsystem.getPose(LimeLightConfig.NAME);
+        boolean hasVisionPose = !visionPose.equals(new Pose2d());
+        FieldPublisher.setVisionGhost(visionPose, hasVisionPose);
         Logger.recordOutput(
-                "Vision/Ghost",
-                visionPose.equals(new Pose2d()) ? new Pose2d[0] : new Pose2d[] {visionPose});
+                "Vision/Ghost", hasVisionPose ? new Pose2d[] {visionPose} : new Pose2d[0]);
     }
 
     public String getAutoSelectionSummary() {
