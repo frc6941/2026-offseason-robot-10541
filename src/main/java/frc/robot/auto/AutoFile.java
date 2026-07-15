@@ -6,10 +6,15 @@ import com.pathplanner.lib.path.PathPlannerPath;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.FieldPublisher;
 import frc.robot.auto.AutoRoutines.EndBehaviour;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import lib.ironpulse.utils.AllianceFlipUtil;
 import lombok.Getter;
 import org.json.simple.parser.ParseException;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
@@ -24,6 +29,8 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
  * left; if Side = RIGHT they are forced back to None.
  */
 public class AutoFile {
+    public static final String SHOW_PREVIEW_KEY = "Auto/Show Preview";
+
     @Getter
     private static final LoggedDashboardChooser<Side> sideChooser =
             new LoggedDashboardChooser<>("Auto/Side");
@@ -43,6 +50,9 @@ public class AutoFile {
             new Alert(
                     "Depot end behaviour is left-only; forcing None on the right side.",
                     Alert.AlertType.kWarning);
+    private static final Alert previewAlert =
+            new Alert("Failed to build selected auto preview.", Alert.AlertType.kError);
+    private static String lastPreviewSelection = "";
 
     private static <E extends Enum<E>> void initChooser(
             LoggedDashboardChooser<E> chooser, E[] values, E defaultValue) {
@@ -56,6 +66,7 @@ public class AutoFile {
 
     public static void init() {
         validatePaths();
+        SmartDashboard.setDefaultBoolean(SHOW_PREVIEW_KEY, true);
         // Default config: Trench start, Middle second sweep, 2 sweeps, no end behaviour.
         initChooser(sideChooser, Side.values(), Side.RIGHT);
         initChooser(startBehaviourChooser, StartBehaviour.values(), StartBehaviour.TRENCH_START);
@@ -138,6 +149,109 @@ public class AutoFile {
                 end,
                 secondSweep == SecondSweepBehaviour.BUMP_AGAIN,
                 startPath(StartBehaviour.BUMP_START));
+    }
+
+    /** Refresh the disabled-time Field2d preview when a chooser or alliance selection changes. */
+    public static void updatePreview() {
+        boolean showPreview = SmartDashboard.getBoolean(SHOW_PREVIEW_KEY, true);
+        String previewSelection =
+                selectionSummary()
+                        + ", Flipped="
+                        + AllianceFlipUtil.shouldFlip()
+                        + ", ShowPreview="
+                        + showPreview;
+        if (previewSelection.equals(lastPreviewSelection)) {
+            return;
+        }
+        lastPreviewSelection = previewSelection;
+
+        if (!showPreview) {
+            FieldPublisher.setPreview(List.of());
+            previewAlert.set(false);
+            return;
+        }
+
+        Side side = orDefault(sideChooser.get(), Side.RIGHT);
+        StartBehaviour start = orDefault(startBehaviourChooser.get(), StartBehaviour.TRENCH_START);
+        SecondSweepBehaviour secondSweep =
+                orDefault(secondSweepChooser.get(), SecondSweepBehaviour.MIDDLE);
+        int sweepTimes = sweepTimesChooser.get() != null ? sweepTimesChooser.get() : 2;
+        EndBehaviour end = orDefault(endBehaviourChooser.get(), EndBehaviour.NONE);
+        boolean isLeft = side == Side.LEFT;
+
+        if (!isLeft && (end == EndBehaviour.DEPOT || end == EndBehaviour.DEPOT_DRIVE_THROUGH)) {
+            end = EndBehaviour.NONE;
+        }
+
+        try {
+            List<Pose2d> preview = new ArrayList<>();
+            appendPose(preview, alliancePose(startPose(start, isLeft)));
+
+            if (start == StartBehaviour.BUMP_START) {
+                appendPose(preview, alliancePose(isLeft ? kSlopeFrontL : kSlopeFrontR));
+            } else {
+                appendPath(preview, "RightTrenchToMiddle", isLeft);
+            }
+            appendPath(preview, startPath(start), isLeft);
+            appendPose(preview, alliancePose(isLeft ? kSlopeEndL : kSlopeEndR));
+
+            if (sweepTimes >= 2) {
+                if (secondSweep == SecondSweepBehaviour.BUMP_AGAIN) {
+                    appendPose(preview, alliancePose(isLeft ? kBumpStartL : kBumpStartR));
+                    appendPose(preview, alliancePose(isLeft ? kSlopeFrontL : kSlopeFrontR));
+                    appendPath(preview, startPath(StartBehaviour.BUMP_START), isLeft);
+                } else {
+                    appendPose(
+                            preview,
+                            alliancePose(isLeft ? kSecondSweepStartL : kSecondSweepStartR));
+                    appendPath(preview, secondSweepPath(secondSweep), isLeft);
+                }
+                appendPose(preview, alliancePose(isLeft ? kSlopeEndL : kSlopeEndR));
+            }
+
+            switch (end) {
+                case MIDDLE -> appendPath(preview, "RightEndtoMiddle", isLeft);
+                case DEPOT -> appendPath(preview, "LeftDriveDepot", false);
+                case DEPOT_DRIVE_THROUGH ->
+                        appendPath(preview, "LeftDriveDepotDriveThrough", false);
+                case NONE -> {
+                    // No final movement to preview.
+                }
+            }
+
+            FieldPublisher.setPreview(preview);
+            previewAlert.set(false);
+        } catch (IOException | ParseException e) {
+            FieldPublisher.setPreview(List.of());
+            previewAlert.setText("Failed to build selected auto preview: " + e.getMessage());
+            previewAlert.set(true);
+        }
+    }
+
+    private static void appendPath(List<Pose2d> preview, String pathName, boolean shouldMirror)
+            throws IOException, ParseException {
+        PathPlannerPath path = PathPlannerPath.fromPathFile(pathName);
+        path = shouldMirror ? path.mirrorPath() : path;
+        if (AllianceFlipUtil.shouldFlip()) {
+            path = path.flipPath();
+        }
+        for (Pose2d pose : path.getPathPoses()) {
+            appendPose(preview, pose);
+        }
+    }
+
+    private static Pose2d alliancePose(Pose2d bluePose) {
+        return AllianceFlipUtil.apply(bluePose);
+    }
+
+    private static void appendPose(List<Pose2d> preview, Pose2d pose) {
+        if (preview.isEmpty()
+                || preview.get(preview.size() - 1)
+                                .getTranslation()
+                                .getDistance(pose.getTranslation())
+                        > 1e-3) {
+            preview.add(pose);
+        }
     }
 
     // ---- chooser -> path/pose mapping (paths are RIGHT-authored; left mirrors them) ----

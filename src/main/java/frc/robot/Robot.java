@@ -10,6 +10,7 @@ import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.utils.HubShiftUtil;
 import lib.ironpulse.utils.LoggedTracer;
 import lib.ironpulse.utils.PhoenixUtils;
 import lib.ntext.NTParameterRegistry;
@@ -146,6 +147,7 @@ public class Robot extends LoggedRobot {
      */
     @Override
     public void autonomousInit() {
+        HubShiftUtil.initialize();
         autonomousCommand = robotContainer.getAutonomousCommand();
         DriverStation.reportWarning(
                 "Selected auto: " + robotContainer.getAutoSelectionSummary(), false);
@@ -162,6 +164,7 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void teleopInit() {
+        HubShiftUtil.initialize();
         // This makes sure that the autonomous stops running when
         // teleop starts running. If you want the autonomous to
         // continue until interrupted by another command, remove

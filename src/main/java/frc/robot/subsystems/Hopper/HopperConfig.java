@@ -45,9 +45,9 @@ public class HopperConfig {
         public static final double kA = 0.004;
         public static final double kS = 0.252;
 
-        public static final double feedRPS = 20;
-        public static final double shootRPS = 60;
-        public static final double idleRPS = -2;
+        public static final double feedRPS = -8;
+        public static final double shootRPS = 105;
+        public static final double idleRPS = -8;
 
         private HopperParams() {}
     }

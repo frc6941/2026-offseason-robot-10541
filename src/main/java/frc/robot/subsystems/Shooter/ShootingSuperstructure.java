@@ -44,7 +44,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     private static final String MANUAL_OVERRIDE_KEY = "Shooter Tuning/Manual Override";
     private static final String MANUAL_HOOD_ANGLE_KEY = "Shooter Tuning/Hood Angle Deg";
     private static final String MANUAL_FLYWHEEL_RPS_KEY = "Shooter Tuning/Flywheel RPS";
-    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.4;
+    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.2;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
@@ -264,6 +264,17 @@ public class ShootingSuperstructure extends SubsystemBase {
                                 ShooterUpperParamsNT.velocityAtGoalToleranceRPS.getValue()));
     }
 
+    /** True when the upper shooter has reached the current distance-based shot speed. */
+    public boolean upperAtShotSpeed() {
+        return upperAtTarget(() -> currentSolution().shooterSpeed());
+    }
+
+    /** Completes when the upper shooter is ready and the configured feed delay has elapsed. */
+    public Command waitForFeedStart() {
+        return Commands.waitUntil(this::upperAtShotSpeed)
+                .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
+    }
+
     private Command runShooterPrespin() {
         return Commands.parallel(
                 shooterUpper.runVelVolt(
@@ -399,10 +410,10 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     /**
-     * Park the shot mechanisms: stop the flywheel, flatten the hood, and STOP THE HOPPER. The hopper
-     * is commanded to idle (0 RPS) directly here so it actually stops when the shot ends, instead of
-     * being left to its default command (which keeps it spinning off the intake mode). Bind to
-     * {@code onFalse} of the aim trigger.
+     * Park the shot mechanisms: stop the flywheel, flatten the hood, and STOP THE HOPPER. The
+     * hopper is commanded to idle (0 RPS) directly here so it actually stops when the shot ends,
+     * instead of being left to its default command (which keeps it spinning off the intake mode).
+     * Bind to {@code onFalse} of the aim trigger.
      */
     public Command idle() {
         return Commands.parallel(

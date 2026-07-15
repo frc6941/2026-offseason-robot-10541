@@ -16,7 +16,9 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -36,6 +38,7 @@ import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import frc.robot.utils.HubShiftUtil;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -279,7 +282,9 @@ public class RobotContainer {
                         shootingSuperstructure::aimHeading,
                         shootingSuperstructure::aimHeadingRateRadPerSec),
                 shootingSuperstructure.aimAndShoot(),
-                intaker.holdRetractedFeedPosition());
+                shootingSuperstructure
+                        .waitForFeedStart()
+                        .andThen(intaker.holdRetractedFeedPosition()));
     }
 
     private Command autoTrenchCommand() {
@@ -296,7 +301,8 @@ public class RobotContainer {
         return Commands.deferredProxy(
                 () ->
                         AutoActions.driveToPoseAutoPilot(
-                                AllianceFlipUtil.apply(AutoActions.kSecondSweepStartL)).andThen(
+                                        AllianceFlipUtil.apply(AutoActions.kSecondSweepStartL))
+                                .andThen(
                                         AutoActions.sweepCollectShoot(
                                                 "RightTrenchSecondMiddle", true)));
     }
@@ -322,6 +328,16 @@ public class RobotContainer {
     }
 
     public void updateDashboard() {
+        SmartDashboard.putNumber("Match Time", DriverStation.getMatchTime());
+        SmartDashboard.putNumber("Robot Voltage", RobotController.getBatteryVoltage());
+        HubShiftUtil.ShiftInfo hubShift = HubShiftUtil.getShiftInfo();
+        Logger.recordOutput("Competition/isHubActive", hubShift.active());
+        Logger.recordOutput("Competition/Hub Phase", hubShift.phase().toString());
+        Logger.recordOutput("Competition/Hub Remaining", hubShift.remainingTimeSeconds());
+        SmartDashboard.putBoolean("Competition/isHubActive", hubShift.active());
+        SmartDashboard.putString("Competition/Hub Phase", hubShift.phase().toString());
+        SmartDashboard.putNumber("Competition/Hub Remaining", hubShift.remainingTimeSeconds());
+
         // Feed the swerve pose into the transform tree (World->Robot). This is the single place the
         // robot's world pose enters RobotStateRecorder; everything alliance-aware (driver-relative
         // driving, flipped targets) derives from here. Runs every loop incl. disabled.
@@ -336,6 +352,7 @@ public class RobotContainer {
         // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's
         // callbacks).
         FieldPublisher.setRobotPose(swerve.getEstimatedPose().toPose2d());
+        AutoFile.updatePreview();
 
         // Vision ghost — re-homed out of the vendored lib so future lib copies stay drop-in. Logs
         // the
@@ -343,9 +360,10 @@ public class RobotContainer {
         // doesn't snap to the field origin. Bind a translucent robot to Vision/Ghost in
         // AdvantageScope.
         Pose2d visionPose = limelightSubsystem.getPose(LimeLightConfig.NAME);
+        boolean hasVisionPose = !visionPose.equals(new Pose2d());
+        FieldPublisher.setVisionGhost(visionPose, hasVisionPose);
         Logger.recordOutput(
-                "Vision/Ghost",
-                visionPose.equals(new Pose2d()) ? new Pose2d[0] : new Pose2d[] {visionPose});
+                "Vision/Ghost", hasVisionPose ? new Pose2d[] {visionPose} : new Pose2d[0]);
     }
 
     public String getAutoSelectionSummary() {

@@ -49,19 +49,13 @@ public final class AutoParams {
     @NTParameter(tableName = "Params/AutoShoot")
     public static final class AutoShootParams {
         // How long to run the feed once at the shoot pose. Size this to empty a full hopper.
-        // Total auto shot ≈ FEED_DELAY_AFTER_UPPER_READY (0.5s) + feedSeconds, because the flywheel
+        // Total auto shot ≈ FEED_DELAY_AFTER_UPPER_READY (0.2s) + feedSeconds, because the flywheel
         // is pre-spun during the drive in (see ShootingSuperstructure.spinUpForShot), so there's no
         // spin-up wait. 1.5 keeps the whole shot within ~2s.
         public static final double feedSeconds = 1.5;
         // Max time to wait for the flywheel to reach speed before giving up and NOT feeding. With
         // pre-spin the drum is at speed on arrival, so this is rarely used; it only caps the wait.
         public static final double readyTimeoutSeconds = 1.5;
-        // Delay after the shoot sequence starts before raising the intake to the retracted-feed
-        // (shoot) pose, so it clears the shot path / helps feeding. Mirrors the teleop shot's
-        // intake
-        // raise. In auto the pivot is ramped up gently via pivotTargetAngle's RETRACTED_FEEDING
-        // rate limit (followModePivot reads the mode), matching raisePivotForShootSlowly().
-        public static final double pivotRaiseDelaySeconds = 1.0;
 
         private AutoShootParams() {}
     }

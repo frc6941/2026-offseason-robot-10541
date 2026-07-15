@@ -12,7 +12,7 @@
             "x": 256.0,
             "y": 0.0,
             "width": 1152.0,
-            "height": 768.0,
+            "height": 512.0,
             "type": "Field",
             "properties": {
               "topic": "/SmartDashboard/Field",
@@ -92,6 +92,19 @@
               "period": 0.06,
               "sort_options": false
             }
+          },
+          {
+            "title": "Show Auto Preview",
+            "x": 256.0,
+            "y": 512.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Toggle Switch",
+            "properties": {
+              "topic": "/SmartDashboard/Auto/Show Preview",
+              "period": 0.06,
+              "data_type": "boolean"
+            }
           }
         ]
       }
@@ -103,10 +116,10 @@
         "containers": [
           {
             "title": "Field",
-            "x": 384.0,
+            "x": 768.0,
             "y": 0.0,
-            "width": 1024.0,
-            "height": 640.0,
+            "width": 768.0,
+            "height": 384.0,
             "type": "Field",
             "properties": {
               "topic": "/SmartDashboard/Field",
@@ -124,8 +137,8 @@
           },
           {
             "title": "Pattern",
-            "x": 0.0,
-            "y": 0.0,
+            "x": 512.0,
+            "y": 384.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Text Display",
@@ -138,8 +151,8 @@
           },
           {
             "title": "limelight-aalive",
-            "x": 0.0,
-            "y": 128.0,
+            "x": 1280.0,
+            "y": 384.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Boolean Box",
@@ -155,7 +168,7 @@
           },
           {
             "title": "Enabled",
-            "x": 0.0,
+            "x": 512.0,
             "y": 256.0,
             "width": 256.0,
             "height": 128.0,
@@ -172,7 +185,7 @@
           },
           {
             "title": "IntakeEnabled",
-            "x": 0.0,
+            "x": 768.0,
             "y": 384.0,
             "width": 256.0,
             "height": 128.0,
@@ -189,13 +202,105 @@
           },
           {
             "title": "ShooterEnabled",
-            "x": 0.0,
-            "y": 512.0,
+            "x": 1024.0,
+            "y": 384.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Boolean Box",
             "properties": {
               "topic": "/FieldCore/Robot/ShooterEnabled",
+              "period": 0.06,
+              "data_type": "boolean",
+              "true_color": 4283215696,
+              "false_color": 4294198070,
+              "true_icon": "None",
+              "false_icon": "None"
+            }
+          },
+          {
+            "title": "Match Time",
+            "x": 384.0,
+            "y": 0.0,
+            "width": 384.0,
+            "height": 256.0,
+            "type": "Match Time",
+            "properties": {
+              "topic": "/SmartDashboard/Match Time",
+              "period": 0.06,
+              "data_type": "double",
+              "time_display_mode": "Minutes and Seconds",
+              "red_start_time": 15,
+              "yellow_start_time": 30
+            }
+          },
+          {
+            "title": "Voltage",
+            "x": 384.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Voltage View",
+            "properties": {
+              "topic": "/SmartDashboard/Robot Voltage",
+              "period": 0.06,
+              "data_type": "double",
+              "min_value": 4.0,
+              "max_value": 13.0,
+              "divisions": 4,
+              "inverted": false,
+              "orientation": "horizontal"
+            }
+          },
+          {
+            "title": "FMSInfo",
+            "x": 0.0,
+            "y": 384.0,
+            "width": 384.0,
+            "height": 128.0,
+            "type": "FMSInfo",
+            "properties": {
+              "topic": "/FMSInfo",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Hub Remaining",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 384.0,
+            "height": 256.0,
+            "type": "Match Time",
+            "properties": {
+              "topic": "/SmartDashboard/Competition/Hub Remaining",
+              "period": 0.06,
+              "data_type": "double",
+              "time_display_mode": "Seconds Only",
+              "red_start_time": 5,
+              "yellow_start_time": 10
+            }
+          },
+          {
+            "title": "Hub Phase",
+            "x": 0.0,
+            "y": 256.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Large Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Competition/Hub Phase",
+              "period": 0.06,
+              "data_type": "string"
+            }
+          },
+          {
+            "title": "isHubActive",
+            "x": 256.0,
+            "y": 256.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/SmartDashboard/Competition/isHubActive",
               "period": 0.06,
               "data_type": "boolean",
               "true_color": 4283215696,
@@ -210,11 +315,66 @@
     {
       "name": "Tuning",
       "grid_layout": {
-        "layouts": [],
+        "layouts": [
+          {
+            "title": "Shooter Tuning",
+            "x": 0.0,
+            "y": 128.0,
+            "width": 256.0,
+            "height": 384.0,
+            "type": "List Layout",
+            "properties": {
+              "label_position": "TOP"
+            },
+            "children": [
+              {
+                "title": "Flywheel RPS",
+                "x": 0.0,
+                "y": 0.0,
+                "width": 128.0,
+                "height": 128.0,
+                "type": "Text Display",
+                "properties": {
+                  "topic": "/SmartDashboard/Shooter Tuning/Flywheel RPS",
+                  "period": 0.06,
+                  "data_type": "double",
+                  "show_submit_button": false
+                }
+              },
+              {
+                "title": "Hood Angle Deg",
+                "x": 0.0,
+                "y": 0.0,
+                "width": 128.0,
+                "height": 128.0,
+                "type": "Text Display",
+                "properties": {
+                  "topic": "/SmartDashboard/Shooter Tuning/Hood Angle Deg",
+                  "period": 0.06,
+                  "data_type": "double",
+                  "show_submit_button": false
+                }
+              },
+              {
+                "title": "Manual Override",
+                "x": 0.0,
+                "y": 0.0,
+                "width": 128.0,
+                "height": 128.0,
+                "type": "Toggle Switch",
+                "properties": {
+                  "topic": "/SmartDashboard/Shooter Tuning/Manual Override",
+                  "period": 0.06,
+                  "data_type": "boolean"
+                }
+              }
+            ]
+          }
+        ],
         "containers": [
           {
             "title": "Field",
-            "x": 512.0,
+            "x": 256.0,
             "y": 0.0,
             "width": 896.0,
             "height": 640.0,
@@ -231,6 +391,20 @@
               "robot_color": 4294198070,
               "trajectory_color": 4294967295,
               "show_robot_outside_widget": true
+            }
+          },
+          {
+            "title": "distanceMeters",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/AdvantageKit/RealOutputs/Shooting/distanceMeters",
+              "period": 0.06,
+              "data_type": "double",
+              "show_submit_button": false
             }
           }
         ]

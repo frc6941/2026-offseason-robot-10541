@@ -80,8 +80,7 @@ public final class SwerveMK5Config {
                     // prevents skidding, see orbit archive ytb channel open class for theory
                     // prevents skidding, see orbit archive ytb channel open class for theory.
                     // Kept near traction to protect tracking; was 200 (far above traction).
-                    .maxSkidAcceleration(
-                            MetersPerSecondPerSecond.of(10)) // <maxDriveAcceleration
+                    .maxSkidAcceleration(MetersPerSecondPerSecond.of(10)) // <maxDriveAcceleration
                     // Chassis-level brake cap; composes with the module maxDriveDeceleration (the
                     // tighter one binds). Falls back to maxSkidAcceleration if unset.
                     .maxBrakeAcceleration(MetersPerSecondPerSecond.of(25))
@@ -91,7 +90,6 @@ public final class SwerveMK5Config {
                     // actually effective
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
                     .build();
-
 
     public static SwerveLimit kUnlimitedLimit =
             SwerveLimit.builder()

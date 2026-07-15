@@ -391,23 +391,23 @@ public class AutoActions {
     /**
      * Hold the chassis aimed at the hub while emptying the hopper, then spin the drum back to idle.
      *
-     * <p>{@code pivotRaiseDelaySeconds} after the shot starts, the intake is put into
-     * RETRACTED_FEEDING mode ({@link IntakerSubsystem#holdRetractedFeedMode()}) so the pivot raises
-     * to the shoot pose — the auto equivalent of the teleop shot's intake raise. The pivot is
-     * actuated by {@link IntakerSubsystem#followModePivot()} (running for the whole routine), which
-     * is why this only flips the mode instead of commanding the pivot: the pivot requirement is
-     * already taken.
+     * <p>Once the upper shooter reaches its target speed and the feed delay elapses, the intake
+     * enters RETRACTED_FEEDING so the roller feeds while the pivot raises. The pivot is actuated by
+     * {@link IntakerSubsystem#followModePivot()} (running for the whole routine), which is why this
+     * only flips the mode instead of commanding the pivot: the pivot requirement is already taken.
      */
     public static Command aimAndShootAtHub(double feedSeconds) {
         return Commands.sequence(
                 Commands.deadline(
                         shootAtHub(feedSeconds),
                         aimAtHub(),
-                        Commands.waitSeconds(AutoShootParamsNT.pivotRaiseDelaySeconds.getValue())
+                        shootingSuperstructure
+                                .waitForFeedStart()
                                 .andThen(intake.holdRetractedFeedMode())),
                 // After the shot: force the intake to EXTENDED_IDLE so the hopper (whose speed is
                 // driven by the intake mode) actually STOPS — the shot can otherwise leave the mode
-                // in a feeding state (e.g. INTAKING carried over from the sweep). Then drop the drum
+                // in a feeding state (e.g. INTAKING carried over from the sweep). Then drop the
+                // drum
                 // to idle RPS (the auto sequence holds the shooter requirement, so its own default
                 // idle can't run on its own).
                 intake.forceExtendedIdle(),
@@ -448,7 +448,6 @@ public class AutoActions {
                         ? drivePastSlope(isLeft, false)
                         : drivePastSlope(isLeft, false, driveBackHeading);
         return Commands.sequence(
-                
                 Commands.deadline(
                         Commands.sequence(
                                 followPathFile(sweepPath, isLeft),

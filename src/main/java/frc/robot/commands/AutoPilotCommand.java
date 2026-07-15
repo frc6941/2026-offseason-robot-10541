@@ -205,7 +205,7 @@ public class AutoPilotCommand extends Command {
         // generates its trajectory from the CURRENT chassis speeds, so a moving handoff continues
         // with no dead stop. Setting a twist here is pointless (the next command overwrites it next
         // loop). Only stop when aborted.
-            swerve.runTwist(new ChassisSpeeds());
+        swerve.runTwist(new ChassisSpeeds());
         // Restore the default chassis limit now that Autopilot is no longer driving.
         swerve.setSwerveLimitDefault();
     }

@@ -277,15 +277,17 @@ public class IntakerSubsystem extends SubsystemBase {
                             return Degrees.of(commandedAngleDeg[0]);
                         });
 
-        return Commands.waitSeconds(1.6)
-                .andThen(initializeRamp.andThen(followRamp).finallyDo(interrupted -> timer.stop()));
+        return initializeRamp.andThen(followRamp).finallyDo(interrupted -> timer.stop());
     }
 
     public Command runExtendedReverse() {
-        return Commands.startEnd(
-                () -> currentMode = IntakeMode.EXTENDED_REVERSE,
-                () -> currentMode = fallbackMode,
-                this);
+        return Commands.parallel(
+                Commands.startEnd(
+                        () -> currentMode = IntakeMode.EXTENDED_REVERSE,
+                        () -> currentMode = fallbackMode,
+                        this),
+                roller.runVelTC(
+                        () -> RotationsPerSecond.of(IntakerRollerParamsNT.outtakeRPS.getValue())));
     }
 
     /**
