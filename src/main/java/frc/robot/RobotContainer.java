@@ -272,20 +272,18 @@ public class RobotContainer {
     }
 
     private Command shootCommand() {
-        return Commands.sequence(
-                intaker.forceExtendedIdle(),
-                Commands.parallel(
-                        holdAutomaticTargetMode(),
-                        new AutoAimCommand(
-                                swerve,
-                                () -> -driverController.getLeftY(),
-                                () -> -driverController.getLeftX(),
-                                shootingSuperstructure::aimHeading,
-                                shootingSuperstructure::aimHeadingRateRadPerSec),
-                        shootingSuperstructure.aimAndShoot(),
-                        shootingSuperstructure
-                                .waitForFeedStart()
-                                .andThen(intaker.holdRetractedShootPosition())));
+        return Commands.parallel(
+                holdAutomaticTargetMode(),
+                new AutoAimCommand(
+                        swerve,
+                        () -> -driverController.getLeftY(),
+                        () -> -driverController.getLeftX(),
+                        shootingSuperstructure::aimHeading,
+                        shootingSuperstructure::aimHeadingRateRadPerSec),
+                shootingSuperstructure.aimAndShoot(),
+                shootingSuperstructure
+                        .waitForFeedStart()
+                        .andThen(intaker.holdRetractedFeedPosition()));
     }
 
     private Command autoTrenchCommand() {

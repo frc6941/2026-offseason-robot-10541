@@ -384,21 +384,19 @@ public class AutoActions {
     /**
      * Hold the chassis aimed at the hub while emptying the hopper, then spin the drum back to idle.
      *
-     * <p>The intake roller stops as soon as the shot starts. Once the upper shooter reaches its
-     * target speed and the feed delay elapses, the intake enters RETRACTED_SHOOTING so the pivot
-     * raises while the roller stays stopped. The pivot is actuated by {@link
-     * IntakerSubsystem#followModePivot()} (running for the whole routine), which is why this only
-     * flips the mode instead of commanding the pivot: the pivot requirement is already taken.
+     * <p>Once the upper shooter reaches its target speed and the feed delay elapses, the intake
+     * enters RETRACTED_FEEDING so the roller feeds while the pivot raises. The pivot is actuated by
+     * {@link IntakerSubsystem#followModePivot()} (running for the whole routine), which is why this
+     * only flips the mode instead of commanding the pivot: the pivot requirement is already taken.
      */
     public static Command aimAndShootAtHub(double feedSeconds) {
         return Commands.sequence(
-                intake.forceExtendedIdle(),
                 Commands.deadline(
                         shootAtHub(feedSeconds),
                         aimAtHub(),
                         shootingSuperstructure
                                 .waitForFeedStart()
-                                .andThen(intake.holdRetractedShootMode())),
+                                .andThen(intake.holdRetractedFeedMode())),
                 // After the shot: force the intake to EXTENDED_IDLE so the hopper (whose speed is
                 // driven by the intake mode) actually STOPS — the shot can otherwise leave the mode
                 // in a feeding state (e.g. INTAKING carried over from the sweep). Then drop the
