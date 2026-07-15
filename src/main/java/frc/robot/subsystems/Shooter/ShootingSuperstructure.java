@@ -44,7 +44,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     private static final String MANUAL_OVERRIDE_KEY = "Shooter Tuning/Manual Override";
     private static final String MANUAL_HOOD_ANGLE_KEY = "Shooter Tuning/Hood Angle Deg";
     private static final String MANUAL_FLYWHEEL_RPS_KEY = "Shooter Tuning/Flywheel RPS";
-    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.2;
+    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.1;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
