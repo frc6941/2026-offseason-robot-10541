@@ -48,6 +48,7 @@ public class IntakerConfig {
         FEEDING, // Roller: Intake, Pivot: Extended
         EXTENDED_REVERSE, // Roller: Outtake,Pivot: Extended
         RETRACTED_FEEDING, // Roller: Intake, Pivot: Swing
+        RETRACTED_SHOOTING, // Roller: Stop, Pivot: Swing
         EXTENDED_IDLE // Roller: Stop,   Pivot: Extended
     }
 

@@ -98,7 +98,7 @@ public class IntakerSubsystem extends SubsystemBase {
             return pivot.getCurrPos();
         }
 
-        // RETRACTED_FEEDING is the shoot pose. In auto the pivot is driven here by
+        // The retracted modes are the shoot pose. In auto the pivot is driven here by
         // followModePivot's
         // position PID, which would SNAP to the angle. To match the teleop
         // raisePivotForShootSlowly()
@@ -106,7 +106,8 @@ public class IntakerSubsystem extends SubsystemBase {
         // shootRaiseSpeedDegreesPerSecond instead of jumping. (Teleop never reaches this branch —
         // holdRetractedFeedPosition() suppresses this default command and runs the ramp itself. We
         // can't run that ramp in auto because followModePivot already holds the pivot requirement.)
-        if (currentMode == IntakeMode.RETRACTED_FEEDING) {
+        if (currentMode == IntakeMode.RETRACTED_FEEDING
+                || currentMode == IntakeMode.RETRACTED_SHOOTING) {
             double targetDeg = IntakerPivotParamsNT.retractedfeedPosAngle.getValue();
             if (!shootRampActive) {
                 shootRampAngleDeg = pivot.getCurrPos().in(Degrees);
@@ -137,7 +138,8 @@ public class IntakerSubsystem extends SubsystemBase {
 
         if (currentMode != IntakeMode.FEEDING
                 && currentMode != IntakeMode.EXTENDED_REVERSE
-                && currentMode != IntakeMode.RETRACTED_FEEDING) {
+                && currentMode != IntakeMode.RETRACTED_FEEDING
+                && currentMode != IntakeMode.RETRACTED_SHOOTING) {
             currentMode = mode;
         }
     }
@@ -218,6 +220,17 @@ public class IntakerSubsystem extends SubsystemBase {
                 this);
     }
 
+    /** Hold the shoot pivot pose while keeping the intake roller stopped. */
+    public Command holdRetractedShootMode() {
+        return Commands.runEnd(
+                () -> currentMode = IntakeMode.RETRACTED_SHOOTING,
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                },
+                this);
+    }
+
     public Command holdRetractedFeedPosition() {
         Command holdShootMode =
                 Commands.runEnd(
@@ -229,6 +242,11 @@ public class IntakerSubsystem extends SubsystemBase {
                         this);
 
         return Commands.parallel(holdShootMode, raisePivotForShootSlowly());
+    }
+
+    /** Raise to the shoot pose slowly without running the intake roller. */
+    public Command holdRetractedShootPosition() {
+        return Commands.parallel(holdRetractedShootMode(), raisePivotForShootSlowly());
     }
 
     public Command returnPivotToIdleFast() {
@@ -277,8 +295,7 @@ public class IntakerSubsystem extends SubsystemBase {
                             return Degrees.of(commandedAngleDeg[0]);
                         });
 
-        return Commands.waitSeconds(1.6)
-                .andThen(initializeRamp.andThen(followRamp).finallyDo(interrupted -> timer.stop()));
+        return initializeRamp.andThen(followRamp).finallyDo(interrupted -> timer.stop());
     }
 
     public Command runExtendedReverse() {

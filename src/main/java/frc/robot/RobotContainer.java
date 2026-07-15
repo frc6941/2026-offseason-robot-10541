@@ -270,16 +270,20 @@ public class RobotContainer {
     }
 
     private Command shootCommand() {
-        return Commands.parallel(
-                holdAutomaticTargetMode(),
-                new AutoAimCommand(
-                        swerve,
-                        () -> -driverController.getLeftY(),
-                        () -> -driverController.getLeftX(),
-                        shootingSuperstructure::aimHeading,
-                        shootingSuperstructure::aimHeadingRateRadPerSec),
-                shootingSuperstructure.aimAndShoot(),
-                intaker.holdRetractedFeedPosition());
+        return Commands.sequence(
+                intaker.forceExtendedIdle(),
+                Commands.parallel(
+                        holdAutomaticTargetMode(),
+                        new AutoAimCommand(
+                                swerve,
+                                () -> -driverController.getLeftY(),
+                                () -> -driverController.getLeftX(),
+                                shootingSuperstructure::aimHeading,
+                                shootingSuperstructure::aimHeadingRateRadPerSec),
+                        shootingSuperstructure.aimAndShoot(),
+                        shootingSuperstructure
+                                .waitForFeedStart()
+                                .andThen(intaker.holdRetractedShootPosition())));
     }
 
     private Command autoTrenchCommand() {
@@ -296,7 +300,8 @@ public class RobotContainer {
         return Commands.deferredProxy(
                 () ->
                         AutoActions.driveToPoseAutoPilot(
-                                AllianceFlipUtil.apply(AutoActions.kSecondSweepStartL)).andThen(
+                                        AllianceFlipUtil.apply(AutoActions.kSecondSweepStartL))
+                                .andThen(
                                         AutoActions.sweepCollectShoot(
                                                 "RightTrenchSecondMiddle", true)));
     }
@@ -336,6 +341,7 @@ public class RobotContainer {
         // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's
         // callbacks).
         FieldPublisher.setRobotPose(swerve.getEstimatedPose().toPose2d());
+        AutoFile.updatePreview();
 
         // Vision ghost — re-homed out of the vendored lib so future lib copies stay drop-in. Logs
         // the

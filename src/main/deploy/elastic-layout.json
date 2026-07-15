@@ -92,6 +92,19 @@
               "period": 0.06,
               "sort_options": false
             }
+          },
+          {
+            "title": "Show Auto Preview",
+            "x": 0.0,
+            "y": 640.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Toggle Switch",
+            "properties": {
+              "topic": "/SmartDashboard/Auto/Show Preview",
+              "period": 0.06,
+              "data_type": "boolean"
+            }
           }
         ]
       }

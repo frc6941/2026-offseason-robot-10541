@@ -60,7 +60,7 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
         return switch (intaker.getCurrentMode()) {
             case INTAKING, MAX_INTAKING, FEEDING -> HopperParamsNT.feedRPS.getValue();
             case RETRACTED_FEEDING, EXTENDED_REVERSE -> -HopperParamsNT.feedRPS.getValue();
-            case EXTENDED_IDLE, RETRACTED -> HopperParamsNT.idleRPS.getValue();
+            case EXTENDED_IDLE, RETRACTED, RETRACTED_SHOOTING -> HopperParamsNT.idleRPS.getValue();
         };
     }
 }
