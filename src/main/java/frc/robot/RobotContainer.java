@@ -103,15 +103,13 @@ public class RobotContainer {
 
     @SuppressWarnings("unused")
     private final FieldCoreBridge fieldCoreBridge =
-            RobotBase.isSimulation()
-                    ? new FieldCoreBridge(
-                            swerve,
-                            intaker,
-                            hopperSubsystem,
-                            shooterUpperSubsystem,
-                            shooterLowerSubsystem,
-                            hoodSubsystem)
-                    : null;
+            new FieldCoreBridge(
+                    swerve,
+                    intaker,
+                    hopperSubsystem,
+                    shooterUpperSubsystem,
+                    shooterLowerSubsystem,
+                    hoodSubsystem);
 
     // Replace with CommandPS4Controller or CommandJoystick if needed
     private final CommandXboxController driverController = new CommandXboxController(0);
