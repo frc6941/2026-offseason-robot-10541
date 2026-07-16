@@ -261,7 +261,8 @@ public class AutoActions {
                     // (180 deg - angle), NOT rotated 180 deg, so the approach curve/radius enters
                     // from the correct side on the opposite alliance. Without this the entry
                     // direction is wrong when running on the mirrored alliance. (The APTarget's
-                    // scalars — exit velocity, beeline radius — are magnitudes and are NOT flipped.)
+                    // scalars — exit velocity, beeline radius — are magnitudes and are NOT
+                    // flipped.)
                     double entryAngleDeg = AutoPilotParamsNT.entryAngleDegrees.getValue();
                     Rotation2d entryAngle =
                             Rotation2d.fromDegrees(

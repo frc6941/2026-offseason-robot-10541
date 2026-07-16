@@ -164,12 +164,14 @@ public class RobotContainer {
         // Manual intake pivot hard-stop zero.
         OperatorController.povLeft().onTrue(intaker.zeroCommand());
         OperatorController.povDown().whileTrue(intaker.runExtendedReverse());
+        OperatorController.povDown().whileTrue(hopperSubsystem.out());
         OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
         OperatorController.povUp().whileTrue(intaker.holdRetractedFeedPosition());
         OperatorController.y().whileTrue(intaker.holdFeedMode());
 
         driverController.povLeft().onTrue(intaker.zeroCommand());
         driverController.povDown().whileTrue(intaker.runExtendedReverse());
+        driverController.povDown().whileTrue(hopperSubsystem.out());
         driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
         driverController.povUp().whileTrue(driveToPoseAutoPilotTestCommand());
@@ -188,7 +190,7 @@ public class RobotContainer {
                 .whileTrue(intaker.runIntakeContinuous());
         maxIntakeTrigger.whileTrue(intaker.runMaxIntakeContinuous());
         */
-       driverController.leftTrigger().whileTrue(intaker.runMaxIntakeContinuous());
+        driverController.leftTrigger().whileTrue(intaker.runMaxIntakeContinuous());
 
         // Swerve
         // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick
@@ -278,21 +280,21 @@ public class RobotContainer {
     }
 
     private Command shootCommand() {
-        return Commands.sequence(
+        return Commands.parallel(
                 holdAutomaticTargetMode(),
                 new AutoAimCommand(
                         swerve,
                         () -> -driverController.getLeftY(),
                         () -> -driverController.getLeftX(),
                         shootingSuperstructure::aimHeading,
-                        shootingSuperstructure::aimHeadingRateRadPerSec).withTimeout(0.5),
-                Commands.parallel(
+                        shootingSuperstructure::aimHeadingRateRadPerSec), // .withTimeout(0.5),
+                // Commands.parallel(
                 shootingSuperstructure.aimAndShoot(),
                 shootingSuperstructure
                         .waitForFeedStart()
                         .andThen(intaker.holdRetractedFeedPosition())
-                )
-        );
+                // )
+                );
     }
 
     private Command autoTrenchCommand() {

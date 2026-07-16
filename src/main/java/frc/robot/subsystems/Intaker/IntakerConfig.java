@@ -100,7 +100,7 @@ public class IntakerConfig {
         public static final double intakeRPS = 50.0;
         public static final double intakeRPSmax = 70.0;
 
-        public static final double outtakeRPS = -15.0;
+        public static final double outtakeRPS = -50.0;
 
         private IntakerRollerParams() {}
     }

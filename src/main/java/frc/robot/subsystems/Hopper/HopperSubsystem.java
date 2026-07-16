@@ -28,6 +28,7 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
 
     public Command feed() {
         return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.feedRPS.getValue()));
+
     }
 
     public Command shoot() {
@@ -36,6 +37,10 @@ public class HopperSubsystem extends VelocityMotorSubsystem<MotorInputsAutoLogge
 
     public Command reverse() {
         return runVelTC(() -> RotationsPerSecond.of(-HopperParamsNT.feedRPS.getValue()));
+    }
+
+    public Command out() {
+        return runVelTC(() -> RotationsPerSecond.of(HopperParamsNT.outRPS.getValue()));
     }
 
     /**
