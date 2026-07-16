@@ -61,6 +61,8 @@ import org.littletonrobotics.junction.Logger;
  * PLACEHOLDERS derived from the current path files — verify on the real field.
  */
 public class AutoActions {
+    private static final double BUMP_SETTLE_TIMEOUT_SECONDS = 0.75;
+
     // ---- Start poses (robot begins here; used by resetOnPose in sim). ----
     public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(90));
     public static final Pose2d kTrenchStartL = mirrorY(kTrenchStartR);
@@ -339,15 +341,37 @@ public class AutoActions {
                         : (isLeft ? kSlopeEndL : kSlopeEndR);
         Pose2d target = new Pose2d(anchor.getTranslation(), holdHeading);
         return Commands.defer(
-                () ->
-                        Commands.deadline(
-                                waitCrossedBump(isToNeutral),
-                                driveToPose(AllianceFlipUtil.apply(target))),
-                Set.of(swerve));
+                        () ->
+                                Commands.deadline(
+                                        waitCrossedBump(isToNeutral),
+                                        driveToPose(AllianceFlipUtil.apply(target))),
+                        Set.of(swerve))
+                .beforeStarting(
+                        Commands.runOnce(
+                                () ->
+                                        Logger.recordOutput(
+                                                "Auto/Phase",
+                                                isToNeutral ? "BumpOut" : "BumpBack")));
     }
 
     static Command waitCrossedBump(boolean isToNeutral) {
-        return Commands.waitUntil(() -> hasCrossedBump(isToNeutral) && isPitchStable());
+        Command completion =
+                Commands.waitUntil(() -> hasCrossedBump(isToNeutral))
+                        .andThen(
+                                Commands.waitUntil(AutoActions::isPitchStable)
+                                        .withTimeout(BUMP_SETTLE_TIMEOUT_SECONDS));
+        return Commands.deadline(
+                completion,
+                Commands.run(
+                        () -> {
+                            Logger.recordOutput(
+                                    "Auto/Bump/HasCrossed", hasCrossedBump(isToNeutral));
+                            Logger.recordOutput("Auto/Bump/PitchStable", isPitchStable());
+                            Logger.recordOutput("Auto/Bump/PitchRad", swerve.getPitchPosRad());
+                            Logger.recordOutput(
+                                    "Auto/Bump/PitchVelocityRadPerSec",
+                                    swerve.getPitchVelocityRadPerSec());
+                        }));
     }
 
     public static boolean hasCrossedBump(boolean isToNeutral) {
@@ -388,9 +412,27 @@ public class AutoActions {
                 shootingSuperstructure::aimHeadingRateRadPerSec);
     }
 
-    /** Run the same shoot command as teleop, bounded to the configured auto shoot duration. */
-    public static Command shootAtHub(double shootSeconds) {
-        return autoShootCommandSupplier.get().withTimeout(shootSeconds);
+    /**
+     * Run the same mechanism command as teleop. The autonomous timer starts only after the loaded
+     * upper shooter is ready, so {@code feedSeconds} remains the actual hopper-feed duration.
+     */
+    public static Command shootAtHub(double feedSeconds) {
+        return Commands.deadline(
+                        shootingSuperstructure.shotWindowWhenReadyForSeconds(
+                                AutoShootParamsNT.readyTimeoutSeconds.getValue(), feedSeconds),
+                        autoShootCommandSupplier.get())
+                .beforeStarting(
+                        Commands.runOnce(
+                                () -> {
+                                    Logger.recordOutput("Auto/Phase", "Shooting");
+                                    Logger.recordOutput("Auto/ShootActive", true);
+                                }))
+                .finallyDo(
+                        interrupted -> {
+                            Logger.recordOutput("Auto/ShootActive", false);
+                            Logger.recordOutput(
+                                    "Auto/Phase", interrupted ? "ShootInterrupted" : "ShootDone");
+                        });
     }
 
     /**

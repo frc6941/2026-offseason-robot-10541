@@ -128,6 +128,13 @@ public class AutoRoutines {
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 
+    /** Zero mechanisms, then run only the exact autonomous shoot sequence without a drive path. */
+    public static Command shootTestAuto() {
+        return zeroEverything()
+                .andThen(Commands.deadline(aimAndShootAtHub(), intake.followModePivot()))
+                .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
+    }
+
     /**
      * End behaviour with the intake running. MIDDLE uses the RIGHT-authored path (mirrored for the
      * left side); the depot paths are LEFT-authored (depot lives on the left), so never mirrored.

@@ -316,7 +316,11 @@ public class ShootingSuperstructure extends SubsystemBase {
                 feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
-    public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
+    /**
+     * Timing-only shot window for autonomous use. This owns no mechanisms: compose it as the
+     * deadline of the normal shoot command so autonomous and teleop use identical motor control.
+     */
+    public Command shotWindowWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
         Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         boolean[] loadedUpperReady = {false};
 
@@ -328,16 +332,18 @@ public class ShootingSuperstructure extends SubsystemBase {
                         .withTimeout(readyTimeoutSeconds);
         // The shot window ends only after a full feedSeconds measured from actual hopper start.
         // If loaded readiness times out, feeding is skipped and the auto continues.
-        Command shotWindow =
-                Commands.runOnce(() -> loadedUpperReady[0] = false)
-                        .andThen(readyWindow)
-                        .andThen(
-                                Commands.either(
-                                        Commands.waitSeconds(feedSeconds),
-                                        Commands.none(),
-                                        () -> loadedUpperReady[0]));
+        return Commands.runOnce(() -> loadedUpperReady[0] = false)
+                .andThen(readyWindow)
+                .andThen(
+                        Commands.either(
+                                Commands.waitSeconds(feedSeconds),
+                                Commands.none(),
+                                () -> loadedUpperReady[0]));
+    }
 
-        return Commands.deadline(shotWindow, aimAndShoot());
+    public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
+        return Commands.deadline(
+                shotWindowWhenReadyForSeconds(readyTimeoutSeconds, feedSeconds), aimAndShoot());
     }
 
     /**

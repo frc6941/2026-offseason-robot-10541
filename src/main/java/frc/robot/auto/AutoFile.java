@@ -30,6 +30,7 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
  */
 public class AutoFile {
     public static final String SHOW_PREVIEW_KEY = "Auto/Show Preview";
+    public static final String SHOOT_TEST_KEY = "Auto/Shoot Test";
 
     @Getter
     private static final LoggedDashboardChooser<Side> sideChooser =
@@ -67,6 +68,7 @@ public class AutoFile {
     public static void init() {
         validatePaths();
         SmartDashboard.setDefaultBoolean(SHOW_PREVIEW_KEY, true);
+        SmartDashboard.setDefaultBoolean(SHOOT_TEST_KEY, false);
         // Default config: Trench start, Middle second sweep, 2 sweeps, no end behaviour.
         initChooser(sideChooser, Side.values(), Side.RIGHT);
         initChooser(startBehaviourChooser, StartBehaviour.values(), StartBehaviour.TRENCH_START);
@@ -111,10 +113,17 @@ public class AutoFile {
                 + ", Sweeps="
                 + sweepTimesChooser.get()
                 + ", End="
-                + endBehaviourChooser.get();
+                + endBehaviourChooser.get()
+                + ", ShootTest="
+                + SmartDashboard.getBoolean(SHOOT_TEST_KEY, false);
     }
 
     public static Command buildAuto() {
+        if (SmartDashboard.getBoolean(SHOOT_TEST_KEY, false)) {
+            rightSideDepotAlert.set(false);
+            return AutoRoutines.shootTestAuto();
+        }
+
         Side side = orDefault(sideChooser.get(), Side.RIGHT);
         int waitSeconds = waitingChooser.get() != null ? waitingChooser.get() : 0;
         StartBehaviour start = orDefault(startBehaviourChooser.get(), StartBehaviour.TRENCH_START);
@@ -154,6 +163,7 @@ public class AutoFile {
     /** Refresh the disabled-time Field2d preview when a chooser or alliance selection changes. */
     public static void updatePreview() {
         boolean showPreview = SmartDashboard.getBoolean(SHOW_PREVIEW_KEY, true);
+        boolean shootTest = SmartDashboard.getBoolean(SHOOT_TEST_KEY, false);
         String previewSelection =
                 selectionSummary()
                         + ", Flipped="
@@ -165,7 +175,7 @@ public class AutoFile {
         }
         lastPreviewSelection = previewSelection;
 
-        if (!showPreview) {
+        if (!showPreview || shootTest) {
             FieldPublisher.setPreview(List.of());
             previewAlert.set(false);
             return;

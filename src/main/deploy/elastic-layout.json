@@ -105,6 +105,19 @@
               "period": 0.06,
               "data_type": "boolean"
             }
+          },
+          {
+            "title": "Shoot Test Only",
+            "x": 512.0,
+            "y": 512.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Toggle Switch",
+            "properties": {
+              "topic": "/SmartDashboard/Auto/Shoot Test",
+              "period": 0.06,
+              "data_type": "boolean"
+            }
           }
         ]
       }
