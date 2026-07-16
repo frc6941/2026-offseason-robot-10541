@@ -116,16 +116,15 @@ public class AutoRoutines {
         // 3. End behaviour (intake running throughout).
         steps.add(endBehaviour(endBehaviour, isLeft));
 
-        // Run the routine with a pivot manager in parallel: continuously drive the pivot to the
-        // current intake mode's angle. The routine holds the pivot requirement (via this same
-        // followModePivot), which suppresses the pivot's default command for the whole auto — so
-        // without this, intake()/retractIntake() mode changes would flip the mode but never move
-        // the pivot. Intake zeroing is manual-only (D-pad Left, pre-match) — NOT run here — so this
-        // assumes the pivot is already zeroed before auto starts; if it isn't, pivotTargetAngle()
-        // holds the current (unzeroed) position instead of actuating. The routine is the deadline,
-        // so when it ends the manager stops.
-        return Commands.deadline(
-                        Commands.sequence(steps.toArray(Command[]::new)), intake.followModePivot())
+        // Zero the intake pivot and seed the hood at its current stowed position before any auto
+        // movement. Only after zeroing finishes do we start the routine and its pivot manager.
+        // followModePivot continuously drives the pivot to the current intake mode's angle while
+        // the routine runs; the routine is the deadline, so the manager stops when auto finishes.
+        return zeroEverything()
+                .andThen(
+                        Commands.deadline(
+                                Commands.sequence(steps.toArray(Command[]::new)),
+                                intake.followModePivot()))
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 

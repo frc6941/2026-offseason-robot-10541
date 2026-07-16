@@ -392,6 +392,11 @@ public class ShootingSuperstructure extends SubsystemBase {
                 () -> RotationsPerSecond.of(ShooterUpperParamsNT.testRPS.getValue()));
     }
 
+    public Command stopDrum() {
+        return shooterUpper.runVelVolt(
+                () -> RotationsPerSecond.of(ShooterUpperParamsNT.stopRPS.getValue()));
+    }
+
     public void seedHoodPositionAtZero() {
         hood.setCurrPos(ShooterConfig.HOOD_MIN_ANGLE);
     }
