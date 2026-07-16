@@ -82,12 +82,17 @@ public class AutoActions {
     private static Swerve swerve;
     private static ShootingSuperstructure shootingSuperstructure;
     private static IntakerSubsystem intake;
+    private static Supplier<Command> autoShootCommandSupplier;
 
     public static void init(
-            Swerve swerve, ShootingSuperstructure shootingSuperstructure, IntakerSubsystem intake) {
+            Swerve swerve,
+            ShootingSuperstructure shootingSuperstructure,
+            IntakerSubsystem intake,
+            Supplier<Command> autoShootCommandSupplier) {
         AutoActions.swerve = swerve;
         AutoActions.shootingSuperstructure = shootingSuperstructure;
         AutoActions.intake = intake;
+        AutoActions.autoShootCommandSupplier = autoShootCommandSupplier;
     }
 
     /** Mirror a blue-frame pose across the field's horizontal centerline (right pose -> left). */
@@ -383,10 +388,9 @@ public class AutoActions {
                 shootingSuperstructure::aimHeadingRateRadPerSec);
     }
 
-    /** Spin up and feed for {@code feedSeconds}; size it to empty a full hopper. */
-    public static Command shootAtHub(double feedSeconds) {
-        return shootingSuperstructure.shootWhenReadyForSeconds(
-                AutoShootParamsNT.readyTimeoutSeconds.getValue(), feedSeconds);
+    /** Run the same shoot command as teleop, bounded to the configured auto shoot duration. */
+    public static Command shootAtHub(double shootSeconds) {
+        return autoShootCommandSupplier.get().withTimeout(shootSeconds);
     }
 
     /**
@@ -399,12 +403,7 @@ public class AutoActions {
      */
     public static Command aimAndShootAtHub(double feedSeconds) {
         return Commands.sequence(
-                Commands.deadline(
-                        shootAtHub(feedSeconds),
-                        aimAtHub(),
-                        shootingSuperstructure
-                                .waitForFeedStart()
-                                .andThen(intake.holdRetractedFeedMode())),
+                shootAtHub(feedSeconds),
                 // After the shot: force the intake to EXTENDED_IDLE so the hopper (whose speed is
                 // driven by the intake mode) actually STOPS — the shot can otherwise leave the mode
                 // in a feeding state (e.g. INTAKING carried over from the sweep). Then drop the

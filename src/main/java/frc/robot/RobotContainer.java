@@ -39,6 +39,7 @@ import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import frc.robot.utils.HubShiftUtil;
+import java.util.function.DoubleSupplier;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
 import lib.ironpulse.indicator.IndicatorIOSim;
@@ -132,7 +133,7 @@ public class RobotContainer {
         // Intake zeroing stays manual-only on D-pad Left.
         configureBindings();
         // Autonomous: PathPlanner path-following routines (see frc.robot.auto).
-        AutoActions.init(swerve, shootingSuperstructure, intaker);
+        AutoActions.init(swerve, shootingSuperstructure, intaker, this::autoShootCommand);
         AutoRoutines.init(swerve, shootingSuperstructure, intaker);
         AutoFile.init();
         new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
@@ -281,21 +282,28 @@ public class RobotContainer {
     }
 
     private Command shootCommand() {
+        return buildShootCommand(
+                () -> -driverController.getLeftY(),
+                () -> -driverController.getLeftX(),
+                intaker.holdRetractedFeedPosition());
+    }
+
+    private Command autoShootCommand() {
+        return buildShootCommand(() -> 0.0, () -> 0.0, intaker.holdRetractedFeedMode());
+    }
+
+    private Command buildShootCommand(
+            DoubleSupplier xSupplier, DoubleSupplier ySupplier, Command intakeShootCommand) {
         return Commands.parallel(
                 holdAutomaticTargetMode(),
                 new AutoAimCommand(
                         swerve,
-                        () -> -driverController.getLeftY(),
-                        () -> -driverController.getLeftX(),
+                        xSupplier,
+                        ySupplier,
                         shootingSuperstructure::aimHeading,
-                        shootingSuperstructure::aimHeadingRateRadPerSec), // .withTimeout(0.5),
-                // Commands.parallel(
+                        shootingSuperstructure::aimHeadingRateRadPerSec),
                 shootingSuperstructure.aimAndShoot(),
-                shootingSuperstructure
-                        .waitForFeedStart()
-                        .andThen(intaker.holdRetractedFeedPosition())
-                // )
-                );
+                shootingSuperstructure.waitForFeedStart().andThen(intakeShootCommand));
     }
 
     private Command autoTrenchCommand() {
