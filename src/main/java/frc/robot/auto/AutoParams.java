@@ -55,7 +55,7 @@ public final class AutoParams {
         public static final double feedSeconds = 1.5;
         // Max time to wait for the flywheel to reach speed before giving up and NOT feeding. With
         // pre-spin the drum is at speed on arrival, so this is rarely used; it only caps the wait.
-        public static final double readyTimeoutSeconds = 1.5;
+        public static final double readyTimeoutSeconds = 2.5;
 
         private AutoShootParams() {}
     }

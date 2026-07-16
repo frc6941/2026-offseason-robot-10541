@@ -283,19 +283,21 @@ public class ShootingSuperstructure extends SubsystemBase {
                         () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
     }
 
-    /**
-     * Feeds while the shooter is up to speed; drops back to idle the instant it falls below speed,
-     * instead of latching into shoot() after the first ready check. Feeding is gated on flywheel
-     * speed only (NOT chassis aim) — the hopper runs as soon as the shooter is at velocity.
-     */
+    /** Start the hopper only after the upper wheel recovers to speed under lower-shooter load. */
     private Command feedAfterUpperReadyDelay(Supplier<AngularVelocity> upperSpeedSupplier) {
-        Command waitForUpperAndDelay =
-                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
-                        .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
+        Command waitForLoadedUpperReady = waitForLoadedUpperReady(upperSpeedSupplier);
         return Commands.sequence(
-                Commands.deadline(waitForUpperAndDelay, hopper.idle()),
-                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
-                        .andThen(hopper.shoot()));
+                Commands.deadline(waitForLoadedUpperReady, hopper.idle()), hopper.shoot());
+    }
+
+    /** Wait until the upper wheel has recovered to target after the lower shooter starts. */
+    private Command waitForLoadedUpperReady(Supplier<AngularVelocity> upperSpeedSupplier) {
+        return Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS))
+                // The lower shooter starts after the same delay in runShooterAt(). Wait one full
+                // loop so the velocity input reflects that added load before checking again.
+                .andThen(Commands.waitSeconds(RobotConstants.LOOPER_DT))
+                .andThen(Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier)));
     }
 
     /**
@@ -316,20 +318,24 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
         Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
-        // Time bound for the shot: wait until the flywheel is up to speed (cap readyTimeout), then
-        // run for FEED_DELAY + feedSeconds. The shot itself is exactly aimAndShoot() — spin drum +
-        // hood + feed-once-at-velocity (hopper runs as soon as the shooter is at speed, no aim
-        // gate). When this window ends aimAndShoot() is cancelled, so the shooter, hood, and hopper
-        // all stop and fall back to their idle default commands.
+        boolean[] loadedUpperReady = {false};
+
+        // Bound only the wait for loaded readiness. Once the lower shooter has started and the
+        // upper wheel has recovered, give the hopper the full requested feed duration.
+        Command readyWindow =
+                waitForLoadedUpperReady(upperSpeedSupplier)
+                        .andThen(Commands.runOnce(() -> loadedUpperReady[0] = true))
+                        .withTimeout(readyTimeoutSeconds);
+        // The shot window ends only after a full feedSeconds measured from actual hopper start.
+        // If loaded readiness times out, feeding is skipped and the auto continues.
         Command shotWindow =
-                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
-                        .withTimeout(readyTimeoutSeconds)
+                Commands.runOnce(() -> loadedUpperReady[0] = false)
+                        .andThen(readyWindow)
                         .andThen(
                                 Commands.either(
-                                        Commands.waitSeconds(
-                                                FEED_DELAY_AFTER_UPPER_READY_SECONDS + feedSeconds),
+                                        Commands.waitSeconds(feedSeconds),
                                         Commands.none(),
-                                        () -> upperAtTarget(upperSpeedSupplier)));
+                                        () -> loadedUpperReady[0]));
 
         return Commands.deadline(shotWindow, aimAndShoot());
     }
