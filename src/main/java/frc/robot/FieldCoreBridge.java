@@ -113,6 +113,7 @@ public class FieldCoreBridge extends SubsystemBase {
     private boolean isIntakeEnabled() {
         IntakeMode mode = intaker.getCurrentMode();
         return mode == IntakeMode.INTAKING
+                || mode == IntakeMode.MAX_INTAKING
                 || mode == IntakeMode.FEEDING
                 || mode == IntakeMode.EXTENDED_REVERSE
                 || mode == IntakeMode.RETRACTED_FEEDING;

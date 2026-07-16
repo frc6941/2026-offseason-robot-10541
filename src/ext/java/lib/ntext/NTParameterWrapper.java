@@ -48,4 +48,14 @@ public class NTParameterWrapper<T> {
             value = newValue;
         }
     }
+
+    /**
+     * Advance change-tracking without touching NetworkTables. Used when live tuning is gated off:
+     * the value stays at its compile-time default, but prevValue is caught up so hasChanged()
+     * settles to false. Without this, prevValue stays null forever and every consumer that polls
+     * hasChanged()/isAnyChanged() re-applies its config on every loop.
+     */
+    public void settle() {
+        prevValue = value;
+    }
 }

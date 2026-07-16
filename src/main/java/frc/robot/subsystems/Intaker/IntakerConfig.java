@@ -20,7 +20,7 @@ public class IntakerConfig {
     public static final String INTAKER_ROLLER_NAME = "IntakerRoller";
     public static final String INTAKER_PIVOT_NAME = "IntakerPivot";
 
-    private static final double INTAKER_ROLLER_GEAR_RATIO = 20.0 / 35.0;
+    private static final double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0;
     private static final double INTAKER_PIVOT_GEAR_RATIO = 1.0 / 12 * 20 / 36 * 20 / 36 * 15 / 36;
 
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
@@ -36,13 +36,14 @@ public class IntakerConfig {
     public static final Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
     // Placeholder template values for homing. These MUST be verified on the real robot.
     // Sign must drive the intake pivot toward the zero hard stop.
-    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -1.5;
+    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -2;
     // Must be above free-run current and below breaker / unsafe stall current.
-    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 10.0;
+    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 60.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
 
     public enum IntakeMode {
         INTAKING, // Roller: Intake, Pivot: Extended
+        MAX_INTAKING, // Roller: Max intake, Pivot: Extended
         RETRACTED, // Roller: Stop,   Pivot: Retracted
         FEEDING, // Roller: Intake, Pivot: Extended
         EXTENDED_REVERSE, // Roller: Outtake,Pivot: Extended
@@ -88,18 +89,20 @@ public class IntakerConfig {
 
     @NTParameter(tableName = "Params/" + INTAKER_ROLLER_NAME)
     public static final class IntakerRollerParams {
-        public static final double kP = 1.5;
+        public static final double kP = 1;
         public static final double kI = 0.0;
-        public static final double kD = 0.05;
+        public static final double kD = 0.0;
 
-        public static final double kV = 0.16;
-        public static final double kA = 0.0;
-        public static final double kS = 3.0;
+        public static final double kV = 0.9;
+        public static final double kA = 0.016835;
+        public static final double kS = 0.17085;
 
-        // NT integers come back from NetworkTables as Long, which breaks the generated
-        // Integer wrapper on refresh() — keep all tunable NT numerics as double.
-        public static final double intakeRPS = 100.0;
-        public static final double outtakeRPS = -15.0;
+        public static final double intakeRPS = 50.0;
+        public static final double intakeRPSmax = 70.0;
+
+        public static final double outtakeRPS = -50.0;
+
+        private IntakerRollerParams() {}
     }
 
     @NTParameter(tableName = "Params/" + INTAKER_PIVOT_NAME)
@@ -119,9 +122,15 @@ public class IntakerConfig {
         public static final double motionMagicAccelRPS2 = 20.0;
         public static final double motionMagicJerkRPS3 = 0.0;
 
-        public static final double deployPosAngle = 10.0;
+        public static final double deployPosAngle = 10;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 20.0;
+        public static final double retractedfeedPosAngle = 70.0;
+
+        // Shoot-only software position-ramp speed. The pivot still uses runPosition(), not Motion
+        // Magic.
+        public static final double shootRaiseSpeedDegreesPerSecond = 54.0;
+
+        private IntakerPivotParams() {}
     }
 }

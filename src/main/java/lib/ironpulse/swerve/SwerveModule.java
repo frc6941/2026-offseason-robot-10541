@@ -114,6 +114,11 @@ public class SwerveModule {
         return data.driveMotorTorqueCurrentAmpere;
     }
 
+    /** Applied voltage on the drive motor (volts), as reported by the module IO. */
+    public double getDriveVoltageVolt() {
+        return data.driveMotorVoltageVolt;
+    }
+
     public Angle getSteerAngle() {
         return Radian.of(data.steerMotorPositionRad);
     }

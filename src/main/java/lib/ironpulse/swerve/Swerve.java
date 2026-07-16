@@ -8,6 +8,7 @@ import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -47,6 +48,12 @@ public class Swerve extends SubsystemBase implements Localizable {
     private SwerveSetpoint setpointCurr;
     @Getter private Voltage previouslyAppliedVoltage;
     private MODE mode = MODE.VELOCITY;
+
+    // Center about which the chassis rotates, robot frame, meters, relative to the geometric
+    // center.
+    // Translation2d.kZero (the default) pivots about the drivetrain center. Change on the fly via
+    // setCenterOfRotation(...); reset to kZero so autos/paths are unaffected.
+    @Getter private Translation2d centerOfRotation = Translation2d.kZero;
 
     public Swerve(SwerveConfig swerveConfig, ImuIO imuIO, SwerveModuleIO... moduleIOs) {
         this.config = swerveConfig;
@@ -120,10 +127,15 @@ public class Swerve extends SubsystemBase implements Localizable {
         Logger.recordOutput(config.name + "/Mode", mode);
         Logger.recordOutput(config.name + "/ChassisSpeedCurr", getChassisSpeeds());
         Logger.recordOutput(config.name + "/SwerveModuleStateCurr", getModuleStates());
+        Logger.recordOutput(config.name + "/DriveAppliedVolts", getDriveAppliedVolts());
         Logger.recordOutput(config.name + "/SwerveModuleStateCmd", setpointCurr.moduleStates());
         Logger.recordOutput(config.name + "/ChassisSpeedCmd", setpointCurr.chassisSpeeds());
+        Logger.recordOutput(config.name + "/CenterOfRotation", centerOfRotation);
         Logger.recordOutput(
                 config.name + "/SwerveEstimatorPose", poseEstimator.getEstimatedPosition());
+        Logger.recordOutput(
+                config.name + "/SwerveEstimatorHeadingDeg",
+                poseEstimator.getEstimatedPosition().getRotation().toRotation2d().getDegrees());
 
         var limit = getSwerveLimit();
         Logger.recordOutput(
@@ -131,6 +143,9 @@ public class Swerve extends SubsystemBase implements Localizable {
         Logger.recordOutput(
                 config.name + "/Limit/MaxSkidAccMps2",
                 limit.maxSkidAcceleration().in(MetersPerSecondPerSecond));
+        Logger.recordOutput(
+                config.name + "/Limit/MaxBrakeAccMps2",
+                limit.maxBrakeAccelerationOrSkid().in(MetersPerSecondPerSecond));
         Logger.recordOutput(
                 config.name + "/Limit/MaxAngvelDegps",
                 limit.maxAngularVelocity().in(DegreesPerSecond));
@@ -154,16 +169,36 @@ public class Swerve extends SubsystemBase implements Localizable {
      */
     public void runTwist(ChassisSpeeds VRT) {
         mode = MODE.VELOCITY;
-        setpointCurr = setpointGenerator.generate(VRT, setpointCurr, config.dtS);
+        setpointCurr = setpointGenerator.generate(VRT, setpointCurr, config.dtS, centerOfRotation);
+
+        if (Math.abs(VRT.vxMetersPerSecond) > 0.01
+                || Math.abs(VRT.vyMetersPerSecond) > 0.01
+                || Math.abs(VRT.omegaRadiansPerSecond) > 0.01) {}
 
         for (int i = 0; i < config.moduleCount(); i++)
             modules.get(i).runState(setpointCurr.moduleStates()[i]);
     }
 
+    /**
+     * Set the point the chassis rotates about, in the robot frame (meters, relative to the
+     * geometric center). Takes effect on the next {@link #runTwist} call and persists until
+     * changed, so reset to {@link Translation2d#kZero} (or call {@link #resetCenterOfRotation()})
+     * when the offset pivot is no longer wanted — otherwise it will also affect autos/path
+     * following.
+     */
+    public void setCenterOfRotation(Translation2d centerOfRotation) {
+        this.centerOfRotation = centerOfRotation == null ? Translation2d.kZero : centerOfRotation;
+    }
+
+    /** Restore the default center-of-rotation (the drivetrain geometric center). */
+    public void resetCenterOfRotation() {
+        this.centerOfRotation = Translation2d.kZero;
+    }
+
     public void runTwistWithTorque(ChassisSpeeds VRT, Current[] tau) {
         assert (tau.length == config.moduleCount());
         mode = MODE.VELOCITY;
-        setpointCurr = setpointGenerator.generate(VRT, setpointCurr, config.dtS);
+        setpointCurr = setpointGenerator.generate(VRT, setpointCurr, config.dtS, centerOfRotation);
 
         for (int i = 0; i < config.moduleCount(); i++)
             modules.get(i).runState(setpointCurr.moduleStates()[i], tau[i]);
@@ -204,6 +239,13 @@ public class Swerve extends SubsystemBase implements Localizable {
         return states;
     }
 
+    /** Applied drive-motor voltage (volts) for each module, indexed by module order. */
+    public double[] getDriveAppliedVolts() {
+        double[] volts = new double[modules.size()];
+        for (int i = 0; i < modules.size(); i++) volts[i] = modules.get(i).getDriveVoltageVolt();
+        return volts;
+    }
+
     public List<Pair<Double, SwerveModulePosition[]>> getSampledModulePositions() {
         double[] timestamps = imuIOInputs.odometryYawTimestamps;
         int moduleCount = modules.size();
@@ -212,10 +254,12 @@ public class Swerve extends SubsystemBase implements Localizable {
         List<SwerveModulePosition[]> samplesByModule =
                 modules.stream().map(SwerveModule::getSampledSwerveModulePositions).toList();
 
-        // The IMU and per-module sample queues are filled/drained independently by the odometry
-        // thread and can momentarily differ in length. Clamp to the smallest common count so we
-        // never index past a shorter array (was an AIOOBE crash once the sampler runs).
-        // TODO(lib-IP-2026): upstream this guard (or read all queues under one lock).
+        // The IMU and each module drain their own high-frequency odometry queues, so on a given
+        // loop they can report different sample counts (module positions are sized min(drive,
+        // steer); the IMU timestamps come from the Pigeon queue). Process only the common prefix —
+        // the min across the timestamps and every module — so a ragged tail can't index past a
+        // shorter array (this was throwing ArrayIndexOutOfBoundsException here). Any extra samples
+        // from a longer queue are dropped for this cycle, which is harmless for pose estimation.
         int sampleCount = timestamps.length;
         for (SwerveModulePosition[] moduleSamples : samplesByModule)
             sampleCount = Math.min(sampleCount, moduleSamples.length);
@@ -290,8 +334,6 @@ public class Swerve extends SubsystemBase implements Localizable {
             Pose3d visionRobotPoseMeters,
             double timestampSeconds,
             Matrix<N4, N1> visionMeasurementStdDevs) {
-        Logger.recordOutput(config.name + "/VisionCorrectionPose", visionRobotPoseMeters);
-        Logger.recordOutput(config.name + "/VisionCorrectionTimestampSeconds", timestampSeconds);
         poseEstimator.addVisionMeasurement(
                 visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
     }

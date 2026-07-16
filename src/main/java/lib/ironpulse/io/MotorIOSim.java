@@ -97,25 +97,29 @@ public class MotorIOSim implements MotorIO {
                 break;
         }
 
-        // // Apply soft limits
-        // if (forwardSoftLimitEnabled) {
-        //     double threshold = subsystemConfig.forwardSoftLimitDegrees.in(Rotations);
-        //     if (currentPositionRot >= threshold) {
-        //         currentPositionRot = threshold;
-        //         currentVelocityRPS = Math.min(0, currentVelocityRPS);
-        //         currentProfileState =
-        //                 new TrapezoidProfile.State(currentPositionRot, currentVelocityRPS);
-        //     }
-        // }
-        // if (reverseSoftLimitEnabled) {
-        //     double threshold = subsystemConfig.reverseSoftLimitDegrees.in(Rotations);
-        //     if (currentPositionRot <= threshold) {
-        //         currentPositionRot = threshold;
-        //         currentVelocityRPS = Math.max(0, currentVelocityRPS);
-        //         currentProfileState =
-        //                 new TrapezoidProfile.State(currentPositionRot, currentVelocityRPS);
-        //     }
-        // }
+        // Apply soft limits (mirrors MotorIOTalonFX's SoftwareLimitSwitch): clamp mechanism
+        // position to the configured range and kill any velocity that would push further out.
+        // Thresholds are mechanism rotations (deg / 360), matching inputs.positionRot. Only active
+        // where a limit is configured (intake pivot, hood), and honors setEnableSoftLimits() so
+        // homing can temporarily disable them.
+        if (forwardSoftLimitEnabled) {
+            double threshold = subsystemConfig.forwardSoftLimitDegrees.in(Rotations);
+            if (currentPositionRot >= threshold) {
+                currentPositionRot = threshold;
+                currentVelocityRPS = Math.min(0, currentVelocityRPS);
+                currentProfileState =
+                        new TrapezoidProfile.State(currentPositionRot, currentVelocityRPS);
+            }
+        }
+        if (reverseSoftLimitEnabled) {
+            double threshold = subsystemConfig.reverseSoftLimitDegrees.in(Rotations);
+            if (currentPositionRot <= threshold) {
+                currentPositionRot = threshold;
+                currentVelocityRPS = Math.max(0, currentVelocityRPS);
+                currentProfileState =
+                        new TrapezoidProfile.State(currentPositionRot, currentVelocityRPS);
+            }
+        }
 
         inputs.appliedVolts = appliedVolts;
         inputs.currentStatorAmps = 0.0; // Kinematic model doesn't simulate current

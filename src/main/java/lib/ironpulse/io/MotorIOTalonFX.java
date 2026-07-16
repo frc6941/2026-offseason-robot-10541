@@ -95,18 +95,24 @@ public class MotorIOTalonFX implements MotorIO {
             fx.ClosedLoopGeneral.ContinuousWrap = cfg.remoteCANcoder.useContinousWrap;
         }
 
-        // Soft limit enables per config (thresholds should be in fxConfig)
+        // Soft limit enables per config (thresholds should be in fxConfig).
+        // Thresholds live in the RAW MOTOR frame the TalonFX measures in, so they must have the
+        // same zeroOffset subtracted that PositionMotorSubsystem applies to every position setpoint
+        // (setpoint = mechanismAngle - zeroOffset). Without this, after zeroing (which sets the raw
+        // motor position to 0 at the hard stop) the limits sit zeroOffset away from the setpoints
+        // and clamp the mechanism out of part of its commanded range — e.g. the hood can't return
+        // to its stow/min angle.
         if (!Double.isNaN(cfg.forwardSoftLimitDegrees.magnitude())) {
             fx.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
             fx.SoftwareLimitSwitch.ForwardSoftLimitThreshold =
-                    cfg.forwardSoftLimitDegrees.in(Rotations);
+                    cfg.forwardSoftLimitDegrees.minus(cfg.zeroOffset).in(Rotations);
         } else {
             fx.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
         }
         if (!Double.isNaN(cfg.reverseSoftLimitDegrees.magnitude())) {
             fx.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
             fx.SoftwareLimitSwitch.ReverseSoftLimitThreshold =
-                    cfg.reverseSoftLimitDegrees.in(Rotations);
+                    cfg.reverseSoftLimitDegrees.minus(cfg.zeroOffset).in(Rotations);
         } else {
             fx.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
         }
@@ -305,7 +311,18 @@ public class MotorIOTalonFX implements MotorIO {
         } else {
             fx.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
         }
-        main.getConfigurator().apply(this.fx);
+        // Apply ONLY the soft-limit slice, never the whole this.fx. A full apply(this.fx)
+        // overwrites
+        // the device's Motion Magic profile (cruise velocity/accel/jerk) — which is managed
+        // separately in setMotionMagicSetpoint and is NOT mirrored into this.fx, so it's all zeros
+        // —
+        // leaving Motion Magic with a zero-velocity profile that can't move the mechanism. The
+        // caching in setMotionMagicSetpoint then never re-applies it, so the mechanism stays dead
+        // to
+        // every setpoint. This is exactly what broke the hood after zeroCommand (which calls this
+        // in
+        // finallyDo). Same reasoning as updateGains pushing only the Slot0 slice.
+        main.getConfigurator().apply(fx.SoftwareLimitSwitch);
     }
 
     @Override
@@ -322,7 +339,9 @@ public class MotorIOTalonFX implements MotorIO {
         } else {
             this.fx.CurrentLimits.SupplyCurrentLimitEnable = false;
         }
-        main.getConfigurator().apply(this.fx);
+        // Apply only the current-limit slice (see setEnableSoftLimits) so a full config apply can't
+        // clobber the separately-managed Motion Magic profile.
+        main.getConfigurator().apply(fx.CurrentLimits);
     }
 
     @Override

@@ -4,9 +4,14 @@
 
 package frc.robot;
 
+import com.ctre.phoenix6.SignalLogger;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.utils.HubShiftUtil;
+import lib.ironpulse.utils.LoggedTracer;
 import lib.ironpulse.utils.PhoenixUtils;
 import lib.ntext.NTParameterRegistry;
 import org.littletonrobotics.junction.LoggedRobot;
@@ -23,8 +28,17 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 // The default command-based template uses TimedRobot. However, when we are using Advantagekit, we
 // want to use LoggedRobot instead.
 public class Robot extends LoggedRobot {
+    // Keep the full AdvantageKit pipeline off the roboRIO while diagnosing loop overruns. Merely
+    // omitting NT4Publisher is not enough: Logger.start() still clones the full log table each
+    // loop.
+    private static final boolean ENABLE_REAL_NT4_LOGGING = true;
+    private static final boolean ENABLE_REAL_WPILOG_LOGGING = true;
+    private static final long LOOP_WARNING_MICROS = 40_000;
+    private static final long LOOP_WARNING_INTERVAL_MICROS = 1_000_000;
+
     private Command autonomousCommand;
     private final RobotContainer robotContainer;
+    private long lastLoopWarningMicros = 0;
 
     /**
      * This function is run when the robot is first started up and should be used for any
@@ -36,11 +50,27 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void robotInit() {
+        // Stop the CTRE Phoenix signal logger. It auto-starts on the roboRIO and writes .hoot files
+        // (roboRIO disk + CPU) even though we log everything through AdvantageKit instead.
+        SignalLogger.stop();
+
+        // Push the NT live-tuning gate into the ntext framework once, before any refresh() runs.
+        NTParameterRegistry.setEnabled(RobotConstants.ENABLE_NT_PARAMS);
+
         // AdvantageKit logger — sends data to AdvantageScope and writes .wpilog files
-        Logger.addDataReceiver(new NT4Publisher());
-        Logger.addDataReceiver(new WPILOGWriter());
-        Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
-        Logger.start();
+        boolean enableNt4 = RobotBase.isSimulation() || ENABLE_REAL_NT4_LOGGING;
+        boolean enableWpilog = RobotBase.isReal() && ENABLE_REAL_WPILOG_LOGGING;
+
+        if (enableNt4) {
+            Logger.addDataReceiver(new NT4Publisher());
+        }
+        if (enableWpilog) {
+            Logger.addDataReceiver(new WPILOGWriter());
+        }
+        if (enableNt4 || enableWpilog) {
+            Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
+            Logger.start();
+        }
     }
 
     /**
@@ -52,6 +82,13 @@ public class Robot extends LoggedRobot {
      */
     @Override
     public void robotPeriodic() {
+        // Reset the shared stopwatch at the very top of the loop so each subsystem's
+        // LoggedTracer.record(...) reports time elapsed since here (otherwise the deltas chain from
+        // an arbitrary point and the first sample is garbage).
+        LoggedTracer.reset();
+
+        long loopStart = RobotController.getFPGATime();
+
         // Runs the Scheduler.  This is responsible for polling buttons, adding newly-scheduled
         // commands, running already-scheduled commands, removing finished or interrupted commands,
         // and running subsystem periodic() methods.  This must be called from the robot's periodic
@@ -61,13 +98,41 @@ public class Robot extends LoggedRobot {
         // this,
         // module/IMU readings stay stale (frozen pose, frozen yaw). See SwerveModuleIOMK5N ctor.
         PhoenixUtils.refreshAll();
+        long phoenixEnd = RobotController.getFPGATime();
 
         CommandScheduler.getInstance().run();
+        long schedulerEnd = RobotController.getFPGATime();
 
-        // Pull the latest @NTParameter values from NetworkTables and fire onChange hooks so all
-        // tunables (shooting, swerve PID, intaker, hood, ...) update live from the dashboard.
+        // Live NT tuning is gated by RobotConstants.ENABLE_NT_PARAMS (pushed into the registry in
+        // robotInit). When off, this is a no-op — no per-loop NT JNI reads on the loop budget.
         NTParameterRegistry.refresh();
         robotContainer.updateDashboard();
+        long loopEnd = RobotController.getFPGATime();
+
+        reportLoopOverrun(loopStart, phoenixEnd, schedulerEnd, loopEnd);
+    }
+
+    private void reportLoopOverrun(
+            long loopStart, long phoenixEnd, long schedulerEnd, long loopEnd) {
+        long totalMicros = loopEnd - loopStart;
+        if (totalMicros < LOOP_WARNING_MICROS
+                || loopEnd - lastLoopWarningMicros < LOOP_WARNING_INTERVAL_MICROS) {
+            return;
+        }
+
+        lastLoopWarningMicros = loopEnd;
+        DriverStation.reportWarning(
+                String.format(
+                        "Robot loop %.1f ms (Phoenix %.1f, Scheduler %.1f, Dashboard %.1f)",
+                        totalMicros / 1000.0,
+                        (phoenixEnd - loopStart) / 1000.0,
+                        (schedulerEnd - phoenixEnd) / 1000.0,
+                        (loopEnd - schedulerEnd) / 1000.0),
+                false);
+
+        if (schedulerEnd - phoenixEnd >= LOOP_WARNING_MICROS) {
+            CommandScheduler.getInstance().printWatchdogEpochs();
+        }
     }
 
     /** This function is called once each time the robot enters Disabled mode. */
@@ -82,6 +147,7 @@ public class Robot extends LoggedRobot {
      */
     @Override
     public void autonomousInit() {
+        HubShiftUtil.initialize();
         autonomousCommand = robotContainer.getAutonomousCommand();
         DriverStation.reportWarning(
                 "Selected auto: " + robotContainer.getAutoSelectionSummary(), false);
@@ -98,6 +164,7 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void teleopInit() {
+        HubShiftUtil.initialize();
         // This makes sure that the autonomous stops running when
         // teleop starts running. If you want the autonomous to
         // continue until interrupted by another command, remove
@@ -105,6 +172,12 @@ public class Robot extends LoggedRobot {
         if (autonomousCommand != null) {
             autonomousCommand.cancel();
         }
+
+        // Safety net: guarantee teleop always starts at the default swerve speed cap, even if auto
+        // was interrupted mid-way through its unlimited-speed trench-start dash.
+        robotContainer.resetSwerveLimitForTeleop();
+
+        CommandScheduler.getInstance().schedule(robotContainer.getTeleopIntakeZeroCommand());
     }
 
     /** This function is called periodically during operator control. */
