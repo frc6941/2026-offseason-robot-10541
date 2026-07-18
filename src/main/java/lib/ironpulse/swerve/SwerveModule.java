@@ -55,6 +55,11 @@ public class SwerveModule {
         io.configSteerController(kp, ki, kd, ks);
     }
 
+    /** Sets the drive motor neutral mode: true = brake, false = coast. */
+    public void setDriveBrake(boolean isBrake) {
+        io.configDriveBrake(isBrake);
+    }
+
     public void updateInputs() {
         io.updateInputs(data);
         Logger.processInputs(swerveConfig.name + "/Module/" + moduleConfig.name, data);
