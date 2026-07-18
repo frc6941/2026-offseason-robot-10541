@@ -164,6 +164,13 @@ public class Robot extends LoggedRobot {
     public void autonomousPeriodic() {}
 
     @Override
+    public void autonomousExit() {
+        // Coast the drive wheels when auto ends so the robot rolls out its remaining momentum
+        // instead of jolting to a stop. teleopInit() restores brake before the drivers get control.
+        robotContainer.setSwerveDriveBrake(false);
+    }
+
+    @Override
     public void teleopInit() {
         HubShiftUtil.initialize();
         // This makes sure that the autonomous stops running when
@@ -177,6 +184,9 @@ public class Robot extends LoggedRobot {
         // Safety net: guarantee teleop always starts at the default swerve speed cap, even if auto
         // was interrupted mid-way through its unlimited-speed trench-start dash.
         robotContainer.resetSwerveLimitForTeleop();
+
+        // Restore brake mode after the post-auto coast so teleop driving is crisp.
+        robotContainer.setSwerveDriveBrake(true);
 
         CommandScheduler.getInstance().schedule(robotContainer.getTeleopIntakeZeroCommand());
     }

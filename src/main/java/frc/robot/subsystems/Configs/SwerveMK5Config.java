@@ -108,7 +108,32 @@ public final class SwerveMK5Config {
                     // actually effective
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
                     .build();
-
+        public static SwerveModuleLimit kUnlimitedSwerveModuleLimit =
+            SwerveModuleLimit.builder()
+                    // MK5n R1 defaults (drive ~= 6.03, steer = 287/11 ~= 26.09, wheel = 4.0in)
+                    // v (mps) = 5800rpm (X60 with FOC) / 60 / 6.03 * pi * 4.0in
+                    .maxDriveVelocity(
+                            InchesPerSecond.of(
+                                    5800 / 60.0 / 6.03 * Math.PI
+                                            * 4.0)) // Accel held near the carpet traction ceiling
+                    // (~µg ≈ 10-12 m/s²) so wheels do
+                    // not slip while building speed — this is what keeps wheel odometry (and the
+                    // shoot-on-the-move velocity estimate) honest. Was 200, which was far above
+                    // traction and let the wheels slip on every hard input.
+                    .maxDriveAcceleration(MetersPerSecondPerSecond.of(15))
+                    // Braking is allowed to be crisper than accel: a stop ends motion, so brief
+                    // slip
+                    // in the final moments is acceptable (vision re-corrects once stopped) and we
+                    // do
+                    // not need to preserve a precise velocity estimate the way we do under accel.
+                    // In practice this is hardware-bound (~19 m/s² at the 100 A stator limit), so
+                    // this cap mainly removes the artificial low-rate glide. Bench-tune knob.
+                    .maxDriveDeceleration(MetersPerSecondPerSecond.of(25))
+                    .maxSteerAngularVelocity(RotationsPerSecond.of(7368.0 / 60.0 / (287.0 / 11.0)))
+                    // accelerate in 0.2s
+                    .maxSteerAngularAcceleration(
+                            RotationsPerSecondPerSecond.of(7008.0 / 60.0 / (287.0 / 11.0) / 0.2))
+                    .build();
     // Module configs — encoder offsets are from the competition robot and will need re-tuning
     public static final SwerveConfig.SwerveModuleConfig kModuleFL =
             SwerveConfig.SwerveModuleConfig.builder()
