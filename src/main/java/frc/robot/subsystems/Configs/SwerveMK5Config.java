@@ -108,7 +108,7 @@ public final class SwerveMK5Config {
                     // actually effective
                     .maxAngularAcceleration(DegreesPerSecondPerSecond.of(5000)) // 1000-1472
                     .build();
-        public static SwerveModuleLimit kUnlimitedSwerveModuleLimit =
+    public static SwerveModuleLimit kUnlimitedSwerveModuleLimit =
             SwerveModuleLimit.builder()
                     // MK5n R1 defaults (drive ~= 6.03, steer = 287/11 ~= 26.09, wheel = 4.0in)
                     // v (mps) = 5800rpm (X60 with FOC) / 60 / 6.03 * pi * 4.0in
