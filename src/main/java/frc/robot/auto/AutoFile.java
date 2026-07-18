@@ -9,6 +9,7 @@ import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.FieldPublisher;
+import frc.robot.RobotConstants;
 import frc.robot.auto.AutoRoutines.EndBehaviour;
 import java.io.File;
 import java.io.IOException;
@@ -69,6 +70,9 @@ public class AutoFile {
         validatePaths();
         SmartDashboard.setDefaultBoolean(SHOW_PREVIEW_KEY, true);
         SmartDashboard.setDefaultBoolean(SHOOT_TEST_KEY, false);
+        if (!RobotConstants.ENABLE_NT_PARAMS) {
+            SmartDashboard.putBoolean(SHOOT_TEST_KEY, false);
+        }
         // Default config: Trench start, Middle second sweep, 2 sweeps, no end behaviour.
         initChooser(sideChooser, Side.values(), Side.RIGHT);
         initChooser(startBehaviourChooser, StartBehaviour.values(), StartBehaviour.TRENCH_START);
@@ -115,11 +119,11 @@ public class AutoFile {
                 + ", End="
                 + endBehaviourChooser.get()
                 + ", ShootTest="
-                + SmartDashboard.getBoolean(SHOOT_TEST_KEY, false);
+                + shootTestEnabled();
     }
 
     public static Command buildAuto() {
-        if (SmartDashboard.getBoolean(SHOOT_TEST_KEY, false)) {
+        if (shootTestEnabled()) {
             rightSideDepotAlert.set(false);
             return AutoRoutines.shootTestAuto();
         }
@@ -163,7 +167,7 @@ public class AutoFile {
     /** Refresh the disabled-time Field2d preview when a chooser or alliance selection changes. */
     public static void updatePreview() {
         boolean showPreview = SmartDashboard.getBoolean(SHOW_PREVIEW_KEY, true);
-        boolean shootTest = SmartDashboard.getBoolean(SHOOT_TEST_KEY, false);
+        boolean shootTest = shootTestEnabled();
         String previewSelection =
                 selectionSummary()
                         + ", Flipped="
@@ -236,6 +240,10 @@ public class AutoFile {
             previewAlert.setText("Failed to build selected auto preview: " + e.getMessage());
             previewAlert.set(true);
         }
+    }
+
+    private static boolean shootTestEnabled() {
+        return RobotConstants.ENABLE_NT_PARAMS && SmartDashboard.getBoolean(SHOOT_TEST_KEY, false);
     }
 
     private static void appendPath(List<Pose2d> preview, String pathName, boolean shouldMirror)

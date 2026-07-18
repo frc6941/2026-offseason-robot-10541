@@ -69,6 +69,9 @@ public class ShootingSuperstructure extends SubsystemBase {
         SmartDashboard.setDefaultBoolean(MANUAL_OVERRIDE_KEY, false);
         SmartDashboard.setDefaultNumber(MANUAL_HOOD_ANGLE_KEY, 10.0);
         SmartDashboard.setDefaultNumber(MANUAL_FLYWHEEL_RPS_KEY, 55.0);
+        if (!RobotConstants.ENABLE_NT_PARAMS) {
+            SmartDashboard.putBoolean(MANUAL_OVERRIDE_KEY, false);
+        }
     }
 
     private Pose2d robotPose() {
@@ -114,7 +117,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     private ShotSolution solutionForDistance(double effectiveDistanceMeters) {
-        if (SmartDashboard.getBoolean(MANUAL_OVERRIDE_KEY, false)) {
+        if (manualOverrideEnabled()) {
             Angle hoodAngle =
                     clampHoodAngle(
                             Degrees.of(SmartDashboard.getNumber(MANUAL_HOOD_ANGLE_KEY, 10.0)));
@@ -124,6 +127,11 @@ public class ShootingSuperstructure extends SubsystemBase {
             return new ShotSolution(hoodAngle, flywheelSpeed);
         }
         return calculator.solve(effectiveDistanceMeters);
+    }
+
+    private boolean manualOverrideEnabled() {
+        return RobotConstants.ENABLE_NT_PARAMS
+                && SmartDashboard.getBoolean(MANUAL_OVERRIDE_KEY, false);
     }
 
     private Rotation2d computeAimHeading(Pose2d pose) {
@@ -465,8 +473,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         Logger.recordOutput("Shooting/distanceMeters", geometric);
         Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
         Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
-        Logger.recordOutput(
-                "Shooting/manualOverride", SmartDashboard.getBoolean(MANUAL_OVERRIDE_KEY, false));
+        Logger.recordOutput("Shooting/manualOverride", manualOverrideEnabled());
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
         Logger.recordOutput(
                 "Shooting/shooterUpperTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));

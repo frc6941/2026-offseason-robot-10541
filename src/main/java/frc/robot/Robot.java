@@ -45,6 +45,9 @@ public class Robot extends LoggedRobot {
      * initialization code.
      */
     public Robot() {
+        // Set the live-tuning policy before RobotContainer construction can initialize any
+        // generated parameter wrappers or mechanism controllers.
+        NTParameterRegistry.setEnabled(RobotConstants.ENABLE_NT_PARAMS);
         robotContainer = new RobotContainer();
     }
 
@@ -53,9 +56,6 @@ public class Robot extends LoggedRobot {
         // Stop the CTRE Phoenix signal logger. It auto-starts on the roboRIO and writes .hoot files
         // (roboRIO disk + CPU) even though we log everything through AdvantageKit instead.
         SignalLogger.stop();
-
-        // Push the NT live-tuning gate into the ntext framework once, before any refresh() runs.
-        NTParameterRegistry.setEnabled(RobotConstants.ENABLE_NT_PARAMS);
 
         // AdvantageKit logger — sends data to AdvantageScope and writes .wpilog files
         boolean enableNt4 = RobotBase.isSimulation() || ENABLE_REAL_NT4_LOGGING;
@@ -103,8 +103,9 @@ public class Robot extends LoggedRobot {
         CommandScheduler.getInstance().run();
         long schedulerEnd = RobotController.getFPGATime();
 
-        // Live NT tuning is gated by RobotConstants.ENABLE_NT_PARAMS (pushed into the registry in
-        // robotInit). When off, this is a no-op — no per-loop NT JNI reads on the loop budget.
+        // Live NT tuning is gated by RobotConstants.ENABLE_NT_PARAMS (pushed into the registry
+        // before RobotContainer construction). When off, this applies source defaults once without
+        // any per-loop NT reads.
         NTParameterRegistry.refresh();
         robotContainer.updateDashboard();
         long loopEnd = RobotController.getFPGATime();
