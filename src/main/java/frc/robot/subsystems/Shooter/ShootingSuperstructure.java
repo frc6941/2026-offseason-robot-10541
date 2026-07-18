@@ -14,6 +14,8 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -22,7 +24,6 @@ import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
 import java.util.function.Supplier;
-import lib.ironpulse.command.VisualizeProjectileShot;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
 import lib.ironpulse.subsystem.position.PositionMotorSubsystem;
@@ -40,7 +41,10 @@ import org.littletonrobotics.junction.Logger;
  * the drivetrain handles yaw while this handles hood + flywheel + feed.
  */
 public class ShootingSuperstructure extends SubsystemBase {
-    private static final double HOPPER_FEED_DELAY_SECONDS = 0.1;
+    private static final String MANUAL_OVERRIDE_KEY = "Shooter Tuning/Manual Override";
+    private static final String MANUAL_HOOD_ANGLE_KEY = "Shooter Tuning/Hood Angle Deg";
+    private static final String MANUAL_FLYWHEEL_RPS_KEY = "Shooter Tuning/Flywheel RPS";
+    private static final double FEED_DELAY_AFTER_UPPER_READY_SECONDS = 0.1;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper;
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterLower;
@@ -48,10 +52,6 @@ public class ShootingSuperstructure extends SubsystemBase {
     private final HopperSubsystem hopper;
     private final Swerve swerve;
     private final ShotCalculator calculator = new ShotCalculator();
-
-    // TODO: tune kRpsToMuzzleMps until the visualized arc lands in the hub at a known, stationary
-    // distance. Visualization only — does NOT affect aim (that comes from the ToF table).
-    private static final double kRpsToMuzzleMps = 0.11;
 
     public ShootingSuperstructure(
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> shooterUpper,
@@ -65,6 +65,13 @@ public class ShootingSuperstructure extends SubsystemBase {
         this.hopper = hopper;
         this.swerve = swerve;
         cachedAimHeading = AutoAimCommand.getShooterAimHeading(robotPose());
+
+        SmartDashboard.setDefaultBoolean(MANUAL_OVERRIDE_KEY, false);
+        SmartDashboard.setDefaultNumber(MANUAL_HOOD_ANGLE_KEY, 10.0);
+        SmartDashboard.setDefaultNumber(MANUAL_FLYWHEEL_RPS_KEY, 55.0);
+        if (!RobotConstants.ENABLE_NT_PARAMS) {
+            SmartDashboard.putBoolean(MANUAL_OVERRIDE_KEY, false);
+        }
     }
 
     private Pose2d robotPose() {
@@ -73,7 +80,14 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** Horizontal distance from the robot to the (alliance-flipped) hub, in meters. */
     public double distanceToTarget() {
-        return AutoAimCommand.getDistanceToTarget(robotPose().getTranslation());
+        return distanceToTarget(robotPose());
+    }
+
+    // Pose-taking overloads let periodic() read the robot pose ONCE and thread it through,
+    // instead of each helper re-reading the transform buffer (a TreeMap lookup + quaternion
+    // inverse) several times per loop. See periodic().
+    private double distanceToTarget(Pose2d pose) {
+        return AutoAimCommand.getDistanceToTarget(pose.getTranslation());
     }
 
     /**
@@ -83,11 +97,15 @@ public class ShootingSuperstructure extends SubsystemBase {
      * à la 6328.
      */
     public double effectiveDistanceToTarget() {
+        return effectiveDistanceToTarget(robotPose());
+    }
+
+    private double effectiveDistanceToTarget(Pose2d pose) {
         ChassisSpeeds fieldVel =
                 ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), robotPose().getRotation());
+                        swerve.getChassisSpeedsCmd(), pose.getRotation());
         return calculator.effectiveDistance(
-                robotPose().getTranslation(),
+                pose.getTranslation(),
                 AutoAimCommand.getTarget(),
                 fieldVel.vxMetersPerSecond,
                 fieldVel.vyMetersPerSecond);
@@ -95,22 +113,38 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** The shot solution (hood angle + flywheel speed), shoot-on-move compensated. */
     public ShotSolution currentSolution() {
-        return calculator.solve(effectiveDistanceToTarget());
+        return solutionForDistance(effectiveDistanceToTarget());
     }
 
-    private Rotation2d computeAimHeading() {
+    private ShotSolution solutionForDistance(double effectiveDistanceMeters) {
+        if (manualOverrideEnabled()) {
+            Angle hoodAngle =
+                    clampHoodAngle(
+                            Degrees.of(SmartDashboard.getNumber(MANUAL_HOOD_ANGLE_KEY, 10.0)));
+            AngularVelocity flywheelSpeed =
+                    RotationsPerSecond.of(
+                            Math.max(0.0, SmartDashboard.getNumber(MANUAL_FLYWHEEL_RPS_KEY, 55.0)));
+            return new ShotSolution(hoodAngle, flywheelSpeed);
+        }
+        return calculator.solve(effectiveDistanceMeters);
+    }
+
+    private boolean manualOverrideEnabled() {
+        return RobotConstants.ENABLE_NT_PARAMS
+                && SmartDashboard.getBoolean(MANUAL_OVERRIDE_KEY, false);
+    }
+
+    private Rotation2d computeAimHeading(Pose2d pose) {
         ChassisSpeeds fv =
                 ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), robotPose().getRotation());
-        double tof = calculator.timeOfFlightFor(distanceToTarget());
+                        swerve.getChassisSpeedsCmd(), pose.getRotation());
+        double tof = calculator.timeOfFlightFor(distanceToTarget(pose));
         Translation2d lookahead =
-                robotPose()
-                        .getTranslation()
+                pose.getTranslation()
                         .plus(
                                 new Translation2d(
                                         fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof));
-        return AutoAimCommand.getShooterAimHeading(
-                new Pose2d(lookahead, robotPose().getRotation()));
+        return AutoAimCommand.getShooterAimHeading(new Pose2d(lookahead, pose.getRotation()));
     }
 
     // Below this magnitude the aim-heading rate is treated as zero. A stationary robot aimed at a
@@ -123,6 +157,7 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     private Rotation2d cachedAimHeading;
     private Rotation2d lastAimHeading;
+    private double lastAimTimestampSec = Double.NaN;
     private double aimRate;
     private LinearFilter aimRateFilter =
             LinearFilter.movingAverage((int) (0.1 / RobotConstants.LOOPER_DT));
@@ -143,17 +178,24 @@ public class ShootingSuperstructure extends SubsystemBase {
                         ShooterConfig.HOOD_MAX_ANGLE.in(Degrees)));
     }
 
-    /** True when the SHOOTER is pointed at the hub within the (NT-tunable) heading tolerance. */
+    /** True when the shooter is pointed at the hub within the configured heading tolerance. */
     public boolean headingAtGoal() {
-        Pose2d pose = robotPose();
+        return headingAtGoal(robotPose());
+    }
+
+    private boolean headingAtGoal(Pose2d pose) {
         Rotation2d aimHeading = aimHeading();
         double errorDeg = Math.abs(pose.getRotation().minus(aimHeading).getDegrees());
-        return errorDeg <= ShootingParamsNT.headingToleranceDeg.getValue();
+        return errorDeg <= calculator.headingToleranceDeg();
     }
 
     /** All three shot DOFs satisfied: chassis aimed, hood at angle, flywheel up to speed. */
     public boolean readyToShoot() {
-        return headingAtGoal() && hood.positionAtGoal() && shooterAtGoal();
+        return readyToShoot(robotPose());
+    }
+
+    private boolean readyToShoot(Pose2d pose) {
+        return headingAtGoal(pose) && hood.positionAtGoal() && shooterAtGoal();
     }
 
     public boolean shooterAtGoal() {
@@ -195,8 +237,7 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     private AngularVelocity lowerSpeedFor(AngularVelocity upperSpeed) {
         return RotationsPerSecond.of(
-                upperSpeed.in(RotationsPerSecond)
-                        * ShootingParamsNT.lowerShooterSpeedScale.getValue());
+                upperSpeed.in(RotationsPerSecond) * calculator.lowerShooterSpeedScale());
     }
 
     private Command runShooterAt(Supplier<AngularVelocity> upperSpeedSupplier) {
@@ -208,7 +249,38 @@ public class ShootingSuperstructure extends SubsystemBase {
             Supplier<AngularVelocity> lowerSpeedSupplier) {
         return Commands.parallel(
                 shooterUpper.runVelVolt(upperSpeedSupplier),
-                shooterLower.runVelVolt(lowerSpeedSupplier));
+                runLowerIdle()
+                        .until(() -> upperAtTarget(upperSpeedSupplier))
+                        .andThen(
+                                Commands.deadline(
+                                        Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS),
+                                        runLowerIdle()))
+                        .andThen(shooterLower.runVelVolt(lowerSpeedSupplier)));
+    }
+
+    private Command runLowerIdle() {
+        return shooterLower.runVelVolt(
+                () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue()));
+    }
+
+    private boolean upperAtTarget(Supplier<AngularVelocity> upperSpeedSupplier) {
+        return shooterUpper
+                .getVelocity()
+                .isNear(
+                        upperSpeedSupplier.get(),
+                        RotationsPerSecond.of(
+                                ShooterUpperParamsNT.velocityAtGoalToleranceRPS.getValue()));
+    }
+
+    /** True when the upper shooter has reached the current distance-based shot speed. */
+    public boolean upperAtShotSpeed() {
+        return upperAtTarget(() -> currentSolution().shooterSpeed());
+    }
+
+    /** Completes when the upper shooter is ready and the configured feed delay has elapsed. */
+    public Command waitForFeedStart() {
+        return Commands.waitUntil(this::upperAtShotSpeed)
+                .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
     }
 
     private Command runShooterPrespin() {
@@ -219,59 +291,112 @@ public class ShootingSuperstructure extends SubsystemBase {
                         () -> RotationsPerSecond.of(ShooterLowerParamsNT.idleRPS.getValue())));
     }
 
-    private Command feedAfterDelay() {
-        return Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS).andThen(hopper.shoot());
+    /** Start the hopper only after the upper wheel recovers to speed under lower-shooter load. */
+    private Command feedAfterUpperReadyDelay(Supplier<AngularVelocity> upperSpeedSupplier) {
+        Command waitForLoadedUpperReady = waitForLoadedUpperReady(upperSpeedSupplier);
+        return Commands.sequence(
+                Commands.deadline(waitForLoadedUpperReady, hopper.idle()), hopper.shoot());
+    }
+
+    /** Wait until the upper wheel has recovered to target after the lower shooter starts. */
+    private Command waitForLoadedUpperReady(Supplier<AngularVelocity> upperSpeedSupplier) {
+        return Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS))
+                // The lower shooter starts after the same delay in runShooterAt(). Wait one full
+                // loop so the velocity input reflects that added load before checking again.
+                .andThen(Commands.waitSeconds(RobotConstants.LOOPER_DT))
+                .andThen(Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier)));
     }
 
     /**
      * Spin the flywheel to the solution speed and drive the hood to the solution angle — both
-     * tracking distance continuously — then feed shortly after the shooter starts spinning.
+     * tracking distance continuously. The lower shooter and feed start only after the upper shooter
+     * reaches its target speed and the feed delay has elapsed.
      *
      * <p>Requires shooter/hood/floor-roller, NOT swerve; run it in parallel with an {@link
      * AutoAimCommand} which owns chassis yaw.
      */
     public Command aimAndShoot() {
+        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         return Commands.parallel(
-                runShooterAt(() -> currentSolution().shooterSpeed()),
+                runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterDelay());
-    }
-
-    public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
-        Command readyWindow =
-                Commands.sequence(
-                        Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS),
-                        Commands.waitSeconds(feedSeconds));
-
-        return Commands.deadline(
-                readyWindow,
-                runShooterAt(() -> currentSolution().shooterSpeed()),
-                hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterDelay());
-    }
-
-    public Command feedShotForSeconds(double seconds) {
-        return Commands.deadline(
-                Commands.waitSeconds(HOPPER_FEED_DELAY_SECONDS + seconds),
-                runShooterAt(() -> currentSolution().shooterSpeed()),
-                hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterDelay());
-    }
-
-    public Command fixedShoot() {
-        return Commands.parallel(
-                runShooterAt(
-                        () -> RotationsPerSecond.of(ShooterUpperParamsNT.shootRPS.getValue()),
-                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.shootRPS.getValue())),
-                hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
-                feedAfterDelay());
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
     /**
-     * Bench test: rotate the hood to the NT-tunable test angle ({@code Params/Hood/testAngleDeg}),
-     * clamped to the hood limits. Flywheel/feed untouched. Bind {@code whileTrue} so the hood
-     * returns to stow on release. Requires kP (and likely kG) tuned in {@code Params/Hood} or it
-     * won't move.
+     * Timing-only shot window for autonomous use. This owns no mechanisms: compose it as the
+     * deadline of the normal shoot command so autonomous and teleop use identical motor control.
+     */
+    public Command shotWindowWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
+        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
+        boolean[] loadedUpperReady = {false};
+
+        // Bound only the wait for loaded readiness. Once the lower shooter has started and the
+        // upper wheel has recovered, give the hopper the full requested feed duration.
+        Command readyWindow =
+                waitForLoadedUpperReady(upperSpeedSupplier)
+                        .andThen(Commands.runOnce(() -> loadedUpperReady[0] = true))
+                        .withTimeout(readyTimeoutSeconds);
+        // The shot window ends only after a full feedSeconds measured from actual hopper start.
+        // If loaded readiness times out, feeding is skipped and the auto continues.
+        return Commands.runOnce(() -> loadedUpperReady[0] = false)
+                .andThen(readyWindow)
+                .andThen(
+                        Commands.either(
+                                Commands.waitSeconds(feedSeconds),
+                                Commands.none(),
+                                () -> loadedUpperReady[0]));
+    }
+
+    public Command shootWhenReadyForSeconds(double readyTimeoutSeconds, double feedSeconds) {
+        return Commands.deadline(
+                shotWindowWhenReadyForSeconds(readyTimeoutSeconds, feedSeconds), aimAndShoot());
+    }
+
+    /**
+     * Spin the flywheel to the (distance-tracking) solution speed and pre-position the hood,
+     * WITHOUT feeding — run this in parallel with the drive into the shot pose so the flywheel is
+     * already at speed on arrival. That removes the spin-up wait (up to {@code
+     * readyTimeoutSeconds}) from the shot window, which is what lets the whole auto shot fit in ~2
+     * s.
+     *
+     * <p>Deliberately does NOT run the lower shooter (feed) or hopper — those would push balls into
+     * the already-spinning flywheel and shoot them out mid-drive. Only the upper drum + hood spin
+     * up here; the actual feed still waits for the shot command.
+     */
+    public Command spinUpForShot() {
+        return Commands.parallel(
+                shooterUpper.runVelVolt(() -> currentSolution().shooterSpeed()),
+                hood.runMotionMagic(this::clampHoodAngleForSolution));
+    }
+
+    public Command feedShotForSeconds(double seconds) {
+        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
+        return Commands.deadline(
+                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                        .andThen(
+                                Commands.waitSeconds(
+                                        FEED_DELAY_AFTER_UPPER_READY_SECONDS + seconds)),
+                runShooterAt(upperSpeedSupplier),
+                hood.runMotionMagic(this::clampHoodAngleForSolution),
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
+    }
+
+    public Command fixedShoot() {
+        Supplier<AngularVelocity> upperSpeedSupplier =
+                () -> RotationsPerSecond.of(ShooterUpperParamsNT.shootRPS.getValue());
+        return Commands.parallel(
+                runShooterAt(
+                        upperSpeedSupplier,
+                        () -> RotationsPerSecond.of(ShooterLowerParamsNT.shootRPS.getValue())),
+                hood.runMotionMagic(ShooterConfig.HOOD_MAX_ANGLE),
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
+    }
+
+    /**
+     * Bench test: rotate the hood to the configured test angle, clamped to the hood limits.
+     * Flywheel/feed untouched. Bind {@code whileTrue} so the hood returns to stow on release.
      */
     public Command hoodToTestAngle() {
         return hood.runMotionMagic(
@@ -279,14 +404,17 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     /**
-     * Bench test: spin ONLY the shooter drum (upper) at the NT-tunable test RPS ({@code
-     * Params/ShooterDrum/testRPS}); the feed roller stays on its idle default. Bind {@code
-     * whileTrue} so the drum drops back to idle on release. Requires kV/kP tuned in {@code
-     * Params/ShooterDrum} or it won't reach speed.
+     * Bench test: spin only the shooter drum (upper) at the configured test RPS; the feed roller
+     * stays on its idle default. Bind {@code whileTrue} so the drum drops back to idle on release.
      */
     public Command spinDrumAtTestRPS() {
         return shooterUpper.runVelVolt(
                 () -> RotationsPerSecond.of(ShooterUpperParamsNT.testRPS.getValue()));
+    }
+
+    public Command stopDrum() {
+        return shooterUpper.runVelVolt(
+                () -> RotationsPerSecond.of(ShooterUpperParamsNT.stopRPS.getValue()));
     }
 
     public void seedHoodPositionAtZero() {
@@ -298,38 +426,54 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.runOnce(this::seedHoodPositionAtZero, hood);
     }
 
+    public Command zeroCommand() {
+        return hood.zeroCommand();
+    }
+
     public Angle getHoodAngle() {
         return hood.getCurrPos();
     }
 
     /**
-     * Park the shot mechanisms: stop the flywheel and flatten the hood. The floor roller is left to
-     * its own default command. Bind to {@code onFalse} of the aim trigger.
+     * Park the shot mechanisms: stop the flywheel, flatten the hood, and STOP THE HOPPER. The
+     * hopper is commanded to idle (0 RPS) directly here so it actually stops when the shot ends,
+     * instead of being left to its default command (which keeps it spinning off the intake mode).
+     * Bind to {@code onFalse} of the aim trigger.
      */
     public Command idle() {
         return Commands.parallel(
-                runShooterPrespin(), hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE));
+                runShooterPrespin(),
+                hood.runMotionMagic(ShooterConfig.HOOD_STOW_ANGLE),
+                hopper.idle());
     }
 
     @Override
     public void periodic() {
-        double geometric = distanceToTarget();
-        double effective = effectiveDistanceToTarget();
+        // Read the world pose ONCE per loop and thread it through; each robotPose() call re-reads
+        // the transform buffer (TreeMap lookup + quaternion inverse), and this method used to do it
+        // ~6x. See the pose-taking overloads above.
+        Pose2d pose = robotPose();
+        double geometric = distanceToTarget(pose);
+        double effective = effectiveDistanceToTarget(pose);
         ShotSolution solution = calculator.solve(effective);
-        Rotation2d heading = computeAimHeading();
+        Rotation2d heading = computeAimHeading(pose);
+        double timestampSec = Timer.getFPGATimestamp();
+        double dtSec = timestampSec - lastAimTimestampSec;
         double raw =
-                (lastAimHeading == null)
+                lastAimHeading == null || dtSec <= 0.0 || dtSec > 0.25
                         ? 0.0
-                        : heading.minus(lastAimHeading).getRadians() / RobotConstants.LOOPER_DT;
+                        : heading.minus(lastAimHeading).getRadians() / dtSec;
         double filtered = aimRateFilter.calculate(raw);
         // Floor sub-threshold residual to 0 so a stationary aim commands exactly zero feedforward.
         aimRate = Math.abs(filtered) < AIM_RATE_DEADBAND_RAD_S ? 0.0 : filtered;
         lastAimHeading = heading;
+        lastAimTimestampSec = timestampSec;
         cachedAimHeading = heading;
 
         Logger.recordOutput("Shooting/distanceMeters", geometric);
         Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
         Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
+        Logger.recordOutput("Shooting/manualOverride", manualOverrideEnabled());
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
         Logger.recordOutput(
                 "Shooting/shooterUpperTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
@@ -337,45 +481,40 @@ public class ShootingSuperstructure extends SubsystemBase {
                 "Shooting/shooterLowerTargetRPS",
                 lowerSpeedFor(solution.shooterSpeed()).in(RotationsPerSecond));
         Logger.recordOutput("Shooting/shooterAtGoal", shooterAtGoal());
-        Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal());
-        Logger.recordOutput("Shooting/readyToShoot", readyToShoot());
+        Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal(pose));
+        Logger.recordOutput("Shooting/readyToShoot", readyToShoot(pose));
 
-        // --- Shoot-on-move visualization (drag these onto a 2D/3D Field in AdvantageScope) ---
-        Pose2d pose = robotPose();
-        Translation2d hub = AutoAimCommand.getTarget();
-        ChassisSpeeds fv =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), pose.getRotation());
-        double tof = calculator.timeOfFlightFor(geometric);
-        // How far the ball drifts downrange from inheriting chassis velocity over its flight.
-        Translation2d leadOffset =
-                new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
-        // The point the chassis actually aims at: the hub pulled back against our motion.
-        Translation2d virtualTarget = hub.minus(leadOffset);
-        // The internal dual the aim math uses: pretend the shooter is here, aim at the real hub.
-        Translation2d virtualShooter = pose.getTranslation().plus(leadOffset);
+        // Visualization is debug-only telemetry (pose math + a full projectile-arc log). Skip it
+        // when the flywheel is idle so it stays off the loop budget; the fields simply hold their
+        // last value in AdvantageScope while not shooting.
+        if (isShooterActive()) {
+            // --- Shoot-on-move visualization (drag these onto a 2D/3D Field in AdvantageScope) ---
+            Translation2d hub = AutoAimCommand.getTarget();
+            ChassisSpeeds fv =
+                    ChassisSpeeds.fromRobotRelativeSpeeds(
+                            swerve.getChassisSpeedsCmd(), pose.getRotation());
+            double tof = calculator.timeOfFlightFor(geometric);
+            // How far the ball drifts downrange from inheriting chassis velocity over its flight.
+            Translation2d leadOffset =
+                    new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
+            // The point the chassis actually aims at: the hub pulled back against our motion.
+            Translation2d virtualTarget = hub.minus(leadOffset);
+            // The internal dual the aim math uses: pretend the shooter is here, aim at the real
+            // hub.
+            Translation2d virtualShooter = pose.getTranslation().plus(leadOffset);
 
-        Logger.recordOutput("Shooting/Viz/Hub", new Pose2d(hub, new Rotation2d()));
-        Logger.recordOutput(
-                "Shooting/Viz/VirtualTarget", new Pose2d(virtualTarget, new Rotation2d()));
-        Logger.recordOutput(
-                "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
-        Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
+            Logger.recordOutput("Shooting/Viz/Hub", new Pose2d(hub, new Rotation2d()));
+            Logger.recordOutput(
+                    "Shooting/Viz/VirtualTarget", new Pose2d(virtualTarget, new Rotation2d()));
+            Logger.recordOutput(
+                    "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
+            Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
 
-        // --- Ballistic arc overlay (3D Field: Commands/VisualizeProjectileShot/pathWorld) ---
-        // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
-        Pose3d muzzle =
-                new Pose3d(pose).plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
-        VisualizeProjectileShot.logPath(
-                muzzle,
-                // TODO: verify the shooter fires off the back (-X); drop the +180 if it points
-                // forward.
-                pose.getRotation().plus(Rotation2d.fromDegrees(180.0)),
-                // TODO: verify hood angle sign/zero maps to up-positive launch pitch vs CAD.
-                Rotation2d.fromDegrees(hood.getCurrPos().in(Degrees)),
-                solution.shooterSpeed().in(RotationsPerSecond) * kRpsToMuzzleMps,
-                new Translation2d(fv.vxMetersPerSecond, fv.vyMetersPerSecond),
-                true,
-                "");
+            // --- Quadratic-drag arc overlay (3D Field: Shooting/Viz/DragPath) ---
+            // Body-fixed muzzle pose: shooter offset rotated into the field by the robot heading.
+            Pose3d muzzle =
+                    new Pose3d(pose)
+                            .plus(new Transform3d(RobotConstants.HOOD_PIVOT, new Rotation3d()));
+        }
     }
 }

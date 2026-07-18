@@ -37,12 +37,19 @@ public class ShooterConfig {
     public static final Angle SHOOTER_FIRING_YAW_OFFSET = Degrees.of(0.0);
 
     public static final Angle HOOD_MIN_ANGLE = Degrees.of(0.0);
-    public static final Angle HOOD_MAX_ANGLE = Degrees.of(20.0);
+    // Must equal the hood's true mechanical travel. ShotCalculator converts physical launch pitch
+    // to this mechanism angle and clamps the result to this range.
+    public static final Angle HOOD_MAX_ANGLE = Degrees.of(50.0);
     public static final Angle HOOD_STOW_ANGLE = HOOD_MIN_ANGLE;
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
     // SensorToMechanismRatio (below), NOT here — so this must be a bare 360, or the ratio gets
     // applied twice and the hood barely moves. See PositionMotorSubsystem doc ("Pivot: 360").
     public static final Angle HOOD_ANGLE_PER_ROTATION = Degrees.of(360.0);
+    // The hood zeroes against its reverse/stow hard stop, so the raw motor zero IS mechanism 0.
+    // zeroOffset is ONLY for CTRE arm-cosine gravity (see SubsystemConfig.zeroOffset) and the hood
+    // uses Elevator_Static gravity, so it must be 0 here — any nonzero value shifts the whole
+    // coordinate frame, making getCurrPos report the stop as 10 deg and putting stow (0 deg) below
+    // the hard stop where the mechanism can never reach it (hood zeroes, then won't move to angle).
     public static final Angle HOOD_ZERO_OFFSET = Degrees.of(0.0);
 
     public static final SubsystemConfig SHOOTER_DRUM_CONFIG =
@@ -116,17 +123,17 @@ public class ShooterConfig {
 
     @NTParameter(tableName = "Params/" + SHOOTER_DRUM_NAME)
     public static final class ShooterUpperParams {
-        public static final double kP = 0.4;
+        public static final double kP = 0.25;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.1;
+        public static final double kV = 0.092;
         public static final double kA = 0.01;
-        public static final double kS = 0.0;
+        public static final double kS = 0.01;
 
         public static final double shootRPS = 80.0;
-        //public static final double idleRPS = 5.0;
-        public static final double idleRPS = 0.0;
+        public static final double idleRPS = 5.0;
+        public static final double stopRPS = 0.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
         // Bench-test setpoint: drum (upper) RPS for the isolated spin-up test binding.
@@ -137,16 +144,16 @@ public class ShooterConfig {
 
     @NTParameter(tableName = "Params/" + SHOOTER_FEED_NAME)
     public static final class ShooterLowerParams {
-        public static final double kP = 0.4;
+        public static final double kP = 0.3;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
-        public static final double kV = 0.1;
+        public static final double kV = 0.08;
         public static final double kA = 0.01;
         public static final double kS = 0.0;
 
         public static final double shootRPS = 80.0;
-        public static final double idleRPS = 0.0;
+        public static final double idleRPS = -2.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
         private ShooterLowerParams() {}

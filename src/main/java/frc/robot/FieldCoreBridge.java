@@ -23,7 +23,7 @@ import lib.ironpulse.subsystem.velocity.VelocityMotorSubsystem;
 import lib.ironpulse.swerve.Swerve;
 import org.littletonrobotics.junction.Logger;
 
-/** Publishes this robot project's simulation state to FieldCore. */
+/** Publishes robot state to FieldCore and Elastic in both simulation and on real hardware. */
 public class FieldCoreBridge extends SubsystemBase {
     private final Swerve swerve;
     private final IntakerSubsystem intaker;
@@ -113,6 +113,7 @@ public class FieldCoreBridge extends SubsystemBase {
     private boolean isIntakeEnabled() {
         IntakeMode mode = intaker.getCurrentMode();
         return mode == IntakeMode.INTAKING
+                || mode == IntakeMode.MAX_INTAKING
                 || mode == IntakeMode.FEEDING
                 || mode == IntakeMode.EXTENDED_REVERSE
                 || mode == IntakeMode.RETRACTED_FEEDING;

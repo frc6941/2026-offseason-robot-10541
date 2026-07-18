@@ -7,139 +7,105 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
 import lib.ntext.NTParameter;
 
-/**
- * Single source of truth for distance-based aiming on the drum shooter: maps distance-to-hub to a
- * {@link ShotSolution} (hood angle + flywheel speed) by 1D interpolation, and provides the
- * shoot-on-move {@link #effectiveDistance} lookahead.
- *
- * <p>The interpolation breakpoints (distances, in meters) are fixed; the hood angle, flywheel
- * speed, and time-of-flight at each breakpoint are live-tunable over NetworkTables via {@link
- * ShootingParams}. The maps are rebuilt from live NT values on every lookup.
- *
- * <p>{@link InterpolatingDoubleTreeMap#get} clamps to the nearest endpoint for distances outside
- * the tabulated range, so out-of-range lookups are safe.
- *
- * <p>Shoot-on-move (Step 1): {@link #effectiveDistance} converts the geometric robot→hub distance
- * into the distance the shot must actually cover given the chassis velocity, by a fixed-point
- * lookahead. Feeding that effective distance into {@link #solve} aims hood + flywheel for the
- * moving shot. The chassis heading lead and velocity feedforwards are handled by the aim command
- * (later steps); a linear-drag model on the offset is a deliberate later refinement.
- */
+/** Resolves hood angle, shooter speed, and time of flight from live interpolation tables. */
 public class ShotCalculator {
-    // Fixed interpolation breakpoints (m). Only the values at these distances are NT-tunable.
-    private static final double[] BREAKPOINTS_M = {2.0, 3.0, 4.0, 5.0, 6.0};
-
-    // Iterations for the shoot-on-move fixed point. Converges in a few; extra are cheap insurance.
+    private static final double[] BREAKPOINTS_METERS = {2.0, 2.5, 3.0, 3.5, 4.0, 4.5};
     private static final int LOOKAHEAD_ITERATIONS = 10;
 
     private final InterpolatingDoubleTreeMap hoodAngleDeg = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap shooterRps = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap timeOfFlightSec = new InterpolatingDoubleTreeMap();
 
-    /** Resolve a full shot solution for the given distance to the hub (meters). */
     public ShotSolution solve(double distanceMeters) {
-        rebuild();
+        rebuildTables();
         return new ShotSolution(
                 Degrees.of(hoodAngleDeg.get(distanceMeters)),
                 RotationsPerSecond.of(shooterRps.get(distanceMeters)));
     }
 
-    /** Naive time of flight (s) for a static distance — no velocity compensation. */
     public double timeOfFlightFor(double distanceMeters) {
-        rebuild();
+        rebuildTables();
         return timeOfFlightSec.get(distanceMeters);
     }
 
     /**
-     * Shoot-on-move lookahead: the distance the shot must actually cover given chassis motion.
-     *
-     * <p>A ball launched while the chassis moves at field velocity {@code (vx, vy)} inherits that
-     * velocity for its time of flight, drifting {@code v * tof}. Time of flight itself depends on
-     * distance, so this is a fixed point: estimate tof at the current distance, shift the launch
-     * point by {@code v * tof}, remeasure distance, repeat. Feed the result into {@link #solve}.
-     *
-     * <p>When stationary ({@code vx == vy == 0}) this returns the plain geometric distance, so it
-     * is always safe to route the normal (non-moving) case through here too.
-     *
-     * @param shooter field-relative shooter position (≈ robot center for a near-centered shooter)
-     * @param target field-relative hub target
-     * @param vxField field-relative chassis x velocity (m/s)
-     * @param vyField field-relative chassis y velocity (m/s)
-     * @return effective distance (m) to feed {@link #solve}
+     * Compensates distance for the field-relative velocity inherited by a ball launched while the
+     * robot is moving. The tabulated time of flight is iterated because it changes with distance.
      */
     public double effectiveDistance(
             Translation2d shooter, Translation2d target, double vxField, double vyField) {
-        rebuild();
-        // TODO: add 6328-style linear-drag model to the offset (v*effectiveTOF) once stationary aim
-        // is dialed in
+        rebuildTables();
         double distance = target.getDistance(shooter);
         for (int i = 0; i < LOOKAHEAD_ITERATIONS; i++) {
-            double tof = timeOfFlightSec.get(distance);
+            double timeOfFlight = timeOfFlightSec.get(distance);
             Translation2d virtualShooter =
-                    shooter.plus(new Translation2d(vxField * tof, vyField * tof));
+                    shooter.plus(new Translation2d(vxField * timeOfFlight, vyField * timeOfFlight));
             distance = target.getDistance(virtualShooter);
         }
         return distance;
     }
 
-    private void rebuild() {
-        // Rebuild unconditionally. Three 5-entry maps are trivial to repopulate, and it avoids
-        // depending on NTParameterWrapper's one-loop hasChanged() edge — which is easy to miss
-        // (e.g.
-        // editing a value while not actively aiming), leaving the maps frozen on the last-built
-        // (deployed-default) values. Reading .getValue() every call always reflects live NT edits.
-        hoodAngleDeg.clear();
-        hoodAngleDeg.put(BREAKPOINTS_M[0], ShootingParamsNT.hoodAngleDeg2m.getValue());
-        hoodAngleDeg.put(BREAKPOINTS_M[1], ShootingParamsNT.hoodAngleDeg3m.getValue());
-        hoodAngleDeg.put(BREAKPOINTS_M[2], ShootingParamsNT.hoodAngleDeg4m.getValue());
-        hoodAngleDeg.put(BREAKPOINTS_M[3], ShootingParamsNT.hoodAngleDeg5m.getValue());
-        hoodAngleDeg.put(BREAKPOINTS_M[4], ShootingParamsNT.hoodAngleDeg6m.getValue());
-
-        shooterRps.clear();
-        shooterRps.put(BREAKPOINTS_M[0], ShootingParamsNT.shooterRps2m.getValue());
-        shooterRps.put(BREAKPOINTS_M[1], ShootingParamsNT.shooterRps3m.getValue());
-        shooterRps.put(BREAKPOINTS_M[2], ShootingParamsNT.shooterRps4m.getValue());
-        shooterRps.put(BREAKPOINTS_M[3], ShootingParamsNT.shooterRps5m.getValue());
-        shooterRps.put(BREAKPOINTS_M[4], ShootingParamsNT.shooterRps6m.getValue());
-
-        timeOfFlightSec.clear();
-        timeOfFlightSec.put(BREAKPOINTS_M[0], ShootingParamsNT.tofSec2m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_M[1], ShootingParamsNT.tofSec3m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_M[2], ShootingParamsNT.tofSec4m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_M[3], ShootingParamsNT.tofSec5m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_M[4], ShootingParamsNT.tofSec6m.getValue());
+    public double lowerShooterSpeedScale() {
+        return ShootingParamsNT.lowerShooterSpeedScale.getValue();
     }
 
-    /**
-     * Live-tunable aiming parameters. Values are placeholders — TUNE ON REAL ROBOT. The breakpoint
-     * distances themselves are fixed in {@link #BREAKPOINTS_M}; only the hood angle / flywheel
-     * speed / time-of-flight at each distance, and the chassis heading tolerance, are exposed here.
-     */
+    public double headingToleranceDeg() {
+        return ShootingParamsNT.headingToleranceDeg.getValue();
+    }
+
+    private void rebuildTables() {
+        hoodAngleDeg.clear();
+        hoodAngleDeg.put(BREAKPOINTS_METERS[0], ShootingParamsNT.hoodAngleDeg2m.getValue()); // 23
+        hoodAngleDeg.put(BREAKPOINTS_METERS[1], ShootingParamsNT.hoodAngleDeg3m.getValue()); // 29.5
+        hoodAngleDeg.put(BREAKPOINTS_METERS[2], ShootingParamsNT.hoodAngleDeg4m.getValue()); // 37
+        hoodAngleDeg.put(BREAKPOINTS_METERS[3], ShootingParamsNT.hoodAngleDeg5m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_METERS[4], ShootingParamsNT.hoodAngleDeg6m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_METERS[5], ShootingParamsNT.hoodAngleDeg7m.getValue());
+
+        shooterRps.clear();
+        shooterRps.put(BREAKPOINTS_METERS[0], ShootingParamsNT.shooterRps2m.getValue()); // 55
+        shooterRps.put(BREAKPOINTS_METERS[1], ShootingParamsNT.shooterRps3m.getValue()); // 57.5
+        shooterRps.put(BREAKPOINTS_METERS[2], ShootingParamsNT.shooterRps4m.getValue()); // 59
+        shooterRps.put(BREAKPOINTS_METERS[3], ShootingParamsNT.shooterRps5m.getValue());
+        shooterRps.put(BREAKPOINTS_METERS[4], ShootingParamsNT.shooterRps6m.getValue());
+        shooterRps.put(BREAKPOINTS_METERS[5], ShootingParamsNT.shooterRps7m.getValue());
+
+        timeOfFlightSec.clear();
+        timeOfFlightSec.put(BREAKPOINTS_METERS[0], ShootingParamsNT.tofSec2m.getValue()); // 1.1
+        timeOfFlightSec.put(BREAKPOINTS_METERS[1], ShootingParamsNT.tofSec3m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[2], ShootingParamsNT.tofSec4m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[3], ShootingParamsNT.tofSec5m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[4], ShootingParamsNT.tofSec6m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[5], ShootingParamsNT.tofSec7m.getValue());
+    }
+
+    /** Values between breakpoints are linearly interpolated and remain live-tunable over NT. */
     @NTParameter(tableName = "Params/Shooting")
     public static final class ShootingParams {
-        // TODO: tune hood angle (deg) per distance breakpoint on the real robot
-        public static final double hoodAngleDeg2m = 10.0;
-        public static final double hoodAngleDeg3m = 18.0;
-        public static final double hoodAngleDeg4m = 24.0;
-        public static final double hoodAngleDeg5m = 28.0;
-        public static final double hoodAngleDeg6m = 30.0;
+        public static final double hoodAngleDeg2m = 14.0;
+        public static final double hoodAngleDeg3m = 20.5; // 20.5
+        public static final double hoodAngleDeg4m = 20.5; // 20.5
+        public static final double hoodAngleDeg5m = 21.5; // 21.5
+        public static final double hoodAngleDeg6m = 24.0; // 24
+        public static final double hoodAngleDeg7m = 27.0; // 27
 
-        // TODO: tune flywheel speed (rotations/sec) per distance breakpoint on the real robot
-        public static final double shooterRps2m = 55.0;
-        public static final double shooterRps3m = 62.0;
-        public static final double shooterRps4m = 70.0;
-        public static final double shooterRps5m = 78.0;
-        public static final double shooterRps6m = 85.0;
+        public static final double shooterRps2m = 50.0; // 50
+        public static final double shooterRps3m = 51.0; // 51
+        public static final double shooterRps4m = 54.0; // 54
+        public static final double shooterRps5m = 57.2; // 57.5
+        public static final double shooterRps6m = 61.2; // 61.2
+        public static final double shooterRps7m = 65.0; // 65
         public static final double lowerShooterSpeedScale = 1.0;
 
-        // TODO: measure ball time of flight (s) per distance breakpoint (drives shoot-on-move lead)
         public static final double tofSec2m = 0.85;
         public static final double tofSec3m = 0.95;
         public static final double tofSec4m = 1.05;
         public static final double tofSec5m = 1.15;
         public static final double tofSec6m = 1.25;
+        public static final double tofSec7m = 1.30;
 
-        // TODO: tune chassis heading tolerance (deg) for the "aimed at hub" gate
         public static final double headingToleranceDeg = 2.0;
+
+        private ShootingParams() {}
     }
 }

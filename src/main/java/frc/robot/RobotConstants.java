@@ -11,6 +11,20 @@ public final class RobotConstants {
     // (RobotMechanism3d 3D model) and the shooter muzzle release point (projectile viz).
     public static final Translation3d HOOD_PIVOT = new Translation3d(-0.2579, 0.0, 0.47525);
 
+    public static final boolean HAS_INTAKER_IO = true;
+    public static final boolean HAS_HOPPER_IO = true;
+    public static final boolean HAS_SWERVE_IO = true;
+    public static final boolean HAS_SHOOTER_IO = true;
+    public static final boolean HAS_LED_IO = false;
+    public static final boolean HAS_HOOD_IO = true;
+
+    // NT live-tuning gate. When false, @NTParameter values never poll NetworkTables — they hold
+    // their compile-time defaults and NTParameterRegistry.refresh() is a no-op, keeping the
+    // per-loop NT JNI reads off the loop budget. Flip true to tune PID/params live from the
+    // dashboard. Pushed into the ntext framework before RobotContainer construction. See Robot and
+    // lib.ntext.
+    public static final boolean ENABLE_NT_PARAMS = false;
+
     // CAN
     public static final String ROBORIO_CAN_BUS_NAME = "rio";
     public static final String CANIVORE_CAN_BUS_NAME = "10541Canivore0";
