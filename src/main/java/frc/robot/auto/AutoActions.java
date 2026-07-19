@@ -518,7 +518,7 @@ public class AutoActions {
 
     /** Lift the swerve speed cap for a fast unguarded dash (e.g. the trench-start opening move). */
     public static Command setSwerveLimitUnlimited() {
-        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kDefaultSwerveLimit));
+        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit));
     }
 
     /** Restore the normal swerve speed cap after an unlimited-speed segment. */

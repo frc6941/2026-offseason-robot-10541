@@ -174,7 +174,8 @@ public class RobotContainer {
         driverController.povDown().whileTrue(hopperSubsystem.out());
         driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
-        driverController.povUp().whileTrue(driveToPoseAutoPilotTestCommand());
+        // Competition safety: leave the autonomous drive test unbound.
+        // driverController.povUp().whileTrue(driveToPoseAutoPilotTestCommand());
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
