@@ -3,6 +3,7 @@ package frc.robot.subsystems.Intaker;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -18,6 +19,10 @@ import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 
 public class IntakerSubsystem extends SubsystemBase {
+    private static final double SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND = 5.0;
+    private static final double MIN_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 5.0;
+    private static final double MAX_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 180.0;
+
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller;
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> pivot;
 
@@ -30,6 +35,11 @@ public class IntakerSubsystem extends SubsystemBase {
 
     @AutoLogOutput(key = "Intaker/pivotZeroed")
     private boolean pivotZeroed = false;
+
+    @Getter
+    @AutoLogOutput(key = "Intaker/shootRaiseSpeedDegreesPerSecond")
+    private double shootRaiseSpeedDegreesPerSecond =
+            IntakerConfig.INTAKER_PIVOT_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND;
 
     public IntakerSubsystem(
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller,
@@ -112,9 +122,7 @@ public class IntakerSubsystem extends SubsystemBase {
                 shootRampAngleDeg = pivot.getCurrPos().in(Degrees);
                 shootRampActive = true;
             }
-            double stepDeg =
-                    IntakerPivotParamsNT.shootRaiseSpeedDegreesPerSecond.getValue()
-                            * RobotConstants.LOOPER_DT;
+            double stepDeg = shootRaiseSpeedDegreesPerSecond * RobotConstants.LOOPER_DT;
             double errDeg = targetDeg - shootRampAngleDeg;
             shootRampAngleDeg += Math.copySign(Math.min(Math.abs(errDeg), stepDeg), errDeg);
             return Degrees.of(shootRampAngleDeg);
@@ -241,6 +249,22 @@ public class IntakerSubsystem extends SubsystemBase {
                 this);
     }
 
+    public void decreaseShootRaiseSpeed() {
+        adjustShootRaiseSpeed(-SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND);
+    }
+
+    public void increaseShootRaiseSpeed() {
+        adjustShootRaiseSpeed(SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND);
+    }
+
+    private void adjustShootRaiseSpeed(double deltaDegreesPerSecond) {
+        shootRaiseSpeedDegreesPerSecond =
+                MathUtil.clamp(
+                        shootRaiseSpeedDegreesPerSecond + deltaDegreesPerSecond,
+                        MIN_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND,
+                        MAX_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND);
+    }
+
     public Command returnPivotToIdleFast() {
         Command selectIdleMode =
                 Commands.runOnce(
@@ -274,7 +298,7 @@ public class IntakerSubsystem extends SubsystemBase {
                         () -> {
                             double nowSeconds = timer.get();
                             double maxStepDeg =
-                                    IntakerPivotParamsNT.shootRaiseSpeedDegreesPerSecond.getValue()
+                                    shootRaiseSpeedDegreesPerSecond
                                             * Math.max(0.0, nowSeconds - lastTimeSeconds[0]);
                             lastTimeSeconds[0] = nowSeconds;
 

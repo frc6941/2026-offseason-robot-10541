@@ -34,11 +34,14 @@ public class IntakerConfig {
     // Measure on the robot and update this value so getCurrPos() reports the true mechanism angle
     // after homing.
     public static final Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
+    public static final double INTAKER_PIVOT_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 54.0;
+    public static final double INTAKER_PIVOT_STATOR_CURRENT_LIMIT_AMPS = 50.0;
+    public static final double INTAKER_PIVOT_SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
     // Placeholder template values for homing. These MUST be verified on the real robot.
     // Sign must drive the intake pivot toward the zero hard stop.
     public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -2;
     // Must be above free-run current and below breaker / unsafe stall current.
-    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 60.0;
+    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 40.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
 
     public enum IntakeMode {
@@ -70,6 +73,8 @@ public class IntakerConfig {
                     // which is
                     // 1/INTAKER_PIVOT_GEAR_RATIO — not the ratio itself (~0.0107, the reciprocal).
                     .SensorToMechanismRatio(1.0 / INTAKER_PIVOT_GEAR_RATIO)
+                    .statorCurrentLimitAmps(INTAKER_PIVOT_STATOR_CURRENT_LIMIT_AMPS)
+                    .supplyCurrentLimitAmps(INTAKER_PIVOT_SUPPLY_CURRENT_LIMIT_AMPS)
                     // Arm-type gravity: torque needed to hold position varies with cos(angle), so
                     // Slot0 kG is applied as an arm-cosine feedforward (not a constant elevator
                     // term).
@@ -125,11 +130,7 @@ public class IntakerConfig {
         public static final double deployPosAngle = 10;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 70.0;
-
-        // Shoot-only software position-ramp speed. The pivot still uses runPosition(), not Motion
-        // Magic.
-        public static final double shootRaiseSpeedDegreesPerSecond = 54.0;
+        public static final double retractedfeedPosAngle = 120.0;
 
         private IntakerPivotParams() {}
     }

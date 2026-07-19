@@ -75,6 +75,8 @@ public class RobotContainer {
     private static final String FIXED_SHOT_MODE_KEY = "Shoot/Fixed Distance Mode";
     private static final String FIXED_SHOT_DISTANCE_KEY = "Shoot/Fixed Distance Meters";
     private static final String SHOOTER_DRUM_STOP_MODE_KEY = "Shoot/Shooter Drum Stop Mode";
+    private static final String INTAKE_SHOOT_RAISE_SPEED_KEY =
+            "Intake/Shoot Raise Speed Deg Per Sec";
     private static final double SHORT_FIXED_SHOT_DISTANCE_METERS = 1.14;
     private static final double LONG_FIXED_SHOT_DISTANCE_METERS = 3.07;
 
@@ -177,6 +179,10 @@ public class RobotContainer {
         OperatorController.povDown().whileTrue(hopperSubsystem.out());
         OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
         OperatorController.povUp().whileTrue(intaker.holdRetractedFeedPosition());
+        OperatorController.leftBumper()
+                .onTrue(Commands.runOnce(intaker::decreaseShootRaiseSpeed).ignoringDisable(true));
+        OperatorController.rightBumper()
+                .onTrue(Commands.runOnce(intaker::increaseShootRaiseSpeed).ignoringDisable(true));
         OperatorController.b().whileTrue(intaker.holdFeedMode());
         OperatorController.x().toggleOnTrue(shooterDrumStopCommand);
         OperatorController.y()
@@ -413,6 +419,8 @@ public class RobotContainer {
         SmartDashboard.putNumber("Robot Voltage", RobotController.getBatteryVoltage());
         SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, fixedDistanceShotEnabled);
         SmartDashboard.putNumber(FIXED_SHOT_DISTANCE_KEY, selectedFixedShotDistanceMeters);
+        SmartDashboard.putNumber(
+                INTAKE_SHOOT_RAISE_SPEED_KEY, intaker.getShootRaiseSpeedDegreesPerSecond());
         SmartDashboard.putBoolean(SHOOTER_DRUM_STOP_MODE_KEY, shooterDrumStopCommand.isScheduled());
         HubShiftUtil.ShiftInfo hubShift = HubShiftUtil.getShiftInfo();
         Logger.recordOutput("Competition/isHubActive", hubShift.active());

@@ -8,7 +8,7 @@ import lib.ntext.NTParameter;
 
 /** Resolves hood angle, shooter speed, and time of flight from live interpolation tables. */
 public class ShotCalculator {
-    private static final double[] BREAKPOINTS_METERS = {2.0, 2.5, 3.0, 3.5, 4.0, 4.5};
+    private static final double[] BREAKPOINTS_METERS = {1.0, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5};
 
     private final InterpolatingDoubleTreeMap hoodAngleDeg = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap shooterRps = new InterpolatingDoubleTreeMap();
@@ -36,33 +36,37 @@ public class ShotCalculator {
 
     private void rebuildTables() {
         hoodAngleDeg.clear();
-        hoodAngleDeg.put(BREAKPOINTS_METERS[0], ShootingParamsNT.hoodAngleDeg2m.getValue()); // 23
-        hoodAngleDeg.put(BREAKPOINTS_METERS[1], ShootingParamsNT.hoodAngleDeg3m.getValue()); // 29.5
-        hoodAngleDeg.put(BREAKPOINTS_METERS[2], ShootingParamsNT.hoodAngleDeg4m.getValue()); // 37
-        hoodAngleDeg.put(BREAKPOINTS_METERS[3], ShootingParamsNT.hoodAngleDeg5m.getValue());
-        hoodAngleDeg.put(BREAKPOINTS_METERS[4], ShootingParamsNT.hoodAngleDeg6m.getValue());
-        hoodAngleDeg.put(BREAKPOINTS_METERS[5], ShootingParamsNT.hoodAngleDeg7m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_METERS[0], ShootingParamsNT.hoodAngleDeg1m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_METERS[1], ShootingParamsNT.hoodAngleDeg2m.getValue()); // 23
+        hoodAngleDeg.put(BREAKPOINTS_METERS[2], ShootingParamsNT.hoodAngleDeg3m.getValue()); // 29.5
+        hoodAngleDeg.put(BREAKPOINTS_METERS[3], ShootingParamsNT.hoodAngleDeg4m.getValue()); // 37
+        hoodAngleDeg.put(BREAKPOINTS_METERS[4], ShootingParamsNT.hoodAngleDeg5m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_METERS[5], ShootingParamsNT.hoodAngleDeg6m.getValue());
+        hoodAngleDeg.put(BREAKPOINTS_METERS[6], ShootingParamsNT.hoodAngleDeg7m.getValue());
 
         shooterRps.clear();
-        shooterRps.put(BREAKPOINTS_METERS[0], ShootingParamsNT.shooterRps2m.getValue()); // 55
-        shooterRps.put(BREAKPOINTS_METERS[1], ShootingParamsNT.shooterRps3m.getValue()); // 57.5
-        shooterRps.put(BREAKPOINTS_METERS[2], ShootingParamsNT.shooterRps4m.getValue()); // 59
-        shooterRps.put(BREAKPOINTS_METERS[3], ShootingParamsNT.shooterRps5m.getValue());
-        shooterRps.put(BREAKPOINTS_METERS[4], ShootingParamsNT.shooterRps6m.getValue());
-        shooterRps.put(BREAKPOINTS_METERS[5], ShootingParamsNT.shooterRps7m.getValue());
+        shooterRps.put(BREAKPOINTS_METERS[0], ShootingParamsNT.shooterRps1m.getValue());
+        shooterRps.put(BREAKPOINTS_METERS[1], ShootingParamsNT.shooterRps2m.getValue()); // 55
+        shooterRps.put(BREAKPOINTS_METERS[2], ShootingParamsNT.shooterRps3m.getValue()); // 57.5
+        shooterRps.put(BREAKPOINTS_METERS[3], ShootingParamsNT.shooterRps4m.getValue()); // 59
+        shooterRps.put(BREAKPOINTS_METERS[4], ShootingParamsNT.shooterRps5m.getValue());
+        shooterRps.put(BREAKPOINTS_METERS[5], ShootingParamsNT.shooterRps6m.getValue());
+        shooterRps.put(BREAKPOINTS_METERS[6], ShootingParamsNT.shooterRps7m.getValue());
 
         timeOfFlightSec.clear();
-        timeOfFlightSec.put(BREAKPOINTS_METERS[0], ShootingParamsNT.tofSec2m.getValue()); // 1.1
-        timeOfFlightSec.put(BREAKPOINTS_METERS[1], ShootingParamsNT.tofSec3m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_METERS[2], ShootingParamsNT.tofSec4m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_METERS[3], ShootingParamsNT.tofSec5m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_METERS[4], ShootingParamsNT.tofSec6m.getValue());
-        timeOfFlightSec.put(BREAKPOINTS_METERS[5], ShootingParamsNT.tofSec7m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[0], ShootingParamsNT.tofSec1m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[1], ShootingParamsNT.tofSec2m.getValue()); // 1.1
+        timeOfFlightSec.put(BREAKPOINTS_METERS[2], ShootingParamsNT.tofSec3m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[3], ShootingParamsNT.tofSec4m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[4], ShootingParamsNT.tofSec5m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[5], ShootingParamsNT.tofSec6m.getValue());
+        timeOfFlightSec.put(BREAKPOINTS_METERS[6], ShootingParamsNT.tofSec7m.getValue());
     }
 
     /** Values between breakpoints are linearly interpolated and remain live-tunable over NT. */
     @NTParameter(tableName = "Params/Shooting")
     public static final class ShootingParams {
+        public static final double hoodAngleDeg1m = 9.0;
         public static final double hoodAngleDeg2m = 14.0;
         public static final double hoodAngleDeg3m = 20.5; // 20.5
         public static final double hoodAngleDeg4m = 20.5; // 20.5
@@ -70,6 +74,7 @@ public class ShotCalculator {
         public static final double hoodAngleDeg6m = 24.0; // 24
         public static final double hoodAngleDeg7m = 27.0; // 27
 
+        public static final double shooterRps1m = 48.0;
         public static final double shooterRps2m = 50.0; // 50
         public static final double shooterRps3m = 51.0; // 51
         public static final double shooterRps4m = 54.0; // 54
@@ -78,6 +83,7 @@ public class ShotCalculator {
         public static final double shooterRps7m = 65.0; // 65
         public static final double lowerShooterSpeedScale = 1.0;
 
+        public static final double tofSec1m = 0.60;
         public static final double tofSec2m = 0.85;
         public static final double tofSec3m = 0.95;
         public static final double tofSec4m = 1.05;

@@ -249,17 +249,15 @@ public class ShootingSuperstructure extends SubsystemBase {
         return upperAtTarget(() -> currentSolution().shooterSpeed());
     }
 
-    /** Completes when the upper shooter is ready and the configured feed delay has elapsed. */
+    /** Completes as soon as the upper shooter reaches the current shot speed. */
     public Command waitForFeedStart() {
-        return Commands.waitUntil(this::upperAtShotSpeed)
-                .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
+        return Commands.waitUntil(this::upperAtShotSpeed);
     }
 
     public Command waitForFeedStartAtFixedDistance(DoubleSupplier distanceMeters) {
         Supplier<AngularVelocity> upperSpeedSupplier =
                 () -> calculator.solve(distanceMeters.getAsDouble()).shooterSpeed();
-        return Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
-                .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
+        return Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier));
     }
 
     private Command runShooterPrespin() {
