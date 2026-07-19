@@ -150,7 +150,7 @@
           },
           {
             "title": "Pattern",
-            "x": 512.0,
+            "x": 768.0,
             "y": 384.0,
             "width": 256.0,
             "height": 128.0,
@@ -182,7 +182,7 @@
           {
             "title": "Enabled",
             "x": 512.0,
-            "y": 256.0,
+            "y": 0.0,
             "width": 256.0,
             "height": 128.0,
             "type": "Boolean Box",
@@ -231,22 +231,6 @@
             }
           },
           {
-            "title": "Match Time",
-            "x": 384.0,
-            "y": 0.0,
-            "width": 384.0,
-            "height": 256.0,
-            "type": "Match Time",
-            "properties": {
-              "topic": "/SmartDashboard/Match Time",
-              "period": 0.06,
-              "data_type": "double",
-              "time_display_mode": "Minutes and Seconds",
-              "red_start_time": 15,
-              "yellow_start_time": 30
-            }
-          },
-          {
             "title": "Voltage",
             "x": 384.0,
             "y": 384.0,
@@ -280,7 +264,7 @@
             "title": "Hub Remaining",
             "x": 0.0,
             "y": 0.0,
-            "width": 384.0,
+            "width": 512.0,
             "height": 256.0,
             "type": "Match Time",
             "properties": {
@@ -294,7 +278,7 @@
           },
           {
             "title": "Hub Phase",
-            "x": 0.0,
+            "x": 256.0,
             "y": 256.0,
             "width": 256.0,
             "height": 128.0,
@@ -307,7 +291,7 @@
           },
           {
             "title": "isHubActive",
-            "x": 256.0,
+            "x": 0.0,
             "y": 256.0,
             "width": 256.0,
             "height": 128.0,
@@ -324,9 +308,9 @@
           },
           {
             "title": "Drum Stop Mode",
-            "x": 768.0,
-            "y": 384.0,
-            "width": 128.0,
+            "x": 512.0,
+            "y": 128.0,
+            "width": 256.0,
             "height": 128.0,
             "type": "Boolean Box",
             "properties": {
@@ -341,9 +325,9 @@
           },
           {
             "title": "Fixed Shot Mode",
-            "x": 896.0,
-            "y": 384.0,
-            "width": 128.0,
+            "x": 512.0,
+            "y": 256.0,
+            "width": 256.0,
             "height": 128.0,
             "type": "Boolean Box",
             "properties": {
@@ -358,9 +342,9 @@
           },
           {
             "title": "Fixed Shot Distance (m)",
-            "x": 1024.0,
+            "x": 512.0,
             "y": 384.0,
-            "width": 128.0,
+            "width": 256.0,
             "height": 128.0,
             "type": "Text Display",
             "properties": {
