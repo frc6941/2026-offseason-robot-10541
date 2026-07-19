@@ -74,6 +74,7 @@ public class RobotContainer {
     private static final double INTAKE_TRIGGER_MAX_THRESHOLD = 0.6;
     private static final String FIXED_SHOT_MODE_KEY = "Shoot/Fixed Distance Mode";
     private static final String FIXED_SHOT_DISTANCE_KEY = "Shoot/Fixed Distance Meters";
+    private static final String SHOOTER_DRUM_STOP_MODE_KEY = "Shoot/Shooter Drum Stop Mode";
     private static final double DEFAULT_FIXED_SHOT_DISTANCE_METERS = 1.5;
 
     private boolean isReal = RobotBase.isReal();
@@ -99,6 +100,7 @@ public class RobotContainer {
                     hoodSubsystem,
                     hopperSubsystem,
                     swerve);
+    private final Command shooterDrumStopCommand = shootingSuperstructure.stopDrum();
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
     private final IndicatorSubsystem indicator = buildIndicator();
 
@@ -133,6 +135,7 @@ public class RobotContainer {
         hopperSubsystem.configureDefaultCommand();
         shootingSuperstructure.configureDefaultCommands();
         SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, false);
+        SmartDashboard.putBoolean(SHOOTER_DRUM_STOP_MODE_KEY, false);
         SmartDashboard.setDefaultNumber(
                 FIXED_SHOT_DISTANCE_KEY, DEFAULT_FIXED_SHOT_DISTANCE_METERS);
         // Intake zeroing stays manual-only on D-pad Left.
@@ -174,7 +177,7 @@ public class RobotContainer {
         OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
         OperatorController.povUp().whileTrue(intaker.holdRetractedFeedPosition());
         OperatorController.y().whileTrue(intaker.holdFeedMode());
-        OperatorController.a().toggleOnTrue(shootingSuperstructure.stopDrum());
+        OperatorController.a().toggleOnTrue(shooterDrumStopCommand);
         OperatorController.b().onTrue(Commands.runOnce(this::toggleFixedDistanceShotMode));
 
         driverController.povLeft().onTrue(intaker.zeroCommand());
@@ -377,7 +380,7 @@ public class RobotContainer {
         SmartDashboard.putNumber("Match Time", DriverStation.getMatchTime());
         SmartDashboard.putNumber("Robot Voltage", RobotController.getBatteryVoltage());
         SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, fixedDistanceShotEnabled);
-        Logger.recordOutput("Shoot/FixedDistanceMode", fixedDistanceShotEnabled);
+        SmartDashboard.putBoolean(SHOOTER_DRUM_STOP_MODE_KEY, shooterDrumStopCommand.isScheduled());
         Logger.recordOutput("Shoot/FixedDistanceMeters", fixedShotDistanceMeters());
         HubShiftUtil.ShiftInfo hubShift = HubShiftUtil.getShiftInfo();
         Logger.recordOutput("Competition/isHubActive", hubShift.active());
