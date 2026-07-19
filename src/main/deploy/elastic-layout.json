@@ -355,6 +355,19 @@
               "true_icon": "None",
               "false_icon": "None"
             }
+          },
+          {
+            "title": "Fixed Shot Distance (m)",
+            "x": 1024.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Shoot/Fixed Distance Meters",
+              "period": 0.06,
+              "data_type": "double"
+            }
           }
         ]
       }
