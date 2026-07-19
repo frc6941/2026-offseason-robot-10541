@@ -11,7 +11,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.wpilibj.Timer;
@@ -23,6 +22,7 @@ import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorInputsAutoLogged;
@@ -91,32 +91,13 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     /**
-     * Distance the shot must actually cover given chassis motion (shoot-on-move lookahead): the
-     * ball inherits the chassis field velocity for its time of flight. Equals {@link
-     * #distanceToTarget()} when stationary. Uses the commanded (setpoint) velocity for smoothness,
-     * à la 6328.
+     * The stationary shot solution (hood angle + flywheel speed) for the current geometric range.
      */
-    public double effectiveDistanceToTarget() {
-        return effectiveDistanceToTarget(robotPose());
-    }
-
-    private double effectiveDistanceToTarget(Pose2d pose) {
-        ChassisSpeeds fieldVel =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), pose.getRotation());
-        return calculator.effectiveDistance(
-                pose.getTranslation(),
-                AutoAimCommand.getTarget(),
-                fieldVel.vxMetersPerSecond,
-                fieldVel.vyMetersPerSecond);
-    }
-
-    /** The shot solution (hood angle + flywheel speed), shoot-on-move compensated. */
     public ShotSolution currentSolution() {
-        return solutionForDistance(effectiveDistanceToTarget());
+        return solutionForDistance(distanceToTarget());
     }
 
-    private ShotSolution solutionForDistance(double effectiveDistanceMeters) {
+    private ShotSolution solutionForDistance(double distanceMeters) {
         if (manualOverrideEnabled()) {
             Angle hoodAngle =
                     clampHoodAngle(
@@ -126,7 +107,7 @@ public class ShootingSuperstructure extends SubsystemBase {
                             Math.max(0.0, SmartDashboard.getNumber(MANUAL_FLYWHEEL_RPS_KEY, 55.0)));
             return new ShotSolution(hoodAngle, flywheelSpeed);
         }
-        return calculator.solve(effectiveDistanceMeters);
+        return calculator.solve(distanceMeters);
     }
 
     private boolean manualOverrideEnabled() {
@@ -135,16 +116,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     private Rotation2d computeAimHeading(Pose2d pose) {
-        ChassisSpeeds fv =
-                ChassisSpeeds.fromRobotRelativeSpeeds(
-                        swerve.getChassisSpeedsCmd(), pose.getRotation());
-        double tof = calculator.timeOfFlightFor(distanceToTarget(pose));
-        Translation2d lookahead =
-                pose.getTranslation()
-                        .plus(
-                                new Translation2d(
-                                        fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof));
-        return AutoAimCommand.getShooterAimHeading(new Pose2d(lookahead, pose.getRotation()));
+        return AutoAimCommand.getShooterAimHeading(pose);
     }
 
     // Below this magnitude the aim-heading rate is treated as zero. A stationary robot aimed at a
@@ -283,6 +255,13 @@ public class ShootingSuperstructure extends SubsystemBase {
                 .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
     }
 
+    public Command waitForFeedStartAtFixedDistance(DoubleSupplier distanceMeters) {
+        Supplier<AngularVelocity> upperSpeedSupplier =
+                () -> calculator.solve(distanceMeters.getAsDouble()).shooterSpeed();
+        return Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS));
+    }
+
     private Command runShooterPrespin() {
         return Commands.parallel(
                 shooterUpper.runVelVolt(
@@ -321,6 +300,19 @@ public class ShootingSuperstructure extends SubsystemBase {
         return Commands.parallel(
                 runShooterAt(upperSpeedSupplier),
                 hood.runMotionMagic(this::clampHoodAngleForSolution),
+                feedAfterUpperReadyDelay(upperSpeedSupplier));
+    }
+
+    /**
+     * Shoot with the interpolation-table solution for one fixed distance, without chassis aiming.
+     */
+    public Command shootAtFixedDistance(DoubleSupplier distanceMeters) {
+        Supplier<ShotSolution> solutionSupplier =
+                () -> calculator.solve(distanceMeters.getAsDouble());
+        Supplier<AngularVelocity> upperSpeedSupplier = () -> solutionSupplier.get().shooterSpeed();
+        return Commands.parallel(
+                runShooterAt(upperSpeedSupplier),
+                hood.runMotionMagic(() -> clampHoodAngle(solutionSupplier.get().hoodAngle())),
                 feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
@@ -454,8 +446,7 @@ public class ShootingSuperstructure extends SubsystemBase {
         // ~6x. See the pose-taking overloads above.
         Pose2d pose = robotPose();
         double geometric = distanceToTarget(pose);
-        double effective = effectiveDistanceToTarget(pose);
-        ShotSolution solution = calculator.solve(effective);
+        ShotSolution solution = solutionForDistance(geometric);
         Rotation2d heading = computeAimHeading(pose);
         double timestampSec = Timer.getFPGATimestamp();
         double dtSec = timestampSec - lastAimTimestampSec;
@@ -471,8 +462,6 @@ public class ShootingSuperstructure extends SubsystemBase {
         cachedAimHeading = heading;
 
         Logger.recordOutput("Shooting/distanceMeters", geometric);
-        Logger.recordOutput("Shooting/effectiveDistanceMeters", effective);
-        Logger.recordOutput("Shooting/lookaheadDeltaMeters", effective - geometric);
         Logger.recordOutput("Shooting/manualOverride", manualOverrideEnabled());
         Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
         Logger.recordOutput(
@@ -488,26 +477,8 @@ public class ShootingSuperstructure extends SubsystemBase {
         // when the flywheel is idle so it stays off the loop budget; the fields simply hold their
         // last value in AdvantageScope while not shooting.
         if (isShooterActive()) {
-            // --- Shoot-on-move visualization (drag these onto a 2D/3D Field in AdvantageScope) ---
             Translation2d hub = AutoAimCommand.getTarget();
-            ChassisSpeeds fv =
-                    ChassisSpeeds.fromRobotRelativeSpeeds(
-                            swerve.getChassisSpeedsCmd(), pose.getRotation());
-            double tof = calculator.timeOfFlightFor(geometric);
-            // How far the ball drifts downrange from inheriting chassis velocity over its flight.
-            Translation2d leadOffset =
-                    new Translation2d(fv.vxMetersPerSecond * tof, fv.vyMetersPerSecond * tof);
-            // The point the chassis actually aims at: the hub pulled back against our motion.
-            Translation2d virtualTarget = hub.minus(leadOffset);
-            // The internal dual the aim math uses: pretend the shooter is here, aim at the real
-            // hub.
-            Translation2d virtualShooter = pose.getTranslation().plus(leadOffset);
-
             Logger.recordOutput("Shooting/Viz/Hub", new Pose2d(hub, new Rotation2d()));
-            Logger.recordOutput(
-                    "Shooting/Viz/VirtualTarget", new Pose2d(virtualTarget, new Rotation2d()));
-            Logger.recordOutput(
-                    "Shooting/Viz/VirtualShooter", new Pose2d(virtualShooter, new Rotation2d()));
             Logger.recordOutput("Shooting/Viz/AimPose", new Pose2d(pose.getTranslation(), heading));
 
             // --- Quadratic-drag arc overlay (3D Field: Shooting/Viz/DragPath) ---

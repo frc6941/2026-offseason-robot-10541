@@ -3,14 +3,12 @@ package frc.robot.subsystems.Shooter;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
-import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
 import lib.ntext.NTParameter;
 
 /** Resolves hood angle, shooter speed, and time of flight from live interpolation tables. */
 public class ShotCalculator {
     private static final double[] BREAKPOINTS_METERS = {2.0, 2.5, 3.0, 3.5, 4.0, 4.5};
-    private static final int LOOKAHEAD_ITERATIONS = 10;
 
     private final InterpolatingDoubleTreeMap hoodAngleDeg = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap shooterRps = new InterpolatingDoubleTreeMap();
@@ -26,23 +24,6 @@ public class ShotCalculator {
     public double timeOfFlightFor(double distanceMeters) {
         rebuildTables();
         return timeOfFlightSec.get(distanceMeters);
-    }
-
-    /**
-     * Compensates distance for the field-relative velocity inherited by a ball launched while the
-     * robot is moving. The tabulated time of flight is iterated because it changes with distance.
-     */
-    public double effectiveDistance(
-            Translation2d shooter, Translation2d target, double vxField, double vyField) {
-        rebuildTables();
-        double distance = target.getDistance(shooter);
-        for (int i = 0; i < LOOKAHEAD_ITERATIONS; i++) {
-            double timeOfFlight = timeOfFlightSec.get(distance);
-            Translation2d virtualShooter =
-                    shooter.plus(new Translation2d(vxField * timeOfFlight, vyField * timeOfFlight));
-            distance = target.getDistance(virtualShooter);
-        }
-        return distance;
     }
 
     public double lowerShooterSpeedScale() {

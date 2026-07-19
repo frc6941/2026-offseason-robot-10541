@@ -72,8 +72,12 @@ public class RobotContainer {
 
     private static final double INTAKE_TRIGGER_START_THRESHOLD = 0.1;
     private static final double INTAKE_TRIGGER_MAX_THRESHOLD = 0.6;
+    private static final String FIXED_SHOT_MODE_KEY = "Shoot/Fixed Distance Mode";
+    private static final String FIXED_SHOT_DISTANCE_KEY = "Shoot/Fixed Distance Meters";
+    private static final double DEFAULT_FIXED_SHOT_DISTANCE_METERS = 1.5;
 
     private boolean isReal = RobotBase.isReal();
+    private boolean fixedDistanceShotEnabled = false;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
             buildIntakerRoller();
@@ -128,6 +132,9 @@ public class RobotContainer {
         intaker.setDefaultCommand();
         hopperSubsystem.configureDefaultCommand();
         shootingSuperstructure.configureDefaultCommands();
+        SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, false);
+        SmartDashboard.setDefaultNumber(
+                FIXED_SHOT_DISTANCE_KEY, DEFAULT_FIXED_SHOT_DISTANCE_METERS);
         // Intake zeroing stays manual-only on D-pad Left.
         configureBindings();
         // Autonomous: PathPlanner path-following routines (see frc.robot.auto).
@@ -168,6 +175,7 @@ public class RobotContainer {
         OperatorController.povUp().whileTrue(intaker.holdRetractedFeedPosition());
         OperatorController.y().whileTrue(intaker.holdFeedMode());
         OperatorController.a().toggleOnTrue(shootingSuperstructure.stopDrum());
+        OperatorController.b().onTrue(Commands.runOnce(this::toggleFixedDistanceShotMode));
 
         driverController.povLeft().onTrue(intaker.zeroCommand());
         driverController.povDown().whileTrue(intaker.runExtendedReverse());
@@ -281,10 +289,30 @@ public class RobotContainer {
     }
 
     private Command shootCommand() {
-        return buildShootCommand(
-                () -> -driverController.getLeftY(),
-                () -> -driverController.getLeftX(),
-                intaker.holdRetractedFeedPosition());
+        return Commands.either(
+                fixedDistanceShootCommand(),
+                buildShootCommand(() -> 0.0, () -> 0.0, intaker.holdRetractedFeedPosition()),
+                () -> fixedDistanceShotEnabled);
+    }
+
+    private Command fixedDistanceShootCommand() {
+        return Commands.parallel(
+                Commands.run(swerve::runStop, swerve),
+                shootingSuperstructure.shootAtFixedDistance(this::fixedShotDistanceMeters),
+                shootingSuperstructure
+                        .waitForFeedStartAtFixedDistance(this::fixedShotDistanceMeters)
+                        .andThen(intaker.holdRetractedFeedPosition()));
+    }
+
+    private double fixedShotDistanceMeters() {
+        return Math.max(
+                0.0,
+                SmartDashboard.getNumber(
+                        FIXED_SHOT_DISTANCE_KEY, DEFAULT_FIXED_SHOT_DISTANCE_METERS));
+    }
+
+    private void toggleFixedDistanceShotMode() {
+        fixedDistanceShotEnabled = !fixedDistanceShotEnabled;
     }
 
     private Command autoShootCommand() {
@@ -348,6 +376,9 @@ public class RobotContainer {
     public void updateDashboard() {
         SmartDashboard.putNumber("Match Time", DriverStation.getMatchTime());
         SmartDashboard.putNumber("Robot Voltage", RobotController.getBatteryVoltage());
+        SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, fixedDistanceShotEnabled);
+        Logger.recordOutput("Shoot/FixedDistanceMode", fixedDistanceShotEnabled);
+        Logger.recordOutput("Shoot/FixedDistanceMeters", fixedShotDistanceMeters());
         HubShiftUtil.ShiftInfo hubShift = HubShiftUtil.getShiftInfo();
         Logger.recordOutput("Competition/isHubActive", hubShift.active());
         Logger.recordOutput("Competition/Hub Phase", hubShift.phase().toString());
