@@ -23,7 +23,7 @@ public final class RobotConstants {
     // per-loop NT JNI reads off the loop budget. Flip true to tune PID/params live from the
     // dashboard. Pushed into the ntext framework before RobotContainer construction. See Robot and
     // lib.ntext.
-    public static final boolean ENABLE_NT_PARAMS = false;
+    public static final boolean ENABLE_NT_PARAMS = true;
 
     // CAN
     public static final String ROBORIO_CAN_BUS_NAME = "rio";
