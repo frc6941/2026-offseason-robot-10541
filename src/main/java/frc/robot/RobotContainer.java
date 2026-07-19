@@ -395,7 +395,12 @@ public class RobotContainer {
      * limit back here so teleop never inherits an unlimited cap.
      */
     public void resetSwerveLimitForTeleop() {
-        swerve.setSwerveLimitDefault();
+        AutoActions.setSwerveLimitDefault();
+    }
+
+    /** Sets the swerve drive motors' neutral mode: true = brake, false = coast. */
+    public void setSwerveDriveBrake(boolean isBrake) {
+        swerve.setDriveBrake(isBrake);
     }
 
     /**

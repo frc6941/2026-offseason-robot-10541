@@ -356,6 +356,15 @@ public class Swerve extends SubsystemBase implements Localizable {
     }
 
     // ------- Configurations -------
+    /**
+     * Sets the drive motor neutral mode on every module: true = brake, false = coast. Steer motors
+     * always stay in brake so the modules hold their angle. Each call reapplies the motor config
+     * over CAN, so only call this on mode transitions, not periodically.
+     */
+    public void setDriveBrake(boolean isBrake) {
+        modules.forEach(module -> module.setDriveBrake(isBrake));
+    }
+
     public SwerveLimit getSwerveLimit() {
         return setpointGenerator.getChassisLimit();
     }
