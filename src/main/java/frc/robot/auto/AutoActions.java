@@ -537,7 +537,7 @@ public class AutoActions {
     }
 
     public static Command zeroEverything() {
-        return Commands.parallel(shootingSuperstructure.zeroHoodHere(), intake.zeroCommand());
+        return Commands.parallel(shootingSuperstructure.zeroCommand(), intake.zeroCommand());
     }
 
     /** In sim only, snap the pose estimator + transform tree to a known blue start pose. */

@@ -403,9 +403,9 @@ public class RobotContainer {
         return AutoFile.buildAuto();
     }
 
-    /** Hard-stop zero the intake pivot once when teleop starts. */
-    public Command getTeleopIntakeZeroCommand() {
-        return intaker.zeroCommand();
+    /** Hard-stop zero the intake and hood pivots once when teleop starts. */
+    public Command getTeleopZeroCommand() {
+        return Commands.parallel(intaker.zeroCommand(), hoodSubsystem.zeroCommand());
     }
 
     public void updateDashboard() {

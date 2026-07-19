@@ -116,8 +116,8 @@ public class AutoRoutines {
         // 3. End behaviour (intake running throughout).
         steps.add(endBehaviour(endBehaviour, isLeft));
 
-        // Zero the intake pivot and seed the hood at its current stowed position before any auto
-        // movement. Only after zeroing finishes do we start the routine and its pivot manager.
+        // Hard-stop zero the intake pivot and hood before any auto movement. Only after both
+        // zeroing commands finish do we start the routine and its pivot manager.
         // followModePivot continuously drives the pivot to the current intake mode's angle while
         // the routine runs; the routine is the deadline, so the manager stops when auto finishes.
         return zeroEverything()

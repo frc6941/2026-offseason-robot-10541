@@ -188,7 +188,8 @@ public class Robot extends LoggedRobot {
         // Restore brake mode after the post-auto coast so teleop driving is crisp.
         robotContainer.setSwerveDriveBrake(true);
 
-        CommandScheduler.getInstance().schedule(robotContainer.getTeleopIntakeZeroCommand());
+        // Match the operator zero controls: hard-stop zero both pivots when teleop begins.
+        CommandScheduler.getInstance().schedule(robotContainer.getTeleopZeroCommand());
     }
 
     /** This function is called periodically during operator control. */
