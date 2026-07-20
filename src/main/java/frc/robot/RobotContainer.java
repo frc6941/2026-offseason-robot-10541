@@ -269,9 +269,15 @@ public class RobotContainer {
                                         indicator.indicateWithTimeout(
                                                 IndicatorIO.Patterns.RESET_ODOM, 1)));
 
-        // Y aims without shooting; RT aims and shoots. Both select the hub inside our alliance
-        // zone, or the matching pass corner after crossing out of it.
-        driverController.y().whileTrue(aimCommand());
+        // In normal mode Y aims at the automatic hub/pass target. In fixed-distance mode Y uses
+        // the fixed forward heading, while LB uses the opposite heading for a backward pass.
+        Trigger fixedDistanceMode = new Trigger(() -> fixedDistanceShotEnabled);
+        driverController.y().and(fixedDistanceMode.negate()).whileTrue(aimCommand());
+        driverController.y().and(fixedDistanceMode).whileTrue(fixedDistanceAimCommand(false));
+        driverController
+                .leftBumper()
+                .and(fixedDistanceMode)
+                .whileTrue(fixedDistanceAimCommand(true));
 
         driverController.x().whileTrue(autoTrenchCommand());
         driverController.b().whileTrue(autoTrenchCommand());
@@ -318,13 +324,24 @@ public class RobotContainer {
 
     private Command fixedDistanceShootCommand() {
         return Commands.parallel(
-                holdHubTargetMode(),
-                new AutoAimCommand(
-                        swerve, () -> 0.0, () -> 0.0, this::fixedShotAimHeading, () -> 0.0),
                 shootingSuperstructure.shootAtFixedDistance(this::fixedShotDistanceMeters),
                 shootingSuperstructure
                         .waitForFeedStartAtFixedDistance(this::fixedShotDistanceMeters)
                         .andThen(intaker.holdRetractedFeedPosition()));
+    }
+
+    private Command fixedDistanceAimCommand(boolean backward) {
+        return Commands.parallel(
+                holdHubTargetMode(),
+                new AutoAimCommand(
+                        swerve,
+                        () -> 0.0,
+                        () -> 0.0,
+                        () ->
+                                backward
+                                        ? fixedShotAimHeading().plus(Rotation2d.k180deg)
+                                        : fixedShotAimHeading(),
+                        () -> 0.0));
     }
 
     private Rotation2d fixedShotAimHeading() {
