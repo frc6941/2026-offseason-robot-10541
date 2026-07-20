@@ -69,6 +69,11 @@ public class Robot extends LoggedRobot {
         }
         if (enableNt4 || enableWpilog) {
             Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
+            // Event-branch traceability: record which branch this build came from and whether the
+            // tree was dirty at build time, so a match log unambiguously identifies the code that
+            // ran (e.g. the event/... branch) if a version has to be rolled back.
+            Logger.recordMetadata("GitBranch", BuildConstants.GIT_BRANCH);
+            Logger.recordMetadata("GitDirty", BuildConstants.DIRTY == 0 ? "Clean" : "Dirty");
             Logger.start();
         }
     }

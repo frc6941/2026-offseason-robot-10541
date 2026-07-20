@@ -21,6 +21,11 @@ public class IntakerConfig {
     public static final String INTAKER_PIVOT_NAME = "IntakerPivot";
 
     private static final double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0;
+
+    // Caps for the intake-roller Kraken X60 (an unset limit means UNLIMITED). The roller stalls on
+    // game-piece contact, so the stator cap limits stall heat; bench-tune for grip vs. draw.
+    public static final double INTAKER_ROLLER_STATOR_CURRENT_LIMIT_AMPS = 60.0;
+    public static final double INTAKER_ROLLER_SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
     private static final double INTAKER_PIVOT_GEAR_RATIO = 1.0 / 12 * 20 / 36 * 20 / 36 * 15 / 36;
 
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
@@ -38,8 +43,16 @@ public class IntakerConfig {
     public static final double INTAKER_PIVOT_STATOR_CURRENT_LIMIT_AMPS = 50.0;
     public static final double INTAKER_PIVOT_SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
     // Placeholder template values for homing. These MUST be verified on the real robot.
-    // Sign must drive the intake pivot toward the zero hard stop.
-    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -8;
+    // Sign must drive the intake pivot toward the zero hard stop. Magnitude sets descent speed
+    // through the ~93:1 reduction — was -2 (a slow creep that delayed the start of auto). Raised to
+    // home faster so it finishes in the ball-free zone near the start pose, but kept below the -8
+    // that slams the hard stop hard; bench-tune. Pairs with the overlap in AutoRoutines, which runs
+    // homing concurrently with the opening transit but gates collecting on isPivotZeroed().
+    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -5;
+    // Safety cap on the homing descent: if the hard stop is never detected (mechanism hung, motor
+    // unplugged), stop pushing after this long instead of driving into the stop forever. On timeout
+    // the pivot is left NOT zeroed, so auto declines to intake rather than trusting a false zero.
+    public static final double INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS = 2.0;
     // Must be above free-run current and below breaker / unsafe stall current.
     public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 40.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
@@ -61,6 +74,8 @@ public class IntakerConfig {
                     .mainId(INTAKER_ROLLER_ID)
                     .motorInvertedValue(InvertedValue.Clockwise_Positive)
                     .SensorToMechanismRatio(INTAKER_ROLLER_GEAR_RATIO)
+                    .statorCurrentLimitAmps(INTAKER_ROLLER_STATOR_CURRENT_LIMIT_AMPS)
+                    .supplyCurrentLimitAmps(INTAKER_ROLLER_SUPPLY_CURRENT_LIMIT_AMPS)
                     .build();
 
     public static final SubsystemConfig INTAKER_PIVOT_CONFIG =

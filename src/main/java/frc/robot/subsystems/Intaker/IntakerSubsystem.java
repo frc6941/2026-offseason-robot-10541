@@ -337,18 +337,26 @@ public class IntakerSubsystem extends SubsystemBase {
 
     public Command zeroCommand() {
         return Commands.runOnce(() -> pivotZeroed = false)
-                .andThen(pivot.zeroCommand())
+                .andThen(
+                        pivot.zeroCommand()
+                                .withTimeout(
+                                        IntakerConfig.INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS))
                 .andThen(Commands.runOnce(this::finishPivotZeroing));
     }
 
-    private void finishPivotZeroing() {
-        pivotZeroed = true;
-        fallbackMode = IntakeMode.EXTENDED_IDLE;
-        currentMode = IntakeMode.EXTENDED_IDLE;
-    }
-
+    /** True only after a homing run actually seated on the hard stop (never after a timeout). */
     public boolean isPivotZeroed() {
         return pivotZeroed;
+    }
+
+    private void finishPivotZeroing() {
+        // Trust the mechanism's own detection: on a timed-out home pivot.isZeroed() is false, so we
+        // leave pivotZeroed false and the pivot stays parked rather than acting on a false zero.
+        pivotZeroed = pivot.isZeroed();
+        if (pivotZeroed) {
+            fallbackMode = IntakeMode.EXTENDED_IDLE;
+            currentMode = IntakeMode.EXTENDED_IDLE;
+        }
     }
 
     /** Live pivot angle, for 3D mechanism visualization / logging. */

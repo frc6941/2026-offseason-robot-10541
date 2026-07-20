@@ -435,7 +435,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     public Command zeroCommand() {
-        return hood.zeroCommand();
+        return hood.zeroCommand().withTimeout(ShooterConfig.HOOD_ZEROING_TIMEOUT_SECONDS);
     }
 
     public Angle getHoodAngle() {

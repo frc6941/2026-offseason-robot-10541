@@ -212,6 +212,16 @@ public class PositionMotorSubsystem<
                 this);
     }
 
+    // True only after a homing run actually seated on the hard stop and set the zero. Stays false if
+    // the routine is interrupted (e.g. a withTimeout on the caller) before detection, so callers can
+    // distinguish a real zero from a bailed-out one and never trust a false zero. See isZeroed().
+    private boolean zeroed = false;
+
+    /** Whether the last {@link #zeroCommand()} run completed by detecting the hard stop. */
+    public boolean isZeroed() {
+        return zeroed;
+    }
+
     /**
      * Returns a command that zeroes the mechanism by driving it until a current spike is detected.
      *
@@ -223,6 +233,7 @@ public class PositionMotorSubsystem<
         Command realZero =
                 Commands.runOnce(
                                 () -> {
+                                    zeroed = false;
                                     io.setEnableSoftLimits(false, false);
                                     currentFilter =
                                             LinearFilter.movingAverage(
@@ -244,7 +255,10 @@ public class PositionMotorSubsystem<
                                                                         > config.zeroingConfig
                                                                                 .zeroingCurrentLimit),
                                         runVoltage(() -> zeroVoltage)))
+                        // Reached only after the current-spike detection above completes; a caller
+                        // timeout interrupts before here, leaving zeroed=false (no false zero).
                         .andThen(Commands.runOnce(io::setCurrentPositionAsZero, this))
+                        .andThen(Commands.runOnce(() -> zeroed = true, this))
                         .finallyDo(
                                 () -> {
                                     mode = ControlMode.VOLTAGE;
@@ -253,7 +267,13 @@ public class PositionMotorSubsystem<
                                     io.setEnableSoftLimits(true, true);
                                 });
 
-        Command simZero = Commands.runOnce(io::setCurrentPositionAsZero, this);
+        Command simZero =
+                Commands.runOnce(
+                        () -> {
+                            io.setCurrentPositionAsZero();
+                            zeroed = true;
+                        },
+                        this);
 
         return new ConditionalCommand(realZero, simZero, RobotBase::isReal);
     }
