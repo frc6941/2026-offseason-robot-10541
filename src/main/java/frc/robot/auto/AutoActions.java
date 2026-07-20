@@ -518,22 +518,12 @@ public class AutoActions {
 
     /** Lift the swerve speed cap for a fast unguarded dash (e.g. the trench-start opening move). */
     public static Command setSwerveLimitUnlimited() {
-        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit))
-                .alongWith(
-                        Commands.runOnce(
-                                () ->
-                                        swerve.setSwerveModuleLimit(
-                                                SwerveMK5Config.kUnlimitedSwerveModuleLimit)));
+        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kDefaultSwerveLimit));
     }
 
     /** Restore the normal swerve speed cap after an unlimited-speed segment. */
     public static Command setSwerveLimitDefault() {
-        return Commands.runOnce(swerve::setSwerveLimitDefault)
-                .alongWith(
-                        Commands.runOnce(
-                                () ->
-                                        swerve.setSwerveModuleLimit(
-                                                SwerveMK5Config.kDefaultSwerveModuleLimit)));
+        return Commands.runOnce(swerve::setSwerveLimitDefault);
     }
 
     public static Command zeroEverything() {

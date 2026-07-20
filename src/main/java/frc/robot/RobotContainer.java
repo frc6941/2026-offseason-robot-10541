@@ -39,6 +39,7 @@ import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import frc.robot.utils.HubShiftUtil;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import lib.ironpulse.indicator.IndicatorIO;
 import lib.ironpulse.indicator.IndicatorIOARGB;
@@ -78,10 +79,11 @@ public class RobotContainer {
     private static final String INTAKE_SHOOT_RAISE_SPEED_KEY =
             "Intake/Shoot Raise Speed Deg Per Sec";
     private static final double SHORT_FIXED_SHOT_DISTANCE_METERS = 1.14;
-    private static final double LONG_FIXED_SHOT_DISTANCE_METERS = 3.07;
+    private static final double LONG_FIXED_SHOT_DISTANCE_METERS = 2.9;
 
     private boolean isReal = RobotBase.isReal();
     private boolean fixedDistanceShotEnabled = false;
+    private boolean operatorMaxHoodOverrideEnabled = false;
     private double selectedFixedShotDistanceMeters = SHORT_FIXED_SHOT_DISTANCE_METERS;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
@@ -183,6 +185,12 @@ public class RobotContainer {
                 .onTrue(Commands.runOnce(intaker::decreaseShootRaiseSpeed).ignoringDisable(true));
         OperatorController.rightBumper()
                 .onTrue(Commands.runOnce(intaker::increaseShootRaiseSpeed).ignoringDisable(true));
+        OperatorController.leftTrigger()
+                .whileTrue(
+                        Commands.startEnd(
+                                        () -> operatorMaxHoodOverrideEnabled = true,
+                                        () -> operatorMaxHoodOverrideEnabled = false)
+                                .ignoringDisable(true));
         OperatorController.b().whileTrue(intaker.holdFeedMode());
         OperatorController.x().toggleOnTrue(shooterDrumStopCommand);
         OperatorController.y()
@@ -267,7 +275,8 @@ public class RobotContainer {
                                                 limelightSubsystem::requestInternalIMUReseedAll))
                                 .alongWith(
                                         indicator.indicateWithTimeout(
-                                                IndicatorIO.Patterns.RESET_ODOM, 1)));
+                                                IndicatorIO.Patterns.RESET_ODOM, 1))
+                                .ignoringDisable(true));
 
         // In normal mode Y aims at the automatic hub/pass target. In fixed-distance mode Y uses
         // the fixed forward heading, while LB uses the opposite heading for a backward pass.
@@ -318,13 +327,18 @@ public class RobotContainer {
     private Command shootCommand() {
         return Commands.either(
                 fixedDistanceShootCommand(),
-                buildShootCommand(() -> 0.0, () -> 0.0, intaker.holdRetractedFeedPosition()),
+                buildShootCommand(
+                        () -> 0.0,
+                        () -> 0.0,
+                        intaker.holdRetractedFeedPosition(),
+                        this::operatorMaxHoodRequested),
                 () -> fixedDistanceShotEnabled);
     }
 
     private Command fixedDistanceShootCommand() {
         return Commands.parallel(
-                shootingSuperstructure.shootAtFixedDistance(this::fixedShotDistanceMeters),
+                shootingSuperstructure.shootAtFixedDistance(
+                        this::fixedShotDistanceMeters, this::operatorMaxHoodRequested),
                 shootingSuperstructure
                         .waitForFeedStartAtFixedDistance(this::fixedShotDistanceMeters)
                         .andThen(intaker.holdRetractedFeedPosition()));
@@ -357,6 +371,10 @@ public class RobotContainer {
         return selectedFixedShotDistanceMeters;
     }
 
+    private boolean operatorMaxHoodRequested() {
+        return operatorMaxHoodOverrideEnabled;
+    }
+
     private void toggleFixedDistanceShotMode(double distanceMeters) {
         if (fixedDistanceShotEnabled && selectedFixedShotDistanceMeters == distanceMeters) {
             fixedDistanceShotEnabled = false;
@@ -368,11 +386,15 @@ public class RobotContainer {
     }
 
     private Command autoShootCommand() {
-        return buildShootCommand(() -> 0.0, () -> 0.0, intaker.holdRetractedFeedMode());
+        return buildShootCommand(
+                () -> 0.0, () -> 0.0, intaker.holdRetractedFeedMode(), () -> false);
     }
 
     private Command buildShootCommand(
-            DoubleSupplier xSupplier, DoubleSupplier ySupplier, Command intakeShootCommand) {
+            DoubleSupplier xSupplier,
+            DoubleSupplier ySupplier,
+            Command intakeShootCommand,
+            BooleanSupplier forceMaxHood) {
         return Commands.parallel(
                 holdAutomaticTargetMode(),
                 new AutoAimCommand(
@@ -381,7 +403,7 @@ public class RobotContainer {
                         ySupplier,
                         shootingSuperstructure::aimHeading,
                         shootingSuperstructure::aimHeadingRateRadPerSec),
-                shootingSuperstructure.aimAndShoot(),
+                shootingSuperstructure.aimAndShoot(forceMaxHood),
                 shootingSuperstructure.waitForFeedStart().andThen(intakeShootCommand));
     }
 

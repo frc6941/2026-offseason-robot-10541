@@ -19,8 +19,8 @@ import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 
 public class IntakerSubsystem extends SubsystemBase {
-    private static final double SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND = 5.0;
-    private static final double MIN_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 5.0;
+    private static final double SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND = 2.0;
+    private static final double MIN_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 2.0;
     private static final double MAX_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 180.0;
 
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller;

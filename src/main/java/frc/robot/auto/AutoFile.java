@@ -131,6 +131,10 @@ public class AutoFile {
         Side side = orDefault(sideChooser.get(), Side.RIGHT);
         int waitSeconds = waitingChooser.get() != null ? waitingChooser.get() : 0;
         StartBehaviour start = orDefault(startBehaviourChooser.get(), StartBehaviour.TRENCH_START);
+        if (start == StartBehaviour.SHOOT) {
+            rightSideDepotAlert.set(false);
+            return AutoRoutines.shootOnlyAuto(waitSeconds);
+        }
         SecondSweepBehaviour secondSweep =
                 orDefault(secondSweepChooser.get(), SecondSweepBehaviour.MIDDLE);
         int sweepTimes = sweepTimesChooser.get() != null ? sweepTimesChooser.get() : 2;
@@ -192,6 +196,12 @@ public class AutoFile {
         int sweepTimes = sweepTimesChooser.get() != null ? sweepTimesChooser.get() : 2;
         EndBehaviour end = orDefault(endBehaviourChooser.get(), EndBehaviour.NONE);
         boolean isLeft = side == Side.LEFT;
+
+        if (start == StartBehaviour.SHOOT) {
+            FieldPublisher.setPreview(List.of());
+            previewAlert.set(false);
+            return;
+        }
 
         if (!isLeft && (end == EndBehaviour.DEPOT || end == EndBehaviour.DEPOT_DRIVE_THROUGH)) {
             end = EndBehaviour.NONE;
@@ -279,6 +289,7 @@ public class AutoFile {
             case TRENCH_START -> "RightTrenchStart";
             case TRENCH_START_SHORT -> "RightTrenchStartShort";
             case BUMP_START -> "RightBumpStart";
+            case SHOOT -> throw new IllegalArgumentException("SHOOT does not use a start path");
         };
     }
 
@@ -288,6 +299,7 @@ public class AutoFile {
                 // neutral.
             case BUMP_START -> isLeft ? kBumpStartL : kBumpStartR;
             case TRENCH_START, TRENCH_START_SHORT -> isLeft ? kTrenchStartL : kTrenchStartR;
+            case SHOOT -> throw new IllegalArgumentException("SHOOT does not use a start pose");
         };
     }
 
@@ -314,7 +326,8 @@ public class AutoFile {
     private enum StartBehaviour {
         BUMP_START,
         TRENCH_START,
-        TRENCH_START_SHORT
+        TRENCH_START_SHORT,
+        SHOOT
     }
 
     private enum SecondSweepBehaviour {

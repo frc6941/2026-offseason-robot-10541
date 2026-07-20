@@ -30,6 +30,8 @@ import lib.ironpulse.utils.AllianceFlipUtil;
  * </ol>
  */
 public class AutoRoutines {
+    private static final double SHOOT_ONLY_FEED_SECONDS = 3.0;
+
     public static Swerve swerve;
     public static ShootingSuperstructure shootingSuperstructure;
     public static IntakerSubsystem intake;
@@ -132,6 +134,18 @@ public class AutoRoutines {
     public static Command shootTestAuto() {
         return zeroEverything()
                 .andThen(Commands.deadline(aimAndShootAtHub(), intake.followModePivot()))
+                .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
+    }
+
+    /** Zero, optionally wait, shoot for three seconds, then hold the drivetrain stopped. */
+    public static Command shootOnlyAuto(int waitSeconds) {
+        Command shootSequence =
+                Commands.sequence(
+                        Commands.waitSeconds(Math.max(0, waitSeconds)),
+                        aimAndShootAtHub(SHOOT_ONLY_FEED_SECONDS),
+                        Commands.run(swerve::runStop, swerve));
+        return zeroEverything()
+                .andThen(Commands.deadline(shootSequence, intake.followModePivot()))
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 

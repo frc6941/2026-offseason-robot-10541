@@ -34,7 +34,7 @@ public class IntakerConfig {
     // Measure on the robot and update this value so getCurrPos() reports the true mechanism angle
     // after homing.
     public static final Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
-    public static final double INTAKER_PIVOT_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 54.0;
+    public static final double INTAKER_PIVOT_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 64.0;
     public static final double INTAKER_PIVOT_STATOR_CURRENT_LIMIT_AMPS = 50.0;
     public static final double INTAKER_PIVOT_SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
     // Placeholder template values for homing. These MUST be verified on the real robot.

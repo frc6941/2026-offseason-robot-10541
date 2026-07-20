@@ -22,6 +22,7 @@ import frc.robot.RobotConstants;
 import frc.robot.RobotStateRecorder;
 import frc.robot.commands.AutoAimCommand;
 import frc.robot.subsystems.Hopper.HopperSubsystem;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lib.ironpulse.io.MotorIO;
@@ -294,10 +295,18 @@ public class ShootingSuperstructure extends SubsystemBase {
      * AutoAimCommand} which owns chassis yaw.
      */
     public Command aimAndShoot() {
+        return aimAndShoot(() -> false);
+    }
+
+    public Command aimAndShoot(BooleanSupplier forceMaxHood) {
         Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         return Commands.parallel(
                 runShooterAt(upperSpeedSupplier),
-                hood.runMotionMagic(this::clampHoodAngleForSolution),
+                hood.runMotionMagic(
+                        () ->
+                                forceMaxHood.getAsBoolean()
+                                        ? ShooterConfig.HOOD_MAX_ANGLE
+                                        : clampHoodAngleForSolution()),
                 feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
@@ -305,12 +314,21 @@ public class ShootingSuperstructure extends SubsystemBase {
      * Shoot with the interpolation-table solution for one fixed distance, without chassis aiming.
      */
     public Command shootAtFixedDistance(DoubleSupplier distanceMeters) {
+        return shootAtFixedDistance(distanceMeters, () -> false);
+    }
+
+    public Command shootAtFixedDistance(
+            DoubleSupplier distanceMeters, BooleanSupplier forceMaxHood) {
         Supplier<ShotSolution> solutionSupplier =
                 () -> calculator.solve(distanceMeters.getAsDouble());
         Supplier<AngularVelocity> upperSpeedSupplier = () -> solutionSupplier.get().shooterSpeed();
         return Commands.parallel(
                 runShooterAt(upperSpeedSupplier),
-                hood.runMotionMagic(() -> clampHoodAngle(solutionSupplier.get().hoodAngle())),
+                hood.runMotionMagic(
+                        () ->
+                                forceMaxHood.getAsBoolean()
+                                        ? ShooterConfig.HOOD_MAX_ANGLE
+                                        : clampHoodAngle(solutionSupplier.get().hoodAngle())),
                 feedAfterUpperReadyDelay(upperSpeedSupplier));
     }
 
