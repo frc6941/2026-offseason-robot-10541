@@ -347,6 +347,10 @@ public class IntakerSubsystem extends SubsystemBase {
         currentMode = IntakeMode.EXTENDED_IDLE;
     }
 
+    public boolean isPivotZeroed() {
+        return pivotZeroed;
+    }
+
     /** Live pivot angle, for 3D mechanism visualization / logging. */
     public Angle getPivotAngle() {
         return pivot.getCurrPos();

@@ -31,6 +31,7 @@ import lib.ironpulse.utils.AllianceFlipUtil;
  */
 public class AutoRoutines {
     private static final double SHOOT_ONLY_FEED_SECONDS = 3.0;
+    public static final double INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS = 0.5;
 
     public static Swerve swerve;
     public static ShootingSuperstructure shootingSuperstructure;
@@ -87,7 +88,11 @@ public class AutoRoutines {
             steps.add(setSwerveLimitDefault());
         }
 
-        // 1. First sweep: collect out, drive back, aim + shoot.
+        // 1. The opening drive may overlap intake homing, but collection must not start until the
+        // pivot has a valid zero. Otherwise finishPivotZeroing() could overwrite the intake mode.
+        steps.add(Commands.waitUntil(intake::isPivotZeroed));
+
+        // First sweep: collect out, drive back, aim + shoot.
         steps.add(sweepCollectShoot(startPath, isLeft));
 
         // 2. Optional second sweep. BUMP_AGAIN repeats the bump cycle so it can follow any first
@@ -118,15 +123,18 @@ public class AutoRoutines {
         // 3. End behaviour (intake running throughout).
         steps.add(endBehaviour(endBehaviour, isLeft));
 
-        // Hard-stop zero the intake pivot and hood before any auto movement. Only after both
-        // zeroing commands finish do we start the routine and its pivot manager.
-        // followModePivot continuously drives the pivot to the current intake mode's angle while
-        // the routine runs; the routine is the deadline, so the manager stops when auto finishes.
-        return zeroEverything()
-                .andThen(
-                        Commands.deadline(
-                                Commands.sequence(steps.toArray(Command[]::new)),
-                                intake.followModePivot()))
+        // Start intake and hood hard-stop homing together. The path branch may begin after the
+        // configured delay (and after hood homing), while intake homing continues independently.
+        // Once the intake reaches zero, followModePivot takes over the same pivot requirement.
+        Command delayedPath =
+                Commands.sequence(
+                        Commands.parallel(
+                                shootingSuperstructure.zeroCommand(),
+                                Commands.waitSeconds(INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS)),
+                        Commands.sequence(steps.toArray(Command[]::new)));
+        Command intakeHomingAndControl = intake.zeroCommand().andThen(intake.followModePivot());
+
+        return Commands.deadline(delayedPath, intakeHomingAndControl)
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 
