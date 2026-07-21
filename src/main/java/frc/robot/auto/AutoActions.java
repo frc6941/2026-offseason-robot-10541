@@ -80,6 +80,11 @@ public class AutoActions {
     // Bump start begins here (alliance side, 45 deg), then drives past the slope into neutral.
     public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.84, Rotation2d.fromDegrees(45));
     public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
+    // Middle start (left-only middleDepotTrenchAuto): centered in Y, touching the hub near face
+    // (HUB_NEAR_FACE_X = 4.022), preload loaded, heading 180 deg toward the hub per the launch-pose
+    // convention. PLACEHOLDER x — set to the real bumper-to-hub touch on the field.
+    public static final Pose2d kMiddleHubTouch =
+            new Pose2d(3.55, FieldConstants.fieldWidth / 2.0, Rotation2d.fromDegrees(180));
 
     // ---- Trench-mouth pose near the second-sweep entry. The competition routine no longer drives
     // here (the second-sweep path now starts at the shoot pose and flows straight in); kept for the
@@ -405,6 +410,17 @@ public class AutoActions {
 
     public static Command intake() {
         return intake.runIntake();
+    }
+
+    /**
+     * Raised-frame intake for the depot: sets {@code IntakeMode.DEPOT} (pivot to {@code
+     * depotPosAngle}, so the intake reaches balls sitting on the depot's raised frame). Same
+     * runOnce shape as {@link #intake()} — flips the mode; {@link
+     * IntakerSubsystem#followModePivot()} actuates the pivot. This is the auto form of the
+     * operator's right-trigger {@code holdDepotMode()}.
+     */
+    public static Command depotIntake() {
+        return intake.runDepot();
     }
 
     public static Command feed() {

@@ -165,6 +165,17 @@ public class IntakerSubsystem extends SubsystemBase {
         return Commands.runOnce(() -> setIntakeMode(IntakeMode.INTAKING));
     }
 
+    /**
+     * Set the raised-frame {@link IntakeMode#DEPOT} mode once, without holding the intake
+     * requirement — the auto analogue of {@link #runIntake()}. The pivot is driven to {@code
+     * depotPosAngle} by whatever reads the mode (in auto, {@link #followModePivot()}), same as
+     * every other auto mode flip. Teleop uses {@link #holdDepotMode()} (a {@code runEnd} that
+     * reverts on release); auto can't hold the intake requirement, so this is the runOnce form.
+     */
+    public Command runDepot() {
+        return Commands.runOnce(() -> setIntakeMode(IntakeMode.DEPOT));
+    }
+
     public Command runIntakeContinuous() {
         return Commands.startEnd(
                 () -> setIntakeMode(IntakeMode.INTAKING),

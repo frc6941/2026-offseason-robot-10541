@@ -165,6 +165,69 @@ public class AutoRoutines {
     }
 
     /**
+     * MIDDLE-start coordination auto (LEFT-only — the depot is physically on the left).
+     *
+     * <p>Starts touching the hub with the preload, then, holding off the trench so an alliance
+     * partner can sweep it first:
+     *
+     * <ol>
+     *   <li>Follow {@code MiddleStartDepot} with the <b>raised depot intake</b> ({@link
+     *       AutoActions#depotIntake}) collecting the depot balls, pre-spinning the flywheel; the
+     *       path ends at the left shoot pose ({@code kSlopeEndL}).
+     *   <li>Aim + empty the hopper — preload plus depot balls in one volley.
+     *   <li>Reposition across to the left trench mouth via {@code DepotToTrench} (intake stowed).
+     *   <li>Run the standard trench sweep (mirrored to the left): collect out, cross back over the
+     *       slope, aim + shoot again.
+     * </ol>
+     *
+     * <p>Coordination is purely sequential: the depot cycle's own duration is the handoff, so by
+     * the time we reach the trench the partner has cleared it. All legs run inside the same
+     * intake-homing / {@code followModePivot} deadline as {@link #competitionAuto}.
+     */
+    public static Command middleDepotTrenchAuto(int waitSeconds) {
+        List<Command> steps = new ArrayList<>();
+
+        // 0. Optional pre-auto delay.
+        if (waitSeconds > 0) {
+            steps.add(Commands.waitSeconds(waitSeconds));
+        }
+
+        // 0a. Sim-only pose reset to the middle hub-touch start.
+        steps.add(resetOnPose(kMiddleHubTouch));
+
+        // 0b. Collection must not start until the pivot has a valid zero (see competitionAuto).
+        steps.add(Commands.waitUntil(intake::isPivotZeroed));
+
+        // 1. Drive the depot with the raised depot intake + pre-spin; the path ends at the left
+        // shoot pose. Then aim and empty the hopper (preload + depot balls).
+        steps.add(
+                Commands.sequence(
+                        Commands.deadline(
+                                followPathFile("MiddleStartDepot", false),
+                                depotIntake(),
+                                shootingSuperstructure.spinUpForShot()),
+                        aimAndShootAtHub()));
+
+        // 2. Reposition across to the left trench mouth with the intake stowed.
+        steps.add(retractIntake());
+        steps.add(followPathFile("DepotToTrench", false));
+
+        // 3. Trench sweep (mirrored to the left): collect out, drive back over the slope, shoot.
+        steps.add(sweepCollectShoot("RightTrenchStart", true));
+
+        Command delayedPath =
+                Commands.sequence(
+                        Commands.parallel(
+                                shootingSuperstructure.zeroCommand(),
+                                Commands.waitSeconds(INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS)),
+                        Commands.sequence(steps.toArray(Command[]::new)));
+        Command intakeHomingAndControl = intake.zeroCommand().andThen(intake.followModePivot());
+
+        return Commands.deadline(delayedPath, intakeHomingAndControl)
+                .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
+    }
+
+    /**
      * End behaviour with the intake running. MIDDLE uses the RIGHT-authored path (mirrored for the
      * left side); the depot paths are LEFT-authored (depot lives on the left), so never mirrored.
      */
@@ -177,7 +240,9 @@ public class AutoRoutines {
                     Commands.sequence(
                             Commands.deadline(
                                     followPathFile("LeftDriveDepot", false),
-                                    intake(),
+                                    // Raised depot intake: the depot balls sit on a frame above the
+                                    // floor, so use the DEPOT pivot angle, not the floor deploy.
+                                    depotIntake(),
                                     // Pre-spin during the depot drive so the shot needs no spin-up.
                                     shootingSuperstructure.spinUpForShot()),
                             aimAndShootAtHub());
@@ -185,7 +250,7 @@ public class AutoRoutines {
                     Commands.sequence(
                             Commands.deadline(
                                     followPathFile("LeftDriveDepotDriveThrough", false),
-                                    intake(),
+                                    depotIntake(),
                                     shootingSuperstructure.spinUpForShot()),
                             aimAndShootAtHub());
         };
