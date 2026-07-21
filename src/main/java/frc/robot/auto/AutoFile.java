@@ -214,7 +214,7 @@ public class AutoFile {
             if (start == StartBehaviour.BUMP_START) {
                 appendPose(preview, alliancePose(isLeft ? kSlopeFrontL : kSlopeFrontR));
             } else {
-                appendPath(preview, "RightTrenchToMiddle", isLeft);
+                appendPath(preview, isLeft ? "LeftTrenchToMiddle" : "RightTrenchToMiddle", false);
             }
             appendPath(preview, startPath(start), isLeft);
             appendPose(preview, alliancePose(isLeft ? kSlopeEndL : kSlopeEndR));

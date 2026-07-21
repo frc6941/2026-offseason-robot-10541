@@ -64,8 +64,13 @@ public class AutoActions {
     private static final double BUMP_SETTLE_TIMEOUT_SECONDS = 0.75;
 
     // ---- Start poses (robot begins here; used by resetOnPose in sim). ----
-    public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(90));
-    public static final Pose2d kTrenchStartL = mirrorY(kTrenchStartR);
+    // Trench start headings are chosen per-side and are NOT a rotation mirror of each other:
+    // right holds 0 deg, left holds 180 deg (both keep the intake toward the driver station and a
+    // constant heading through the trench — see LeftTrenchToMiddle/RightTrenchToMiddle paths). So
+    // the left pose mirrors only the translation and sets its heading explicitly.
+    public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTrenchStartL =
+            new Pose2d(mirrorY(kTrenchStartR).getTranslation(), Rotation2d.fromDegrees(180));
     // Bump start begins here (alliance side, 45 deg), then drives past the slope into neutral.
     public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.84, Rotation2d.fromDegrees(45));
     public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
