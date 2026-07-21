@@ -81,7 +81,9 @@ public class AutoActions {
     public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.84, Rotation2d.fromDegrees(45));
     public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
 
-    // ---- Second-sweep entry pose (drive here before the second sweep path). ----
+    // ---- Trench-mouth pose near the second-sweep entry. The competition routine no longer drives
+    // here (the second-sweep path now starts at the shoot pose and flows straight in); kept for the
+    // RobotContainer AutoPilot test command. ----
     public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.562, Rotation2d.fromDegrees(0));
     public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
 
@@ -529,7 +531,7 @@ public class AutoActions {
 
     /** Lift the swerve speed cap for a fast unguarded dash (e.g. the trench-start opening move). */
     public static Command setSwerveLimitUnlimited() {
-        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kDefaultSwerveLimit));
+        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit));
     }
 
     /** Restore the normal swerve speed cap after an unlimited-speed segment. */

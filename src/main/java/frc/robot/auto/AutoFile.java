@@ -152,7 +152,6 @@ public class AutoFile {
         }
 
         Pose2d blueStartPose = startPose(start, isLeft);
-        Pose2d blueSecondSweepStart = isLeft ? kSecondSweepStartL : kSecondSweepStartR;
 
         return AutoRoutines.competitionAuto(
                 isLeft,
@@ -160,7 +159,6 @@ public class AutoFile {
                 start == StartBehaviour.BUMP_START,
                 blueStartPose,
                 startPath(start),
-                blueSecondSweepStart,
                 secondSweepPath(secondSweep),
                 sweepTimes,
                 end,
@@ -225,9 +223,8 @@ public class AutoFile {
                     appendPose(preview, alliancePose(isLeft ? kSlopeFrontL : kSlopeFrontR));
                     appendPath(preview, startPath(StartBehaviour.BUMP_START), isLeft);
                 } else {
-                    appendPose(
-                            preview,
-                            alliancePose(isLeft ? kSecondSweepStartL : kSecondSweepStartR));
+                    // No reposition pose: the second-sweep path now starts at the shoot pose
+                    // (kSlopeEnd, appended just above), so draw the path straight from there.
                     appendPath(preview, secondSweepPath(secondSweep), isLeft);
                 }
                 appendPose(preview, alliancePose(isLeft ? kSlopeEndL : kSlopeEndR));

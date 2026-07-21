@@ -24,8 +24,9 @@ import lib.ironpulse.utils.AllianceFlipUtil;
  *   <li>Follow the <b>start</b> path with the intake running (collect on the way out).
  *   <li>{@code drivePastSlope} back across the bump.
  *   <li>Aim the chassis at the hub and empty the hopper.
- *   <li>{@code driveToPose} to the hardcoded second-sweep start, run the <b>second sweep</b> path
- *       (intake on), come back, aim + shoot again — only when sweep count is 2.
+ *   <li>Run the <b>second sweep</b> path directly from the shoot pose — its start waypoint is the
+ *       first-sweep shoot pose ({@code kSlopeEnd}), so there is no reposition leg — with the intake
+ *       on, come back, aim + shoot again; only when sweep count is 2.
  *   <li>Run the <b>end behaviour</b> (depot paths) with the intake running.
  * </ol>
  */
@@ -61,7 +62,6 @@ public class AutoRoutines {
             boolean startFromBump,
             Pose2d blueStartPose,
             String startPath,
-            Pose2d blueSecondSweepStart,
             String secondSweepPath,
             int sweepTimes,
             EndBehaviour endBehaviour,
@@ -115,11 +115,10 @@ public class AutoRoutines {
                 steps.add(drivePastSlope(isLeft, true));
                 steps.add(sweepCollectShoot(bumpPath, isLeft));
             } else {
-                // Reposition to the second-sweep start with Autopilot (straight beeline) rather
-                // than the pose PID — the alliance-side lane here is clear after the shot. The
+                // No reposition leg: the second-sweep path's start waypoint IS the first-sweep
+                // shoot pose (kSlopeEnd), so it flows straight from the shot into the sweep. The
                 // drive-back after this sweep holds -90 deg (blue-right frame; mirrored to +90 on
                 // the left) instead of kSlopeEnd's default rotation.
-                steps.add(driveToPoseAutoPilot(AllianceFlipUtil.apply(blueSecondSweepStart)));
                 steps.add(
                         sweepCollectShoot(
                                 secondSweepPath,
