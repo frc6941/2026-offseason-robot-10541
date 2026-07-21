@@ -32,6 +32,9 @@ import lib.ironpulse.utils.AllianceFlipUtil;
 public class AutoRoutines {
     private static final double SHOOT_ONLY_FEED_SECONDS = 3.0;
     public static final double INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS = 0.5;
+    // Hub-touch shoot: back off the hub toward our alliance wall this far before firing, for
+    // shooter/hood clearance. Tune to whatever gap the shot needs.
+    private static final double HUB_BACKUP_DISTANCE_METERS = 0.4;
 
     public static Swerve swerve;
     public static ShootingSuperstructure shootingSuperstructure;
@@ -150,11 +153,16 @@ public class AutoRoutines {
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 
-    /** Zero, optionally wait, shoot for three seconds, then hold the drivetrain stopped. */
+    /**
+     * Zero, optionally wait, back off the hub toward our alliance wall for shooter clearance, shoot
+     * for three seconds, then hold the drivetrain stopped. Used when the robot starts touching the
+     * hub with only its preload to fire.
+     */
     public static Command shootOnlyAuto(int waitSeconds) {
         Command shootSequence =
                 Commands.sequence(
                         Commands.waitSeconds(Math.max(0, waitSeconds)),
+                        backUpTowardAllianceWall(HUB_BACKUP_DISTANCE_METERS),
                         aimAndShootAtHub(SHOOT_ONLY_FEED_SECONDS),
                         Commands.run(swerve::runStop, swerve));
         return zeroEverything()

@@ -16,6 +16,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -62,6 +63,11 @@ import org.littletonrobotics.junction.Logger;
  */
 public class AutoActions {
     private static final double BUMP_SETTLE_TIMEOUT_SECONDS = 0.75;
+
+    // Backward-nudge (see backUpTowardAllianceWall): gentle speed + a safety timeout so a stalled
+    // odometry reading can't leave the drivetrain crawling into the hub indefinitely.
+    private static final double BACKUP_SPEED_MPS = 0.8;
+    private static final double BACKUP_TIMEOUT_SECONDS = 1.5;
 
     // ---- Start poses (robot begins here; used by resetOnPose in sim). ----
     // Trench start headings are chosen per-side and are NOT a rotation mirror of each other:
@@ -533,6 +539,48 @@ public class AutoActions {
 
     public static Command zeroEverything() {
         return Commands.parallel(shootingSuperstructure.zeroCommand(), intake.zeroCommand());
+    }
+
+    /**
+     * Drive straight toward the robot's own alliance wall (field -X on blue, +X on red) by roughly
+     * {@code distanceMeters}, holding heading, then stop. Used by the hub-touch shoot auto to back
+     * off the hub for shooter clearance before firing.
+     *
+     * <p>The command is field-relative, so the travel direction depends only on the (gyro-backed)
+     * heading, and the stop distance is measured from the odometry translation delta rather than an
+     * absolute pose — both stay valid even if vision hasn't localized while pressed against the hub.
+     * A timeout ({@link #BACKUP_TIMEOUT_SECONDS}) bounds it if the wheels can't make ground.
+     */
+    public static Command backUpTowardAllianceWall(double distanceMeters) {
+        final Translation2d[] start = new Translation2d[1];
+        double vx = (AllianceFlipUtil.shouldFlip() ? 1.0 : -1.0) * BACKUP_SPEED_MPS;
+        return Commands.runOnce(
+                        () ->
+                                start[0] =
+                                        RobotStateRecorder.getPoseWorldRobotCurrent()
+                                                .toPose2d()
+                                                .getTranslation())
+                .andThen(
+                        Commands.run(
+                                        () -> {
+                                            Rotation2d heading =
+                                                    RobotStateRecorder.getPoseWorldRobotCurrent()
+                                                            .toPose2d()
+                                                            .getRotation();
+                                            swerve.runTwist(
+                                                    ChassisSpeeds.fromFieldRelativeSpeeds(
+                                                            vx, 0.0, 0.0, heading));
+                                        },
+                                        swerve)
+                                .until(
+                                        () ->
+                                                RobotStateRecorder.getPoseWorldRobotCurrent()
+                                                                .toPose2d()
+                                                                .getTranslation()
+                                                                .getDistance(start[0])
+                                                        >= distanceMeters)
+                                .withTimeout(BACKUP_TIMEOUT_SECONDS))
+                .andThen(Commands.runOnce(swerve::runStop, swerve));
     }
 
     /** In sim only, snap the pose estimator + transform tree to a known blue start pose. */
