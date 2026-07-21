@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.*;
 
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.Pair;
+import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -82,9 +83,21 @@ public class Swerve extends SubsystemBase implements Localizable {
         setpointCurr = new SwerveSetpoint(new ChassisSpeeds(), states);
 
         // estimator
+        // Odometry state std-devs (x, y, z, angle) raised from the WPILib default 0.1 -> 0.15 on
+        // the translation axes: this robot bumps field elements/other robots, wheels slip, and
+        // wheel dead-reckoning walks the estimate off-field. Raising these tells the estimator to
+        // trust odometry less (and to grow its uncertainty faster during a vision dropout), so
+        // vision re-anchors the pose sooner after a slip. z/angle kept at 0.1. Vision std-devs here
+        // are just an initial default -- every addVisionMeasurement() passes its own per-frame
+        // std-devs (see LimelightSubsystem / LimeLightConfig Params/LL).
         poseEstimator =
                 new SwerveDrivePoseEstimator3d(
-                        kinematics, new Rotation3d(), getModulePositions(), new Pose3d());
+                        kinematics,
+                        new Rotation3d(),
+                        getModulePositions(),
+                        new Pose3d(),
+                        VecBuilder.fill(0.15, 0.15, 0.1, 0.1),
+                        VecBuilder.fill(0.9, 0.9, 0.9, 0.9));
 
         // precompute
         var moduleLocations = config.moduleLocations();
