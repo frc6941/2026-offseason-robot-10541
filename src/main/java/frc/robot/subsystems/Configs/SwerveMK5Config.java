@@ -236,7 +236,7 @@ public final class SwerveMK5Config {
                             })
                     .odometryFrequency(Hertz.of(100))
                     .driveStatorCurrentLimit(Amps.of(100))
-                    .driveSupplyCurrentLimit(Amps.of(65))
+                    .driveSupplyCurrentLimit(Amps.of(35))
                     .steerStatorCurrentLimit(Amps.of(45))
                     .steerSupplyCurrentLimit(Amps.of(35))
                     .canivoreCanBus(CANIVORE_CAN_BUS)
