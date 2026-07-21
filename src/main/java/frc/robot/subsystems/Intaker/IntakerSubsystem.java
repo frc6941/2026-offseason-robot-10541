@@ -136,6 +136,7 @@ public class IntakerSubsystem extends SubsystemBase {
                     Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case RETRACTED -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
             case FEEDING -> Degrees.of(IntakerPivotParamsNT.feedPosAngle.getValue());
+            case DEPOT -> Degrees.of(IntakerPivotParamsNT.depotPosAngle.getValue());
             default -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
         };
     }
@@ -154,7 +155,7 @@ public class IntakerSubsystem extends SubsystemBase {
         if (currentMode == IntakeMode.EXTENDED_REVERSE) {
             return IntakerRollerParamsNT.outtakeRPS.getValue();
         }
-        if (currentMode == IntakeMode.MAX_INTAKING) {
+        if (currentMode == IntakeMode.MAX_INTAKING || currentMode == IntakeMode.DEPOT) {
             return IntakerRollerParamsNT.intakeRPSmax.getValue();
         }
         return IntakerRollerParamsNT.intakeRPS.getValue();
@@ -219,6 +220,16 @@ public class IntakerSubsystem extends SubsystemBase {
     public Command holdRetractedFeedMode() {
         return Commands.runEnd(
                 () -> currentMode = IntakeMode.RETRACTED_FEEDING,
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                },
+                this);
+    }
+
+    public Command holdDepotMode() {
+        return Commands.runEnd(
+                () -> currentMode = IntakeMode.DEPOT,
                 () -> {
                     fallbackMode = IntakeMode.EXTENDED_IDLE;
                     currentMode = IntakeMode.EXTENDED_IDLE;
@@ -339,8 +350,7 @@ public class IntakerSubsystem extends SubsystemBase {
         return Commands.runOnce(() -> pivotZeroed = false)
                 .andThen(
                         pivot.zeroCommand()
-                                .withTimeout(
-                                        IntakerConfig.INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS))
+                                .withTimeout(IntakerConfig.INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS))
                 .andThen(Commands.runOnce(this::finishPivotZeroing));
     }
 

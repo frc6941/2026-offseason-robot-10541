@@ -90,9 +90,7 @@ public class AutoRoutines {
             // Per-side files (not the auto-mirror): the two sides use non-mirror-symmetric
             // start headings (right 0 deg, left 180 deg) so the intake faces the driver station
             // and the robot holds a constant heading through the trench. shouldMirror=false.
-            steps.add(
-                    followPathFile(
-                            isLeft ? "LeftTrenchToMiddle" : "RightTrenchToMiddle", false));
+            steps.add(followPathFile(isLeft ? "LeftTrenchToMiddle" : "RightTrenchToMiddle", false));
             steps.add(setSwerveLimitDefault());
         }
 

@@ -191,6 +191,7 @@ public class RobotContainer {
                                         () -> operatorMaxHoodOverrideEnabled = true,
                                         () -> operatorMaxHoodOverrideEnabled = false)
                                 .ignoringDisable(true));
+        OperatorController.rightTrigger().whileTrue(intaker.holdDepotMode());
         OperatorController.b().whileTrue(intaker.holdFeedMode());
         OperatorController.x().toggleOnTrue(shooterDrumStopCommand);
         OperatorController.y()

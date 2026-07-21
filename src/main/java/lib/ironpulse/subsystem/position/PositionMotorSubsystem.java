@@ -212,8 +212,10 @@ public class PositionMotorSubsystem<
                 this);
     }
 
-    // True only after a homing run actually seated on the hard stop and set the zero. Stays false if
-    // the routine is interrupted (e.g. a withTimeout on the caller) before detection, so callers can
+    // True only after a homing run actually seated on the hard stop and set the zero. Stays false
+    // if
+    // the routine is interrupted (e.g. a withTimeout on the caller) before detection, so callers
+    // can
     // distinguish a real zero from a bailed-out one and never trust a false zero. See isZeroed().
     private boolean zeroed = false;
 

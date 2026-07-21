@@ -64,7 +64,8 @@ public class IntakerConfig {
         FEEDING, // Roller: Intake, Pivot: Extended
         EXTENDED_REVERSE, // Roller: Outtake,Pivot: Extended
         RETRACTED_FEEDING, // Roller: Intake, Pivot: Swing
-        EXTENDED_IDLE // Roller: Stop,   Pivot: Extended
+        EXTENDED_IDLE, // Roller: Stop,   Pivot: Extended
+        DEPOT
     }
 
     public static final SubsystemConfig INTAKER_ROLLER_CONFIG =
@@ -145,6 +146,7 @@ public class IntakerConfig {
         public static final double deployPosAngle = 10;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
+        public static final double depotPosAngle = 15.0;
         public static final double retractedfeedPosAngle = 120.0;
 
         private IntakerPivotParams() {}

@@ -550,8 +550,8 @@ public class AutoActions {
      *
      * <p>The command is field-relative, so the travel direction depends only on the (gyro-backed)
      * heading, and the stop distance is measured from the odometry translation delta rather than an
-     * absolute pose — both stay valid even if vision hasn't localized while pressed against the hub.
-     * A timeout ({@link #BACKUP_TIMEOUT_SECONDS}) bounds it if the wheels can't make ground.
+     * absolute pose — both stay valid even if vision hasn't localized while pressed against the
+     * hub. A timeout ({@link #BACKUP_TIMEOUT_SECONDS}) bounds it if the wheels can't make ground.
      */
     public static Command backUpTowardAllianceWall(double distanceMeters) {
         final Translation2d[] start = new Translation2d[1];
