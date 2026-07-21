@@ -41,10 +41,6 @@ import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import frc.robot.utils.HubShiftUtil;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
-import lib.ironpulse.indicator.IndicatorIO;
-import lib.ironpulse.indicator.IndicatorIOARGB;
-import lib.ironpulse.indicator.IndicatorIOSim;
-import lib.ironpulse.indicator.IndicatorSubsystem;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
@@ -108,8 +104,6 @@ public class RobotContainer {
                     swerve);
     private final Command shooterDrumStopCommand = shootingSuperstructure.stopDrum();
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
-    private final IndicatorSubsystem indicator = buildIndicator();
-
     @SuppressWarnings("unused")
     private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
 
@@ -149,8 +143,6 @@ public class RobotContainer {
         AutoActions.init(swerve, shootingSuperstructure, intaker, this::autoShootCommand);
         AutoRoutines.init(swerve, shootingSuperstructure, intaker);
         AutoFile.init();
-        new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
-
         // Publish the Field2d ("Field") for Elastic + hook PathPlanner active-path logging
         // (one-time).
         FieldPublisher.init();
@@ -274,9 +266,6 @@ public class RobotContainer {
                                                                                                 .kFrameRobot))),
                                         Commands.runOnce(
                                                 limelightSubsystem::requestInternalIMUReseedAll))
-                                .alongWith(
-                                        indicator.indicateWithTimeout(
-                                                IndicatorIO.Patterns.RESET_ODOM, 1))
                                 .ignoringDisable(true));
 
         // In normal mode Y aims at the automatic hub/pass target. In fixed-distance mode Y uses
@@ -308,10 +297,7 @@ public class RobotContainer {
                 .onFalse(
                         Commands.parallel(
                                 intaker.returnPivotToIdleFast(),
-                                Commands.sequence(
-                                        shootingSuperstructure.idle().withTimeout(0.02),
-                                        indicator.indicateWithTimeout(
-                                                IndicatorIO.Patterns.AFTER_SHOOTING, 0.5))));
+                                shootingSuperstructure.idle().withTimeout(0.02)));
     }
 
     private Command aimCommand() {
@@ -517,75 +503,6 @@ public class RobotContainer {
         swerve.setDriveBrake(isBrake);
     }
 
-    /**
-     * Evaluates subsystem states each cycle and sets the indicator pattern accordingly.
-     *
-     * <p>Priority order (higher wins when multiple states overlap):
-     *
-     * <ol>
-     *   <li>{@link IndicatorIO.Patterns#AUTO Auto} — robot is in autonomous mode
-     *   <li>{@link IndicatorIO.Patterns#SHOOTING Shooting} — flywheel spinning up, not at speed yet
-     *   <li>{@link IndicatorIO.Patterns#HOLD_SHOOTING HoldShooting} — flywheel + hood ready,
-     *       waiting for feed
-     *   <li>{@link IndicatorIO.Patterns#INTAKE Intake} — intaker is intaking, feeding, or reversing
-     *   <li>{@link IndicatorIO.Patterns#RED_ALLIANCE Red} / {@link
-     *       IndicatorIO.Patterns#BLUE_ALLIANCE Blue} — disabled, show alliance
-     *   <li>{@link IndicatorIO.Patterns#NORMAL Normal} — fallback (teleop driving)
-     * </ol>
-     */
-    public void updateIndicator() {
-        // Don't clobber a command-driven transient pattern (e.g. AFTER_SHOOTING flash).
-        // Commands set outsideDefault = true while they own the pattern.
-        if (indicator.isOutsideDefault()) {
-            return;
-        }
-
-        // --- 1. Autonomous ---
-        if (DriverStation.isAutonomousEnabled()) {
-            indicator.setPattern(IndicatorIO.Patterns.AUTO);
-            return;
-        }
-
-        // --- 2 & 3. Shooting pipeline ---
-        // Detect whether the shooter is actively being commanded above idle.
-        boolean shooterActive = shootingSuperstructure.isShooterActive();
-
-        if (shooterActive) {
-            if (shootingSuperstructure.shooterAtGoal() && shootingSuperstructure.hoodAtGoal()) {
-                // Flywheel at speed + hood on target → ready to feed
-                indicator.setPattern(IndicatorIO.Patterns.HOLD_SHOOTING);
-            } else {
-                // Still spinning up
-                indicator.setPattern(IndicatorIO.Patterns.SHOOTING);
-            }
-            return;
-        }
-
-        // --- 4. Intaker-deployed states ---
-        var intakeMode = intaker.getCurrentMode();
-        if (intakeMode == IntakerConfig.IntakeMode.INTAKING
-                || intakeMode == IntakerConfig.IntakeMode.MAX_INTAKING
-                || intakeMode == IntakerConfig.IntakeMode.FEEDING
-                || intakeMode == IntakerConfig.IntakeMode.EXTENDED_REVERSE
-                || intakeMode == IntakerConfig.IntakeMode.RETRACTED_FEEDING) {
-            indicator.setPattern(IndicatorIO.Patterns.INTAKE);
-            return;
-        }
-
-        // --- 5. Disabled → alliance colour ---
-        if (DriverStation.isDisabled()) {
-            var alliance = DriverStation.getAlliance();
-            indicator.setPattern(
-                    alliance.isPresent() && alliance.get() == DriverStation.Alliance.Red
-                            ? IndicatorIO.Patterns.RED_ALLIANCE
-                            : IndicatorIO.Patterns.BLUE_ALLIANCE);
-            return;
-        }
-
-        // --- 6. Fallback ---
-        indicator.setPattern(IndicatorIO.Patterns.NORMAL);
-    }
-
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildIntakerRoller() {
         return new VelocityMotorSubsystem<>(
                 IntakerConfig.INTAKER_ROLLER_CONFIG,
@@ -647,14 +564,6 @@ public class RobotContainer {
                         () -> false,
                         LimeLightConfig.asDeviationParams());
         return new LimelightSubsystem(swerve, io);
-    }
-
-    @SuppressWarnings("unused")
-    private IndicatorSubsystem buildIndicator() {
-        return new IndicatorSubsystem(
-                isReal && RobotConstants.HAS_LED_IO
-                        ? new IndicatorIOARGB(/* PWM port */ 9, /* LED count */ 60)
-                        : new IndicatorIOSim());
     }
 
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildHood() {
