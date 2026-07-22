@@ -94,9 +94,15 @@ public class AutoActions {
 
     // ---- Slope crossing poses. Front = neutral side, End = alliance side (drive-back target).
     // ----
+    // Both targets sit WELL PAST the bump so the driveToPose P-controller keeps commanding a strong
+    // velocity all the way across the crest. kSlopeEnd used to be x=3.0, which sat right on the bump
+    // crest (~x3.3): the P-command decayed to ~0.4 m/s exactly where peak push was needed, so the
+    // robot stalled balanced on the slope (see Q41). Pulling it back onto the alliance-side flat
+    // keeps ~1 m of error at the crest so it powers over and down. The waitCrossedBump stop still
+    // ends the leg at x<3.4, so the further target only sustains push — it doesn't overshoot.
     public static final Pose2d kSlopeFrontR = new Pose2d(5.84, 2.84, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeFrontL = mirrorY(kSlopeFrontR);
-    public static final Pose2d kSlopeEndR = new Pose2d(3, 2.84, Rotation2d.fromDegrees(-135));
+    public static final Pose2d kSlopeEndR = new Pose2d(2.3, 2.84, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeEndL = mirrorY(kSlopeEndR);
 
     private static Swerve swerve;
