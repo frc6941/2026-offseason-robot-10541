@@ -495,7 +495,12 @@ public class RobotContainer {
      * limit back here so teleop never inherits an unlimited cap.
      */
     public void resetSwerveLimitForTeleop() {
-        AutoActions.setSwerveLimitDefault();
+        // AutoActions.setSwerveLimitDefault() only *builds* a Command; calling it here without
+        // scheduling was a no-op, so the auto trench-start's unlimited cap (99999 m/s) rode into
+        // teleop. That over-scales joystick translation, and the huge translation demand starves
+        // the rotation component via module desaturation — the driver's right stick can't turn the
+        // robot. Apply the default limit directly.
+        swerve.setSwerveLimitDefault();
     }
 
     /** Sets the swerve drive motors' neutral mode: true = brake, false = coast. */
