@@ -43,7 +43,10 @@ public final class SwerveMK5Config {
                     // not slip while building speed — this is what keeps wheel odometry (and the
                     // shoot-on-the-move velocity estimate) honest. Was 200, which was far above
                     // traction and let the wheels slip on every hard input.
-                    .maxDriveAcceleration(MetersPerSecondPerSecond.of(15))
+                    // Lowered 15 -> 11 to sit at the carpet traction ceiling: caps the drive
+                    // current spike per hard input (less battery sag/brownout risk) while keeping
+                    // wheels from slipping as speed builds. Bench-tune knob.
+                    .maxDriveAcceleration(MetersPerSecondPerSecond.of(11))
                     // Braking is allowed to be crisper than accel: a stop ends motion, so brief
                     // slip
                     // in the final moments is acceptable (vision re-corrects once stopped) and we
@@ -236,7 +239,7 @@ public final class SwerveMK5Config {
                             })
                     .odometryFrequency(Hertz.of(100))
                     .driveStatorCurrentLimit(Amps.of(100))
-                    .driveSupplyCurrentLimit(Amps.of(65))
+                    .driveSupplyCurrentLimit(Amps.of(35))
                     .steerStatorCurrentLimit(Amps.of(45))
                     .steerSupplyCurrentLimit(Amps.of(35))
                     .canivoreCanBus(CANIVORE_CAN_BUS)

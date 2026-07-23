@@ -16,6 +16,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -63,22 +64,45 @@ import org.littletonrobotics.junction.Logger;
 public class AutoActions {
     private static final double BUMP_SETTLE_TIMEOUT_SECONDS = 0.75;
 
+    // Backward-nudge (see backUpTowardAllianceWall): gentle speed + a safety timeout so a stalled
+    // odometry reading can't leave the drivetrain crawling into the hub indefinitely.
+    private static final double BACKUP_SPEED_MPS = 0.8;
+    private static final double BACKUP_TIMEOUT_SECONDS = 1.5;
+
     // ---- Start poses (robot begins here; used by resetOnPose in sim). ----
-    public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(90));
-    public static final Pose2d kTrenchStartL = mirrorY(kTrenchStartR);
+    // Trench start headings are chosen per-side and are NOT a rotation mirror of each other:
+    // right holds 0 deg, left holds 180 deg (both keep the intake toward the driver station and a
+    // constant heading through the trench — see LeftTrenchToMiddle/RightTrenchToMiddle paths). So
+    // the left pose mirrors only the translation and sets its heading explicitly.
+    public static final Pose2d kTrenchStartR = new Pose2d(4.4, 0.562, Rotation2d.fromDegrees(0));
+    public static final Pose2d kTrenchStartL =
+            new Pose2d(mirrorY(kTrenchStartR).getTranslation(), Rotation2d.fromDegrees(180));
     // Bump start begins here (alliance side, 45 deg), then drives past the slope into neutral.
     public static final Pose2d kBumpStartR = new Pose2d(3.3, 2.84, Rotation2d.fromDegrees(45));
     public static final Pose2d kBumpStartL = mirrorY(kBumpStartR);
+    // Middle start (left-only middleDepotTrenchAuto): centered in Y, touching the hub near face
+    // (HUB_NEAR_FACE_X = 4.022), preload loaded, heading 180 deg toward the hub per the launch-pose
+    // convention. PLACEHOLDER x — set to the real bumper-to-hub touch on the field.
+    public static final Pose2d kMiddleHubTouch =
+            new Pose2d(3.55, FieldConstants.fieldWidth / 2.0, Rotation2d.fromDegrees(180));
 
-    // ---- Second-sweep entry pose (drive here before the second sweep path). ----
+    // ---- Trench-mouth pose near the second-sweep entry. The competition routine no longer drives
+    // here (the second-sweep path now starts at the shoot pose and flows straight in); kept for the
+    // RobotContainer AutoPilot test command. ----
     public static final Pose2d kSecondSweepStartR = new Pose2d(3, 0.562, Rotation2d.fromDegrees(0));
     public static final Pose2d kSecondSweepStartL = mirrorY(kSecondSweepStartR);
 
     // ---- Slope crossing poses. Front = neutral side, End = alliance side (drive-back target).
     // ----
+    // Both targets sit WELL PAST the bump so the driveToPose P-controller keeps commanding a strong
+    // velocity all the way across the crest. kSlopeEnd used to be x=3.0, which sat right on the bump
+    // crest (~x3.3): the P-command decayed to ~0.4 m/s exactly where peak push was needed, so the
+    // robot stalled balanced on the slope (see Q41). Pulling it back onto the alliance-side flat
+    // keeps ~1 m of error at the crest so it powers over and down. The waitCrossedBump stop still
+    // ends the leg at x<3.4, so the further target only sustains push — it doesn't overshoot.
     public static final Pose2d kSlopeFrontR = new Pose2d(5.84, 2.84, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeFrontL = mirrorY(kSlopeFrontR);
-    public static final Pose2d kSlopeEndR = new Pose2d(3, 2.84, Rotation2d.fromDegrees(-135));
+    public static final Pose2d kSlopeEndR = new Pose2d(2.3, 2.84, Rotation2d.fromDegrees(-135));
     public static final Pose2d kSlopeEndL = mirrorY(kSlopeEndR);
 
     private static Swerve swerve;
@@ -394,6 +418,17 @@ public class AutoActions {
         return intake.runIntake();
     }
 
+    /**
+     * Raised-frame intake for the depot: sets {@code IntakeMode.DEPOT} (pivot to {@code
+     * depotPosAngle}, so the intake reaches balls sitting on the depot's raised frame). Same
+     * runOnce shape as {@link #intake()} — flips the mode; {@link
+     * IntakerSubsystem#followModePivot()} actuates the pivot. This is the auto form of the
+     * operator's right-trigger {@code holdDepotMode()}.
+     */
+    public static Command depotIntake() {
+        return intake.runDepot();
+    }
+
     public static Command feed() {
         return intake.runFeed();
     }
@@ -518,26 +553,58 @@ public class AutoActions {
 
     /** Lift the swerve speed cap for a fast unguarded dash (e.g. the trench-start opening move). */
     public static Command setSwerveLimitUnlimited() {
-        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit))
-                .alongWith(
-                        Commands.runOnce(
-                                () ->
-                                        swerve.setSwerveModuleLimit(
-                                                SwerveMK5Config.kUnlimitedSwerveModuleLimit)));
+        return Commands.runOnce(() -> swerve.setSwerveLimit(SwerveMK5Config.kUnlimitedLimit));
     }
 
     /** Restore the normal swerve speed cap after an unlimited-speed segment. */
     public static Command setSwerveLimitDefault() {
-        return Commands.runOnce(swerve::setSwerveLimitDefault)
-                .alongWith(
-                        Commands.runOnce(
-                                () ->
-                                        swerve.setSwerveModuleLimit(
-                                                SwerveMK5Config.kDefaultSwerveModuleLimit)));
+        return Commands.runOnce(swerve::setSwerveLimitDefault);
     }
 
     public static Command zeroEverything() {
-        return Commands.parallel(shootingSuperstructure.zeroHoodHere(), intake.zeroCommand());
+        return Commands.parallel(shootingSuperstructure.zeroCommand(), intake.zeroCommand());
+    }
+
+    /**
+     * Drive straight toward the robot's own alliance wall (field -X on blue, +X on red) by roughly
+     * {@code distanceMeters}, holding heading, then stop. Used by the hub-touch shoot auto to back
+     * off the hub for shooter clearance before firing.
+     *
+     * <p>The command is field-relative, so the travel direction depends only on the (gyro-backed)
+     * heading, and the stop distance is measured from the odometry translation delta rather than an
+     * absolute pose — both stay valid even if vision hasn't localized while pressed against the
+     * hub. A timeout ({@link #BACKUP_TIMEOUT_SECONDS}) bounds it if the wheels can't make ground.
+     */
+    public static Command backUpTowardAllianceWall(double distanceMeters) {
+        final Translation2d[] start = new Translation2d[1];
+        double vx = (AllianceFlipUtil.shouldFlip() ? 1.0 : -1.0) * BACKUP_SPEED_MPS;
+        return Commands.runOnce(
+                        () ->
+                                start[0] =
+                                        RobotStateRecorder.getPoseWorldRobotCurrent()
+                                                .toPose2d()
+                                                .getTranslation())
+                .andThen(
+                        Commands.run(
+                                        () -> {
+                                            Rotation2d heading =
+                                                    RobotStateRecorder.getPoseWorldRobotCurrent()
+                                                            .toPose2d()
+                                                            .getRotation();
+                                            swerve.runTwist(
+                                                    ChassisSpeeds.fromFieldRelativeSpeeds(
+                                                            vx, 0.0, 0.0, heading));
+                                        },
+                                        swerve)
+                                .until(
+                                        () ->
+                                                RobotStateRecorder.getPoseWorldRobotCurrent()
+                                                                .toPose2d()
+                                                                .getTranslation()
+                                                                .getDistance(start[0])
+                                                        >= distanceMeters)
+                                .withTimeout(BACKUP_TIMEOUT_SECONDS))
+                .andThen(Commands.runOnce(swerve::runStop, swerve));
     }
 
     /** In sim only, snap the pose estimator + transform tree to a known blue start pose. */

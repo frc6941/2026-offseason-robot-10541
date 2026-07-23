@@ -3,6 +3,7 @@ package frc.robot.subsystems.Intaker;
 import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -18,6 +19,10 @@ import lombok.Getter;
 import org.littletonrobotics.junction.AutoLogOutput;
 
 public class IntakerSubsystem extends SubsystemBase {
+    private static final double SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND = 2.0;
+    private static final double MIN_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 2.0;
+    private static final double MAX_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 180.0;
+
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller;
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> pivot;
 
@@ -30,6 +35,11 @@ public class IntakerSubsystem extends SubsystemBase {
 
     @AutoLogOutput(key = "Intaker/pivotZeroed")
     private boolean pivotZeroed = false;
+
+    @Getter
+    @AutoLogOutput(key = "Intaker/shootRaiseSpeedDegreesPerSecond")
+    private double shootRaiseSpeedDegreesPerSecond =
+            IntakerConfig.INTAKER_PIVOT_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND;
 
     public IntakerSubsystem(
             VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> roller,
@@ -112,9 +122,7 @@ public class IntakerSubsystem extends SubsystemBase {
                 shootRampAngleDeg = pivot.getCurrPos().in(Degrees);
                 shootRampActive = true;
             }
-            double stepDeg =
-                    IntakerPivotParamsNT.shootRaiseSpeedDegreesPerSecond.getValue()
-                            * RobotConstants.LOOPER_DT;
+            double stepDeg = shootRaiseSpeedDegreesPerSecond * RobotConstants.LOOPER_DT;
             double errDeg = targetDeg - shootRampAngleDeg;
             shootRampAngleDeg += Math.copySign(Math.min(Math.abs(errDeg), stepDeg), errDeg);
             return Degrees.of(shootRampAngleDeg);
@@ -128,6 +136,7 @@ public class IntakerSubsystem extends SubsystemBase {
                     Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case RETRACTED -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
             case FEEDING -> Degrees.of(IntakerPivotParamsNT.feedPosAngle.getValue());
+            case DEPOT -> Degrees.of(IntakerPivotParamsNT.depotPosAngle.getValue());
             default -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
         };
     }
@@ -146,7 +155,7 @@ public class IntakerSubsystem extends SubsystemBase {
         if (currentMode == IntakeMode.EXTENDED_REVERSE) {
             return IntakerRollerParamsNT.outtakeRPS.getValue();
         }
-        if (currentMode == IntakeMode.MAX_INTAKING) {
+        if (currentMode == IntakeMode.MAX_INTAKING || currentMode == IntakeMode.DEPOT) {
             return IntakerRollerParamsNT.intakeRPSmax.getValue();
         }
         return IntakerRollerParamsNT.intakeRPS.getValue();
@@ -154,6 +163,17 @@ public class IntakerSubsystem extends SubsystemBase {
 
     public Command runIntake() {
         return Commands.runOnce(() -> setIntakeMode(IntakeMode.INTAKING));
+    }
+
+    /**
+     * Set the raised-frame {@link IntakeMode#DEPOT} mode once, without holding the intake
+     * requirement — the auto analogue of {@link #runIntake()}. The pivot is driven to {@code
+     * depotPosAngle} by whatever reads the mode (in auto, {@link #followModePivot()}), same as
+     * every other auto mode flip. Teleop uses {@link #holdDepotMode()} (a {@code runEnd} that
+     * reverts on release); auto can't hold the intake requirement, so this is the runOnce form.
+     */
+    public Command runDepot() {
+        return Commands.runOnce(() -> setIntakeMode(IntakeMode.DEPOT));
     }
 
     public Command runIntakeContinuous() {
@@ -218,6 +238,16 @@ public class IntakerSubsystem extends SubsystemBase {
                 this);
     }
 
+    public Command holdDepotMode() {
+        return Commands.runEnd(
+                () -> currentMode = IntakeMode.DEPOT,
+                () -> {
+                    fallbackMode = IntakeMode.EXTENDED_IDLE;
+                    currentMode = IntakeMode.EXTENDED_IDLE;
+                },
+                this);
+    }
+
     public Command holdRetractedFeedPosition() {
         Command holdShootMode =
                 Commands.runEnd(
@@ -239,6 +269,22 @@ public class IntakerSubsystem extends SubsystemBase {
                     currentMode = IntakeMode.EXTENDED_IDLE;
                 },
                 this);
+    }
+
+    public void decreaseShootRaiseSpeed() {
+        adjustShootRaiseSpeed(-SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND);
+    }
+
+    public void increaseShootRaiseSpeed() {
+        adjustShootRaiseSpeed(SHOOT_RAISE_SPEED_STEP_DEGREES_PER_SECOND);
+    }
+
+    private void adjustShootRaiseSpeed(double deltaDegreesPerSecond) {
+        shootRaiseSpeedDegreesPerSecond =
+                MathUtil.clamp(
+                        shootRaiseSpeedDegreesPerSecond + deltaDegreesPerSecond,
+                        MIN_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND,
+                        MAX_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND);
     }
 
     public Command returnPivotToIdleFast() {
@@ -274,7 +320,7 @@ public class IntakerSubsystem extends SubsystemBase {
                         () -> {
                             double nowSeconds = timer.get();
                             double maxStepDeg =
-                                    IntakerPivotParamsNT.shootRaiseSpeedDegreesPerSecond.getValue()
+                                    shootRaiseSpeedDegreesPerSecond
                                             * Math.max(0.0, nowSeconds - lastTimeSeconds[0]);
                             lastTimeSeconds[0] = nowSeconds;
 
@@ -313,14 +359,25 @@ public class IntakerSubsystem extends SubsystemBase {
 
     public Command zeroCommand() {
         return Commands.runOnce(() -> pivotZeroed = false)
-                .andThen(pivot.zeroCommand())
+                .andThen(
+                        pivot.zeroCommand()
+                                .withTimeout(IntakerConfig.INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS))
                 .andThen(Commands.runOnce(this::finishPivotZeroing));
     }
 
+    /** True only after a homing run actually seated on the hard stop (never after a timeout). */
+    public boolean isPivotZeroed() {
+        return pivotZeroed;
+    }
+
     private void finishPivotZeroing() {
-        pivotZeroed = true;
-        fallbackMode = IntakeMode.EXTENDED_IDLE;
-        currentMode = IntakeMode.EXTENDED_IDLE;
+        // Trust the mechanism's own detection: on a timed-out home pivot.isZeroed() is false, so we
+        // leave pivotZeroed false and the pivot stays parked rather than acting on a false zero.
+        pivotZeroed = pivot.isZeroed();
+        if (pivotZeroed) {
+            fallbackMode = IntakeMode.EXTENDED_IDLE;
+            currentMode = IntakeMode.EXTENDED_IDLE;
+        }
     }
 
     /** Live pivot angle, for 3D mechanism visualization / logging. */

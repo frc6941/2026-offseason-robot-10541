@@ -39,11 +39,8 @@ import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
 import frc.robot.subsystems.Shooter.ShootingSuperstructure;
 import frc.robot.utils.HubShiftUtil;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
-import lib.ironpulse.indicator.IndicatorIO;
-import lib.ironpulse.indicator.IndicatorIOARGB;
-import lib.ironpulse.indicator.IndicatorIOSim;
-import lib.ironpulse.indicator.IndicatorSubsystem;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
@@ -72,8 +69,18 @@ public class RobotContainer {
 
     private static final double INTAKE_TRIGGER_START_THRESHOLD = 0.1;
     private static final double INTAKE_TRIGGER_MAX_THRESHOLD = 0.6;
+    private static final String FIXED_SHOT_MODE_KEY = "Shoot/Fixed Distance Mode";
+    private static final String FIXED_SHOT_DISTANCE_KEY = "Shoot/Fixed Distance Meters";
+    private static final String SHOOTER_DRUM_STOP_MODE_KEY = "Shoot/Shooter Drum Stop Mode";
+    private static final String INTAKE_SHOOT_RAISE_SPEED_KEY =
+            "Intake/Shoot Raise Speed Deg Per Sec";
+    private static final double SHORT_FIXED_SHOT_DISTANCE_METERS = 1.14;
+    private static final double LONG_FIXED_SHOT_DISTANCE_METERS = 2.9;
 
     private boolean isReal = RobotBase.isReal();
+    private boolean fixedDistanceShotEnabled = false;
+    private boolean operatorMaxHoodOverrideEnabled = false;
+    private double selectedFixedShotDistanceMeters = SHORT_FIXED_SHOT_DISTANCE_METERS;
 
     private final VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> intakerRoller =
             buildIntakerRoller();
@@ -95,9 +102,8 @@ public class RobotContainer {
                     hoodSubsystem,
                     hopperSubsystem,
                     swerve);
+    private final Command shooterDrumStopCommand = shootingSuperstructure.stopDrum();
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
-    private final IndicatorSubsystem indicator = buildIndicator();
-
     @SuppressWarnings("unused")
     private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
 
@@ -128,14 +134,15 @@ public class RobotContainer {
         intaker.setDefaultCommand();
         hopperSubsystem.configureDefaultCommand();
         shootingSuperstructure.configureDefaultCommands();
+        SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, false);
+        SmartDashboard.putBoolean(SHOOTER_DRUM_STOP_MODE_KEY, false);
+        SmartDashboard.putNumber(FIXED_SHOT_DISTANCE_KEY, selectedFixedShotDistanceMeters);
         // Intake zeroing stays manual-only on D-pad Left.
         configureBindings();
         // Autonomous: PathPlanner path-following routines (see frc.robot.auto).
         AutoActions.init(swerve, shootingSuperstructure, intaker, this::autoShootCommand);
         AutoRoutines.init(swerve, shootingSuperstructure, intaker);
         AutoFile.init();
-        new Trigger(() -> true).onTrue(Commands.run(this::updateIndicator));
-
         // Publish the Field2d ("Field") for Elastic + hook PathPlanner active-path logging
         // (one-time).
         FieldPublisher.init();
@@ -166,15 +173,39 @@ public class RobotContainer {
         OperatorController.povDown().whileTrue(hopperSubsystem.out());
         OperatorController.povRight().onTrue(hoodSubsystem.zeroCommand());
         OperatorController.povUp().whileTrue(intaker.holdRetractedFeedPosition());
-        OperatorController.y().whileTrue(intaker.holdFeedMode());
-        OperatorController.a().toggleOnTrue(shootingSuperstructure.stopDrum());
+        OperatorController.leftBumper()
+                .onTrue(Commands.runOnce(intaker::decreaseShootRaiseSpeed).ignoringDisable(true));
+        OperatorController.rightBumper()
+                .onTrue(Commands.runOnce(intaker::increaseShootRaiseSpeed).ignoringDisable(true));
+        OperatorController.leftTrigger()
+                .whileTrue(
+                        Commands.startEnd(
+                                        () -> operatorMaxHoodOverrideEnabled = true,
+                                        () -> operatorMaxHoodOverrideEnabled = false)
+                                .ignoringDisable(true));
+        OperatorController.rightTrigger().whileTrue(intaker.holdDepotMode());
+        OperatorController.b().whileTrue(intaker.holdFeedMode());
+        OperatorController.x().toggleOnTrue(shooterDrumStopCommand);
+        OperatorController.y()
+                .onTrue(
+                        Commands.runOnce(
+                                () ->
+                                        toggleFixedDistanceShotMode(
+                                                SHORT_FIXED_SHOT_DISTANCE_METERS)));
+        OperatorController.a()
+                .onTrue(
+                        Commands.runOnce(
+                                () ->
+                                        toggleFixedDistanceShotMode(
+                                                LONG_FIXED_SHOT_DISTANCE_METERS)));
 
         driverController.povLeft().onTrue(intaker.zeroCommand());
         driverController.povDown().whileTrue(intaker.runExtendedReverse());
         driverController.povDown().whileTrue(hopperSubsystem.out());
         driverController.povRight().onTrue(hoodSubsystem.zeroCommand());
 
-        driverController.povUp().whileTrue(driveToPoseAutoPilotTestCommand());
+        // Competition safety: leave the autonomous drive test unbound.
+        // driverController.povUp().whileTrue(driveToPoseAutoPilotTestCommand());
 
         // Intake: left trigger runs intake while held.
         // (Hopper feeds automatically off the intake state machine via its default command.)
@@ -235,13 +266,17 @@ public class RobotContainer {
                                                                                                 .kFrameRobot))),
                                         Commands.runOnce(
                                                 limelightSubsystem::requestInternalIMUReseedAll))
-                                .alongWith(
-                                        indicator.indicateWithTimeout(
-                                                IndicatorIO.Patterns.RESET_ODOM, 1)));
+                                .ignoringDisable(true));
 
-        // Y aims without shooting; RT aims and shoots. Both select the hub inside our alliance
-        // zone, or the matching pass corner after crossing out of it.
-        driverController.y().whileTrue(aimCommand());
+        // In normal mode Y aims at the automatic hub/pass target. In fixed-distance mode Y uses
+        // the fixed forward heading, while LB uses the opposite heading for a backward pass.
+        Trigger fixedDistanceMode = new Trigger(() -> fixedDistanceShotEnabled);
+        driverController.y().and(fixedDistanceMode.negate()).whileTrue(aimCommand());
+        driverController.y().and(fixedDistanceMode).whileTrue(fixedDistanceAimCommand(false));
+        driverController
+                .leftBumper()
+                .and(fixedDistanceMode)
+                .whileTrue(fixedDistanceAimCommand(true));
 
         driverController.x().whileTrue(autoTrenchCommand());
         driverController.b().whileTrue(autoTrenchCommand());
@@ -262,10 +297,7 @@ public class RobotContainer {
                 .onFalse(
                         Commands.parallel(
                                 intaker.returnPivotToIdleFast(),
-                                Commands.sequence(
-                                        shootingSuperstructure.idle().withTimeout(0.02),
-                                        indicator.indicateWithTimeout(
-                                                IndicatorIO.Patterns.AFTER_SHOOTING, 0.5))));
+                                shootingSuperstructure.idle().withTimeout(0.02)));
     }
 
     private Command aimCommand() {
@@ -280,18 +312,76 @@ public class RobotContainer {
     }
 
     private Command shootCommand() {
-        return buildShootCommand(
-                () -> -driverController.getLeftY(),
-                () -> -driverController.getLeftX(),
-                intaker.holdRetractedFeedPosition());
+        return Commands.either(
+                fixedDistanceShootCommand(),
+                buildShootCommand(
+                        () -> 0.0,
+                        () -> 0.0,
+                        intaker.holdRetractedFeedPosition(),
+                        this::operatorMaxHoodRequested),
+                () -> fixedDistanceShotEnabled);
+    }
+
+    private Command fixedDistanceShootCommand() {
+        return Commands.parallel(
+                shootingSuperstructure.shootAtFixedDistance(
+                        this::fixedShotDistanceMeters, this::operatorMaxHoodRequested),
+                shootingSuperstructure
+                        .waitForFeedStartAtFixedDistance(this::fixedShotDistanceMeters)
+                        .andThen(intaker.holdRetractedFeedPosition()));
+    }
+
+    private Command fixedDistanceAimCommand(boolean backward) {
+        return Commands.parallel(
+                holdHubTargetMode(),
+                new AutoAimCommand(
+                        swerve,
+                        () -> 0.0,
+                        () -> 0.0,
+                        () ->
+                                backward
+                                        ? fixedShotAimHeading().plus(Rotation2d.k180deg)
+                                        : fixedShotAimHeading(),
+                        () -> 0.0));
+    }
+
+    private Rotation2d fixedShotAimHeading() {
+        Pose2d blueFixedShotPose =
+                new Pose2d(
+                        FieldConstants.Hub.getTarget2d().getX() - fixedShotDistanceMeters(),
+                        FieldConstants.LinesHorizontal.center,
+                        new Rotation2d());
+        return AutoAimCommand.getShooterAimHeading(AllianceFlipUtil.apply(blueFixedShotPose));
+    }
+
+    private double fixedShotDistanceMeters() {
+        return selectedFixedShotDistanceMeters;
+    }
+
+    private boolean operatorMaxHoodRequested() {
+        return operatorMaxHoodOverrideEnabled;
+    }
+
+    private void toggleFixedDistanceShotMode(double distanceMeters) {
+        if (fixedDistanceShotEnabled && selectedFixedShotDistanceMeters == distanceMeters) {
+            fixedDistanceShotEnabled = false;
+            return;
+        }
+        selectedFixedShotDistanceMeters = distanceMeters;
+        fixedDistanceShotEnabled = true;
+        SmartDashboard.putNumber(FIXED_SHOT_DISTANCE_KEY, selectedFixedShotDistanceMeters);
     }
 
     private Command autoShootCommand() {
-        return buildShootCommand(() -> 0.0, () -> 0.0, intaker.holdRetractedFeedMode());
+        return buildShootCommand(
+                () -> 0.0, () -> 0.0, intaker.holdRetractedFeedMode(), () -> false);
     }
 
     private Command buildShootCommand(
-            DoubleSupplier xSupplier, DoubleSupplier ySupplier, Command intakeShootCommand) {
+            DoubleSupplier xSupplier,
+            DoubleSupplier ySupplier,
+            Command intakeShootCommand,
+            BooleanSupplier forceMaxHood) {
         return Commands.parallel(
                 holdAutomaticTargetMode(),
                 new AutoAimCommand(
@@ -300,7 +390,7 @@ public class RobotContainer {
                         ySupplier,
                         shootingSuperstructure::aimHeading,
                         shootingSuperstructure::aimHeadingRateRadPerSec),
-                shootingSuperstructure.aimAndShoot(),
+                shootingSuperstructure.aimAndShoot(forceMaxHood),
                 shootingSuperstructure.waitForFeedStart().andThen(intakeShootCommand));
     }
 
@@ -330,6 +420,12 @@ public class RobotContainer {
                 () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.AUTO));
     }
 
+    private Command holdHubTargetMode() {
+        return Commands.startEnd(
+                () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.HUB),
+                () -> AutoAimCommand.setTargetMode(AutoAimCommand.TargetMode.AUTO));
+    }
+
     /**
      * Use this to pass the autonomous command to the main {@link Robot} class.
      *
@@ -339,14 +435,19 @@ public class RobotContainer {
         return AutoFile.buildAuto();
     }
 
-    /** Hard-stop zero the intake pivot once when teleop starts. */
-    public Command getTeleopIntakeZeroCommand() {
-        return intaker.zeroCommand();
+    /** Hard-stop zero the intake and hood pivots once when teleop starts. */
+    public Command getTeleopZeroCommand() {
+        return Commands.parallel(intaker.zeroCommand(), hoodSubsystem.zeroCommand());
     }
 
     public void updateDashboard() {
         SmartDashboard.putNumber("Match Time", DriverStation.getMatchTime());
         SmartDashboard.putNumber("Robot Voltage", RobotController.getBatteryVoltage());
+        SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, fixedDistanceShotEnabled);
+        SmartDashboard.putNumber(FIXED_SHOT_DISTANCE_KEY, selectedFixedShotDistanceMeters);
+        SmartDashboard.putNumber(
+                INTAKE_SHOOT_RAISE_SPEED_KEY, intaker.getShootRaiseSpeedDegreesPerSecond());
+        SmartDashboard.putBoolean(SHOOTER_DRUM_STOP_MODE_KEY, shooterDrumStopCommand.isScheduled());
         HubShiftUtil.ShiftInfo hubShift = HubShiftUtil.getShiftInfo();
         Logger.recordOutput("Competition/isHubActive", hubShift.active());
         Logger.recordOutput("Competition/Hub Phase", hubShift.phase().toString());
@@ -394,81 +495,17 @@ public class RobotContainer {
      * limit back here so teleop never inherits an unlimited cap.
      */
     public void resetSwerveLimitForTeleop() {
-        AutoActions.setSwerveLimitDefault();
+        // AutoActions.setSwerveLimitDefault() only *builds* a Command; calling it here without
+        // scheduling was a no-op, so the auto trench-start's unlimited cap (99999 m/s) rode into
+        // teleop. That over-scales joystick translation, and the huge translation demand starves
+        // the rotation component via module desaturation — the driver's right stick can't turn the
+        // robot. Apply the default limit directly.
+        swerve.setSwerveLimitDefault();
     }
 
     /** Sets the swerve drive motors' neutral mode: true = brake, false = coast. */
     public void setSwerveDriveBrake(boolean isBrake) {
         swerve.setDriveBrake(isBrake);
-    }
-
-    /**
-     * Evaluates subsystem states each cycle and sets the indicator pattern accordingly.
-     *
-     * <p>Priority order (higher wins when multiple states overlap):
-     *
-     * <ol>
-     *   <li>{@link IndicatorIO.Patterns#AUTO Auto} — robot is in autonomous mode
-     *   <li>{@link IndicatorIO.Patterns#SHOOTING Shooting} — flywheel spinning up, not at speed yet
-     *   <li>{@link IndicatorIO.Patterns#HOLD_SHOOTING HoldShooting} — flywheel + hood ready,
-     *       waiting for feed
-     *   <li>{@link IndicatorIO.Patterns#INTAKE Intake} — intaker is intaking, feeding, or reversing
-     *   <li>{@link IndicatorIO.Patterns#RED_ALLIANCE Red} / {@link
-     *       IndicatorIO.Patterns#BLUE_ALLIANCE Blue} — disabled, show alliance
-     *   <li>{@link IndicatorIO.Patterns#NORMAL Normal} — fallback (teleop driving)
-     * </ol>
-     */
-    public void updateIndicator() {
-        // Don't clobber a command-driven transient pattern (e.g. AFTER_SHOOTING flash).
-        // Commands set outsideDefault = true while they own the pattern.
-        if (indicator.isOutsideDefault()) {
-            return;
-        }
-
-        // --- 1. Autonomous ---
-        if (DriverStation.isAutonomousEnabled()) {
-            indicator.setPattern(IndicatorIO.Patterns.AUTO);
-            return;
-        }
-
-        // --- 2 & 3. Shooting pipeline ---
-        // Detect whether the shooter is actively being commanded above idle.
-        boolean shooterActive = shootingSuperstructure.isShooterActive();
-
-        if (shooterActive) {
-            if (shootingSuperstructure.shooterAtGoal() && shootingSuperstructure.hoodAtGoal()) {
-                // Flywheel at speed + hood on target → ready to feed
-                indicator.setPattern(IndicatorIO.Patterns.HOLD_SHOOTING);
-            } else {
-                // Still spinning up
-                indicator.setPattern(IndicatorIO.Patterns.SHOOTING);
-            }
-            return;
-        }
-
-        // --- 4. Intaker-deployed states ---
-        var intakeMode = intaker.getCurrentMode();
-        if (intakeMode == IntakerConfig.IntakeMode.INTAKING
-                || intakeMode == IntakerConfig.IntakeMode.MAX_INTAKING
-                || intakeMode == IntakerConfig.IntakeMode.FEEDING
-                || intakeMode == IntakerConfig.IntakeMode.EXTENDED_REVERSE
-                || intakeMode == IntakerConfig.IntakeMode.RETRACTED_FEEDING) {
-            indicator.setPattern(IndicatorIO.Patterns.INTAKE);
-            return;
-        }
-
-        // --- 5. Disabled → alliance colour ---
-        if (DriverStation.isDisabled()) {
-            var alliance = DriverStation.getAlliance();
-            indicator.setPattern(
-                    alliance.isPresent() && alliance.get() == DriverStation.Alliance.Red
-                            ? IndicatorIO.Patterns.RED_ALLIANCE
-                            : IndicatorIO.Patterns.BLUE_ALLIANCE);
-            return;
-        }
-
-        // --- 6. Fallback ---
-        indicator.setPattern(IndicatorIO.Patterns.NORMAL);
     }
 
     private VelocityMotorSubsystem<MotorInputsAutoLogged, MotorIO> buildIntakerRoller() {
@@ -532,14 +569,6 @@ public class RobotContainer {
                         () -> false,
                         LimeLightConfig.asDeviationParams());
         return new LimelightSubsystem(swerve, io);
-    }
-
-    @SuppressWarnings("unused")
-    private IndicatorSubsystem buildIndicator() {
-        return new IndicatorSubsystem(
-                isReal && RobotConstants.HAS_LED_IO
-                        ? new IndicatorIOARGB(/* PWM port */ 9, /* LED count */ 60)
-                        : new IndicatorIOSim());
     }
 
     private PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> buildHood() {

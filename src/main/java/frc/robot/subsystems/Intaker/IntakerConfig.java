@@ -21,6 +21,11 @@ public class IntakerConfig {
     public static final String INTAKER_PIVOT_NAME = "IntakerPivot";
 
     private static final double INTAKER_ROLLER_GEAR_RATIO = 35.0 / 20.0;
+
+    // Caps for the intake-roller Kraken X60 (an unset limit means UNLIMITED). The roller stalls on
+    // game-piece contact, so the stator cap limits stall heat; bench-tune for grip vs. draw.
+    public static final double INTAKER_ROLLER_STATOR_CURRENT_LIMIT_AMPS = 60.0;
+    public static final double INTAKER_ROLLER_SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
     private static final double INTAKER_PIVOT_GEAR_RATIO = 1.0 / 12 * 20 / 36 * 20 / 36 * 15 / 36;
 
     // Mechanism degrees per ONE mechanism rotation. The gear reduction is handled by Phoenix's
@@ -34,11 +39,22 @@ public class IntakerConfig {
     // Measure on the robot and update this value so getCurrPos() reports the true mechanism angle
     // after homing.
     public static final Angle INTAKER_PIVOT_ZERO_OFFSET = Degrees.of(0.0);
+    public static final double INTAKER_PIVOT_SHOOT_RAISE_SPEED_DEGREES_PER_SECOND = 64.0;
+    public static final double INTAKER_PIVOT_STATOR_CURRENT_LIMIT_AMPS = 50.0;
+    public static final double INTAKER_PIVOT_SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
     // Placeholder template values for homing. These MUST be verified on the real robot.
-    // Sign must drive the intake pivot toward the zero hard stop.
-    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -2;
+    // Sign must drive the intake pivot toward the zero hard stop. Magnitude sets descent speed
+    // through the ~93:1 reduction — was -2 (a slow creep that delayed the start of auto). Raised to
+    // home faster so it finishes in the ball-free zone near the start pose, but kept below the -8
+    // that slams the hard stop hard; bench-tune. Pairs with the overlap in AutoRoutines, which runs
+    // homing concurrently with the opening transit but gates collecting on isPivotZeroed().
+    public static final double INTAKER_PIVOT_ZEROING_VOLTAGE = -5;
+    // Safety cap on the homing descent: if the hard stop is never detected (mechanism hung, motor
+    // unplugged), stop pushing after this long instead of driving into the stop forever. On timeout
+    // the pivot is left NOT zeroed, so auto declines to intake rather than trusting a false zero.
+    public static final double INTAKER_PIVOT_ZEROING_TIMEOUT_SECONDS = 2.0;
     // Must be above free-run current and below breaker / unsafe stall current.
-    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 60.0;
+    public static final double INTAKER_PIVOT_ZEROING_CURRENT_LIMIT_AMPS = 40.0;
     public static final int INTAKER_PIVOT_ZEROING_FILTER_SIZE = 3;
 
     public enum IntakeMode {
@@ -48,7 +64,8 @@ public class IntakerConfig {
         FEEDING, // Roller: Intake, Pivot: Extended
         EXTENDED_REVERSE, // Roller: Outtake,Pivot: Extended
         RETRACTED_FEEDING, // Roller: Intake, Pivot: Swing
-        EXTENDED_IDLE // Roller: Stop,   Pivot: Extended
+        EXTENDED_IDLE, // Roller: Stop,   Pivot: Extended
+        DEPOT
     }
 
     public static final SubsystemConfig INTAKER_ROLLER_CONFIG =
@@ -58,6 +75,8 @@ public class IntakerConfig {
                     .mainId(INTAKER_ROLLER_ID)
                     .motorInvertedValue(InvertedValue.Clockwise_Positive)
                     .SensorToMechanismRatio(INTAKER_ROLLER_GEAR_RATIO)
+                    .statorCurrentLimitAmps(INTAKER_ROLLER_STATOR_CURRENT_LIMIT_AMPS)
+                    .supplyCurrentLimitAmps(INTAKER_ROLLER_SUPPLY_CURRENT_LIMIT_AMPS)
                     .build();
 
     public static final SubsystemConfig INTAKER_PIVOT_CONFIG =
@@ -70,6 +89,8 @@ public class IntakerConfig {
                     // which is
                     // 1/INTAKER_PIVOT_GEAR_RATIO — not the ratio itself (~0.0107, the reciprocal).
                     .SensorToMechanismRatio(1.0 / INTAKER_PIVOT_GEAR_RATIO)
+                    .statorCurrentLimitAmps(INTAKER_PIVOT_STATOR_CURRENT_LIMIT_AMPS)
+                    .supplyCurrentLimitAmps(INTAKER_PIVOT_SUPPLY_CURRENT_LIMIT_AMPS)
                     // Arm-type gravity: torque needed to hold position varies with cos(angle), so
                     // Slot0 kG is applied as an arm-cosine feedforward (not a constant elevator
                     // term).
@@ -125,11 +146,8 @@ public class IntakerConfig {
         public static final double deployPosAngle = 10;
         public static final double retractPosAngle = 135.0;
         public static final double feedPosAngle = 35.0;
-        public static final double retractedfeedPosAngle = 70.0;
-
-        // Shoot-only software position-ramp speed. The pivot still uses runPosition(), not Motion
-        // Magic.
-        public static final double shootRaiseSpeedDegreesPerSecond = 54.0;
+        public static final double depotPosAngle = 15.0;
+        public static final double retractedfeedPosAngle = 120.0;
 
         private IntakerPivotParams() {}
     }
