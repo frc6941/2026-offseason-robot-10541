@@ -97,11 +97,7 @@ public class RobotContainer {
             buildHood();
     private final ShootingSuperstructure shootingSuperstructure =
             new ShootingSuperstructure(
-                    shooterUpperSubsystem,
-                    shooterLowerSubsystem,
-                    hoodSubsystem,
-                    hopperSubsystem,
-                    swerve);
+                    shooterUpperSubsystem, shooterLowerSubsystem, hoodSubsystem, hopperSubsystem);
     private final Command shooterDrumStopCommand = shootingSuperstructure.stopDrum();
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
 
