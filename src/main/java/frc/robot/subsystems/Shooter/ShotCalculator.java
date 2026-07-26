@@ -8,8 +8,9 @@ import lib.ntext.NTParameter;
 
 /** Resolves hood angle, shooter speed, and time of flight from live interpolation tables. */
 public class ShotCalculator {
-    private static final double[] BREAKPOINTS_METERS =
-            {1.0, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0};
+    private static final double[] BREAKPOINTS_METERS = {
+        1.0, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0
+    };
 
     private final InterpolatingDoubleTreeMap hoodAngleDeg = new InterpolatingDoubleTreeMap();
     private final InterpolatingDoubleTreeMap shooterRps = new InterpolatingDoubleTreeMap();

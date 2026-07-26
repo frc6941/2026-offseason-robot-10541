@@ -168,7 +168,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     private boolean readyToShoot(Pose2d pose) {
-        return headingAtGoal(pose) && hood.positionAtGoal() && shooterAtGoal();
+        return headingAtGoal(pose) && hoodAtGoal() && shooterAtGoal();
     }
 
     public boolean shooterAtGoal() {
@@ -252,12 +252,15 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** Completes as soon as the upper shooter reaches the current shot speed. */
     public Command waitForFeedStart() {
-        return Commands.waitUntil(this::upperAtShotSpeed);
+        return waitForUpperAtSpeed(() -> currentSolution().shooterSpeed());
     }
 
     public Command waitForFeedStartAtFixedDistance(DoubleSupplier distanceMeters) {
-        Supplier<AngularVelocity> upperSpeedSupplier =
-                () -> calculator.solve(distanceMeters.getAsDouble()).shooterSpeed();
+        return waitForUpperAtSpeed(
+                () -> calculator.solve(distanceMeters.getAsDouble()).shooterSpeed());
+    }
+
+    private Command waitForUpperAtSpeed(Supplier<AngularVelocity> upperSpeedSupplier) {
         return Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier));
     }
 
@@ -278,12 +281,12 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     /** Wait until the upper wheel has recovered to target after the lower shooter starts. */
     private Command waitForLoadedUpperReady(Supplier<AngularVelocity> upperSpeedSupplier) {
-        return Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+        return waitForUpperAtSpeed(upperSpeedSupplier)
                 .andThen(Commands.waitSeconds(FEED_DELAY_AFTER_UPPER_READY_SECONDS))
                 // The lower shooter starts after the same delay in runShooterAt(). Wait one full
                 // loop so the velocity input reflects that added load before checking again.
                 .andThen(Commands.waitSeconds(RobotConstants.LOOPER_DT))
-                .andThen(Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier)));
+                .andThen(waitForUpperAtSpeed(upperSpeedSupplier));
     }
 
     /**
@@ -299,15 +302,7 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     public Command aimAndShoot(BooleanSupplier forceMaxHood) {
-        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
-        return Commands.parallel(
-                runShooterAt(upperSpeedSupplier),
-                hood.runMotionMagic(
-                        () ->
-                                forceMaxHood.getAsBoolean()
-                                        ? ShooterConfig.HOOD_MAX_ANGLE
-                                        : clampHoodAngleForSolution()),
-                feedAfterUpperReadyDelay(upperSpeedSupplier));
+        return shootTrackingSolution(this::currentSolution, forceMaxHood);
     }
 
     /**
@@ -319,8 +314,18 @@ public class ShootingSuperstructure extends SubsystemBase {
 
     public Command shootAtFixedDistance(
             DoubleSupplier distanceMeters, BooleanSupplier forceMaxHood) {
-        Supplier<ShotSolution> solutionSupplier =
-                () -> calculator.solve(distanceMeters.getAsDouble());
+        return shootTrackingSolution(
+                () -> calculator.solve(distanceMeters.getAsDouble()), forceMaxHood);
+    }
+
+    /**
+     * Shared body of {@link #aimAndShoot} and {@link #shootAtFixedDistance}: run the flywheel at
+     * the solution speed, track the hood to the solution angle (or max when {@code forceMaxHood}),
+     * and start feed once the upper wheel is ready. The solution supplier decides whether the shot
+     * tracks live distance ({@link #currentSolution}, manual-override aware) or one fixed distance.
+     */
+    private Command shootTrackingSolution(
+            Supplier<ShotSolution> solutionSupplier, BooleanSupplier forceMaxHood) {
         Supplier<AngularVelocity> upperSpeedSupplier = () -> solutionSupplier.get().shooterSpeed();
         return Commands.parallel(
                 runShooterAt(upperSpeedSupplier),
@@ -380,15 +385,12 @@ public class ShootingSuperstructure extends SubsystemBase {
     }
 
     public Command feedShotForSeconds(double seconds) {
-        Supplier<AngularVelocity> upperSpeedSupplier = () -> currentSolution().shooterSpeed();
         return Commands.deadline(
-                Commands.waitUntil(() -> upperAtTarget(upperSpeedSupplier))
+                Commands.waitUntil(this::upperAtShotSpeed)
                         .andThen(
                                 Commands.waitSeconds(
                                         FEED_DELAY_AFTER_UPPER_READY_SECONDS + seconds)),
-                runShooterAt(upperSpeedSupplier),
-                hood.runMotionMagic(this::clampHoodAngleForSolution),
-                feedAfterUpperReadyDelay(upperSpeedSupplier));
+                aimAndShoot());
     }
 
     public Command fixedShoot() {
