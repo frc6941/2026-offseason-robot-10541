@@ -1,0 +1,703 @@
+{
+  "extensions": {
+    "elasticImport": {
+      "gridSize": 128,
+      "sourceVersion": 1
+    }
+  },
+  "format": "flexure-workspace",
+  "id": "workspace-7bad01f3-5505-4fc6-b0ea-8d28446a7373",
+  "name": "Imported Elastic Layout",
+  "recording": {
+    "exclude": [],
+    "include": [],
+    "selectionMode": "all"
+  },
+  "tabs": [
+    {
+      "elements": [
+        {
+          "config": {
+            "topic": "/SmartDashboard/Field",
+            "period": 0.06,
+            "field_game": "Rebuilt",
+            "robot_width": 0.85,
+            "robot_length": 0.85,
+            "show_other_objects": true,
+            "show_trajectories": true,
+            "field_rotation": 0,
+            "robot_color": 4294198070,
+            "trajectory_color": 4294967295,
+            "show_robot_outside_widget": true
+          },
+          "frame": {
+            "height": 512,
+            "width": 1012.8125376732971,
+            "x": 256,
+            "y": 0
+          },
+          "id": "widget-9350d796-d311-4ce0-8af6-7e24366d0cd5",
+          "kind": "widget",
+          "title": "Field",
+          "widgetType": "field",
+          "z": 0
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Auto/End Behaviour",
+            "period": 0.06,
+            "sort_options": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 0,
+            "y": 0
+          },
+          "id": "widget-62188ea1-b649-4473-b238-f7e83c21e5b6",
+          "kind": "widget",
+          "title": "End Behaviour",
+          "widgetType": "combo-box-chooser",
+          "z": 1
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Auto/Second Sweep",
+            "period": 0.06,
+            "sort_options": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 0,
+            "y": 128
+          },
+          "id": "widget-aca20015-2cf2-47f8-82ad-4d39f4d07f32",
+          "kind": "widget",
+          "title": "Second Sweep",
+          "widgetType": "combo-box-chooser",
+          "z": 2
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Auto/Side",
+            "period": 0.06,
+            "sort_options": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 0,
+            "y": 256
+          },
+          "id": "widget-65ae9b99-5f63-4b68-b82e-fefc385aade7",
+          "kind": "widget",
+          "title": "Side",
+          "widgetType": "combo-box-chooser",
+          "z": 3
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Auto/Start Behaviour",
+            "period": 0.06,
+            "sort_options": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 0,
+            "y": 384
+          },
+          "id": "widget-34fba26e-e111-4c8b-9a0a-85d175323342",
+          "kind": "widget",
+          "title": "Start Behaviour",
+          "widgetType": "combo-box-chooser",
+          "z": 4
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Auto/Sweep Times",
+            "period": 0.06,
+            "sort_options": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 0,
+            "y": 512
+          },
+          "id": "widget-59a2963f-14ad-43f6-9a13-86e3e1eef14b",
+          "kind": "widget",
+          "title": "Sweep Times",
+          "widgetType": "combo-box-chooser",
+          "z": 5
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Auto/Show Preview",
+            "period": 0.06,
+            "data_type": "boolean"
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 256,
+            "y": 512
+          },
+          "id": "widget-9f39cdf2-cab0-4a0f-8d3c-341925327c8b",
+          "kind": "widget",
+          "title": "Show Auto Preview",
+          "widgetType": "toggle-switch",
+          "z": 6
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Auto/Shoot Test",
+            "period": 0.06,
+            "data_type": "boolean"
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 512,
+            "y": 512
+          },
+          "id": "widget-0056e5c0-13c9-4275-8c6c-b8958e61cd47",
+          "kind": "widget",
+          "title": "Shoot Test Only",
+          "widgetType": "toggle-switch",
+          "z": 7
+        }
+      ],
+      "id": "tab-c6fe1618-ff2e-401c-bc1b-4b70cfe8ac60",
+      "name": "Auto",
+      "viewport": {
+        "x": 24,
+        "y": 75.09303739738516,
+        "zoom": 1.3075217581331713
+      }
+    },
+    {
+      "elements": [
+        {
+          "config": {
+            "topic": "/SmartDashboard/Field",
+            "period": 0.06,
+            "field_game": "Rebuilt",
+            "robot_width": 0.85,
+            "robot_length": 0.85,
+            "show_other_objects": true,
+            "show_trajectories": true,
+            "field_rotation": 0,
+            "robot_color": 4294198070,
+            "trajectory_color": 4294967295,
+            "show_robot_outside_widget": true
+          },
+          "frame": {
+            "height": 352.5207956600362,
+            "width": 761.8276446654611,
+            "x": 768,
+            "y": 0
+          },
+          "id": "widget-9276f23d-c1ef-4c9e-b051-9a14bf3272a5",
+          "kind": "widget",
+          "title": "Field",
+          "widgetType": "field",
+          "z": 0,
+          "appearance": {
+            "titleVisible": false,
+            "metadataVisible": false
+          }
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Indicator/Pattern",
+            "period": 0.06,
+            "data_type": "string",
+            "show_submit_button": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 768,
+            "y": 384
+          },
+          "id": "widget-f94af5ed-57b7-4ffa-b69b-2a9daf585ad0",
+          "kind": "widget",
+          "title": "Pattern",
+          "widgetType": "text-display",
+          "z": 1
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Limelight/limelight-aalive",
+            "period": 0.06,
+            "data_type": "boolean",
+            "true_color": 4283215696,
+            "false_color": 4294198070,
+            "true_icon": "None",
+            "false_icon": "None"
+          },
+          "frame": {
+            "height": 128,
+            "width": 128,
+            "x": 1408,
+            "y": 384
+          },
+          "id": "widget-862a39c7-9f97-4896-ad59-5641f62b2f64",
+          "kind": "widget",
+          "title": "limelight-aalive",
+          "widgetType": "boolean-box",
+          "z": 2
+        },
+        {
+          "config": {
+            "topic": "/FieldCore/Robot/IntakeEnabled",
+            "period": 0.06,
+            "data_type": "boolean",
+            "true_color": 4283215696,
+            "false_color": 4294198070,
+            "true_icon": "None",
+            "false_icon": "None"
+          },
+          "frame": {
+            "height": 128,
+            "width": 128,
+            "x": 1152,
+            "y": 384
+          },
+          "id": "widget-3ce85d58-261b-4794-841c-dc4899e2a5f4",
+          "kind": "widget",
+          "title": "IntakeEnabled",
+          "widgetType": "boolean-box",
+          "z": 3
+        },
+        {
+          "config": {
+            "topic": "/FieldCore/Robot/ShooterEnabled",
+            "period": 0.06,
+            "data_type": "boolean",
+            "true_color": 4283215696,
+            "false_color": 4294198070,
+            "true_icon": "None",
+            "false_icon": "None"
+          },
+          "frame": {
+            "height": 128,
+            "width": 128,
+            "x": 1280,
+            "y": 384
+          },
+          "id": "widget-3d39342a-5c02-49f4-974f-bda9ea3a99fc",
+          "kind": "widget",
+          "title": "ShooterEnabled",
+          "widgetType": "boolean-box",
+          "z": 4
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Robot Voltage",
+            "period": 0.06,
+            "data_type": "double",
+            "min_value": 4,
+            "max_value": 13,
+            "divisions": 4,
+            "inverted": false,
+            "orientation": "horizontal"
+          },
+          "frame": {
+            "height": 128,
+            "width": 128,
+            "x": 384,
+            "y": 384
+          },
+          "id": "widget-2dce42fb-b565-4204-b7a5-d1fc83adedad",
+          "kind": "widget",
+          "title": "Voltage",
+          "widgetType": "voltage-view",
+          "z": 5
+        },
+        {
+          "config": {
+            "topic": "/FMSInfo",
+            "period": 0.06
+          },
+          "frame": {
+            "height": 128.00005650994578,
+            "width": 382.14825384267635,
+            "x": 0,
+            "y": 383.9999434900542
+          },
+          "id": "widget-07be6a85-1160-4486-871c-5fc4615f4631",
+          "kind": "widget",
+          "title": "FMSInfo",
+          "widgetType": "fms-info",
+          "z": 6,
+          "appearance": {
+            "metadataVisible": false
+          }
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Competition/Hub Remaining",
+            "period": 0.06,
+            "data_type": "double",
+            "time_display_mode": "Seconds Only",
+            "red_start_time": 5,
+            "yellow_start_time": 10,
+            "font_size": 152
+          },
+          "frame": {
+            "height": 256,
+            "width": 512,
+            "x": 0,
+            "y": 0
+          },
+          "id": "widget-927c9e15-0852-45db-873b-b376501f89df",
+          "kind": "widget",
+          "title": "Hub Remaining",
+          "widgetType": "match-time",
+          "z": 7,
+          "appearance": {
+            "metadataVisible": false
+          }
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Competition/Hub Phase",
+            "period": 0.06,
+            "data_type": "string"
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 256,
+            "y": 256
+          },
+          "id": "widget-04e54cf6-8f96-4902-a571-d08ad8a3ea66",
+          "kind": "widget",
+          "title": "Hub Phase",
+          "widgetType": "large-text-display",
+          "z": 8,
+          "appearance": {
+            "metadataVisible": false
+          }
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Competition/isHubActive",
+            "period": 0.06,
+            "data_type": "boolean",
+            "true_color": 4283215696,
+            "false_color": 4294198070,
+            "true_icon": "None",
+            "false_icon": "None"
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 0,
+            "y": 256
+          },
+          "id": "widget-4eda6570-629d-4a98-bedf-647d3d40d04d",
+          "kind": "widget",
+          "title": "isHubActive",
+          "widgetType": "boolean-box",
+          "z": 9
+        },
+        {
+          "children": [
+            {
+              "config": {
+                "topic": "/FieldCore/Robot/Enabled",
+                "period": 0.06,
+                "data_type": "boolean",
+                "true_color": 4283215696,
+                "false_color": 4294198070,
+                "true_icon": "None",
+                "false_icon": "None"
+              },
+              "frame": {
+                "height": 128,
+                "width": 256,
+                "x": 0,
+                "y": 0
+              },
+              "id": "widget-c95b2896-8179-450f-a0c3-ddd69cd9dd07",
+              "kind": "widget",
+              "title": "Enabled",
+              "widgetType": "boolean-box",
+              "z": 3
+            },
+            {
+              "config": {
+                "topic": "/SmartDashboard/Shoot/Shooter Drum Stop Mode",
+                "period": 0.06,
+                "data_type": "boolean",
+                "true_color": 4283215696,
+                "false_color": 4294198070,
+                "true_icon": "None",
+                "false_icon": "None"
+              },
+              "frame": {
+                "height": 128,
+                "width": 256,
+                "x": 0,
+                "y": 128
+              },
+              "id": "widget-4720e34f-270d-43c9-ab93-3f8c2bfda4e0",
+              "kind": "widget",
+              "title": "Drum Stop Mode",
+              "widgetType": "boolean-box",
+              "z": 11
+            },
+            {
+              "config": {
+                "topic": "/SmartDashboard/Shoot/Fixed Distance Mode",
+                "period": 0.06,
+                "data_type": "boolean",
+                "true_color": 4283215696,
+                "false_color": 4294198070,
+                "true_icon": "None",
+                "false_icon": "None"
+              },
+              "frame": {
+                "height": 128,
+                "width": 256,
+                "x": 0,
+                "y": 256
+              },
+              "id": "widget-d842cd74-f60d-45f5-a4f3-421dde6696d9",
+              "kind": "widget",
+              "title": "Fixed Shot Mode",
+              "widgetType": "boolean-box",
+              "z": 12
+            }
+          ],
+          "clip": true,
+          "extensions": {
+            "groupContentInsetTop": 32
+          },
+          "frame": {
+            "height": 383.903537522604,
+            "width": 256.6172581374322,
+            "x": 512,
+            "y": 0.09646247739600966
+          },
+          "id": "group-23149f28-cd7d-45a4-a6f6-de6a03c91657",
+          "kind": "group",
+          "title": "Group",
+          "z": 10,
+          "appearance": {
+            "titleVisible": false,
+            "metadataVisible": true
+          }
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Shoot/Fixed Distance Meters",
+            "period": 0.06,
+            "data_type": "double",
+            "show_submit_button": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 512,
+            "y": 384
+          },
+          "id": "widget-4cc7b188-e628-4b45-bac1-5fd642f35158",
+          "kind": "widget",
+          "title": "Fixed Shot Distance (m)",
+          "widgetType": "text-display",
+          "z": 11
+        },
+        {
+          "config": {
+            "topic": "/SmartDashboard/Intake/Shoot Raise Speed Deg Per Sec",
+            "period": 0.06,
+            "data_type": "double",
+            "show_submit_button": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 128,
+            "x": 1024,
+            "y": 384
+          },
+          "id": "widget-f38182fd-5c2f-4970-a8d3-bb22e698eb2e",
+          "kind": "widget",
+          "title": "Raise Speed",
+          "widgetType": "text-display",
+          "z": 12
+        }
+      ],
+      "id": "tab-41f3e89f-acae-4f54-8033-6baf71a2748a",
+      "name": "Teleop",
+      "viewport": {
+        "x": 24,
+        "y": 217,
+        "zoom": 1.080078125
+      }
+    },
+    {
+      "elements": [
+        {
+          "config": {
+            "topic": "/SmartDashboard/Field",
+            "period": 0.06,
+            "field_game": "Rebuilt",
+            "robot_width": 0.85,
+            "robot_length": 0.85,
+            "show_other_objects": true,
+            "show_trajectories": true,
+            "field_rotation": 0,
+            "robot_color": 4294198070,
+            "trajectory_color": 4294967295,
+            "show_robot_outside_widget": true
+          },
+          "frame": {
+            "height": 470.3102052018629,
+            "width": 931.9668527147071,
+            "x": 256,
+            "y": 0
+          },
+          "id": "widget-35c348c4-4bfb-47ae-8fdb-04b88d2ef0cb",
+          "kind": "widget",
+          "title": "Field",
+          "widgetType": "field",
+          "z": 0,
+          "appearance": {
+            "titleVisible": false,
+            "metadataVisible": false
+          }
+        },
+        {
+          "config": {
+            "topic": "/AdvantageKit/RealOutputs/Shooting/distanceMeters",
+            "period": 0.06,
+            "data_type": "double",
+            "show_submit_button": false
+          },
+          "frame": {
+            "height": 128,
+            "width": 256,
+            "x": 7.105427357601002e-15,
+            "y": 0
+          },
+          "id": "widget-e38720b3-a75c-4e18-b509-510b63431dec",
+          "kind": "widget",
+          "title": "distanceMeters",
+          "widgetType": "text-display",
+          "z": 1
+        },
+        {
+          "children": [
+            {
+              "config": {
+                "topic": "/SmartDashboard/Shooter Tuning/Flywheel RPS",
+                "period": 0.06,
+                "data_type": "double",
+                "show_submit_button": false
+              },
+              "frame": {
+                "height": 128,
+                "width": 128,
+                "x": 0,
+                "y": 0
+              },
+              "id": "widget-503461da-45a4-46b8-80f6-82c5e21d4c90",
+              "kind": "widget",
+              "title": "Flywheel RPS",
+              "widgetType": "text-display",
+              "z": 0
+            },
+            {
+              "config": {
+                "topic": "/SmartDashboard/Shooter Tuning/Hood Angle Deg",
+                "period": 0.06,
+                "data_type": "double",
+                "show_submit_button": false
+              },
+              "frame": {
+                "height": 128,
+                "width": 128,
+                "x": 0,
+                "y": 0
+              },
+              "id": "widget-871fadd3-1f85-4cdb-90dd-fd60b674606e",
+              "kind": "widget",
+              "title": "Hood Angle Deg",
+              "widgetType": "text-display",
+              "z": 0
+            },
+            {
+              "config": {
+                "topic": "/SmartDashboard/Shooter Tuning/Manual Override",
+                "period": 0.06,
+                "data_type": "boolean"
+              },
+              "frame": {
+                "height": 128,
+                "width": 128,
+                "x": 0,
+                "y": 0
+              },
+              "id": "widget-72d02053-54f0-4841-a652-2d066caffc5a",
+              "kind": "widget",
+              "title": "Manual Override",
+              "widgetType": "toggle-switch",
+              "z": 0
+            }
+          ],
+          "config": {
+            "label_position": "TOP",
+            "elasticSourceType": "List Layout"
+          },
+          "direction": "vertical",
+          "frame": {
+            "height": 338.69666398621996,
+            "width": 254.48984271460412,
+            "x": 1.5101572853958558,
+            "y": 128
+          },
+          "id": "layout-4bcf56a2-ace1-4017-bb87-67b17fbef18d",
+          "kind": "layout",
+          "title": "Shooter Tuning",
+          "z": 2
+        }
+      ],
+      "id": "tab-8de875b7-d0c0-47ab-ac08-456447346db4",
+      "name": "Tuning",
+      "viewport": {
+        "x": 202.00001525878906,
+        "y": 257.1050499864965,
+        "zoom": 1.3965036113666822
+      }
+    }
+  ],
+  "theme": {
+    "mode": "dark",
+    "seed": "#00BAAD"
+  },
+  "version": 1,
+  "windows": [
+    {
+      "bounds": {
+        "fullscreen": false,
+        "height": 928,
+        "maximized": true,
+        "width": 1440,
+        "x": 133,
+        "y": 59
+      },
+      "activeTabId": "tab-8de875b7-d0c0-47ab-ac08-456447346db4",
+      "id": "7d4f17b1-97d7-4b55-844f-546009051517",
+      "tabs": [
+        "tab-c6fe1618-ff2e-401c-bc1b-4b70cfe8ac60",
+        "tab-41f3e89f-acae-4f54-8033-6baf71a2748a",
+        "tab-8de875b7-d0c0-47ab-ac08-456447346db4"
+      ]
+    }
+  ]
+}

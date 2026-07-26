@@ -97,13 +97,10 @@ public class RobotContainer {
             buildHood();
     private final ShootingSuperstructure shootingSuperstructure =
             new ShootingSuperstructure(
-                    shooterUpperSubsystem,
-                    shooterLowerSubsystem,
-                    hoodSubsystem,
-                    hopperSubsystem,
-                    swerve);
+                    shooterUpperSubsystem, shooterLowerSubsystem, hoodSubsystem, hopperSubsystem);
     private final Command shooterDrumStopCommand = shootingSuperstructure.stopDrum();
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
+
     @SuppressWarnings("unused")
     private final RobotMechanism3d mechanism3d = new RobotMechanism3d(hoodSubsystem, intaker);
 
@@ -221,7 +218,7 @@ public class RobotContainer {
                 .whileTrue(intaker.runIntakeContinuous());
         maxIntakeTrigger.whileTrue(intaker.runMaxIntakeContinuous());
         */
-        driverController.leftTrigger().whileTrue(intaker.runMaxIntakeContinuous());
+        driverController.leftTrigger().whileTrue(intaker.runIntakeContinuous());
 
         // Swerve
         // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick
