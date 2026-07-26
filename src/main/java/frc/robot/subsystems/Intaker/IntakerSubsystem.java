@@ -57,8 +57,6 @@ public class IntakerSubsystem extends SubsystemBase {
                                                         currentMode
                                                                         != IntakerConfig.IntakeMode
                                                                                 .INTAKING
-                                                                && currentMode
-                                                                        != IntakeMode.MAX_INTAKING
                                                                 && currentMode != IntakeMode.FEEDING
                                                                 && currentMode
                                                                         != IntakeMode
@@ -70,8 +68,6 @@ public class IntakerSubsystem extends SubsystemBase {
                                         .until(
                                                 () ->
                                                         currentMode == IntakeMode.INTAKING
-                                                                || currentMode
-                                                                        == IntakeMode.MAX_INTAKING
                                                                 || currentMode == IntakeMode.FEEDING
                                                                 || currentMode
                                                                         == IntakeMode
@@ -81,7 +77,6 @@ public class IntakerSubsystem extends SubsystemBase {
                                                                                 .RETRACTED_FEEDING),
                                 () ->
                                         currentMode == IntakeMode.INTAKING
-                                                || currentMode == IntakeMode.MAX_INTAKING
                                                 || currentMode == IntakeMode.FEEDING
                                                 || currentMode == IntakeMode.EXTENDED_REVERSE
                                                 || currentMode == IntakeMode.RETRACTED_FEEDING)
@@ -130,8 +125,6 @@ public class IntakerSubsystem extends SubsystemBase {
 
         shootRampActive = false;
         return switch (currentMode) {
-            case INTAKING, MAX_INTAKING ->
-                    Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case EXTENDED_IDLE, EXTENDED_REVERSE ->
                     Degrees.of(IntakerPivotParamsNT.deployPosAngle.getValue());
             case RETRACTED -> Degrees.of(IntakerPivotParamsNT.retractPosAngle.getValue());
@@ -155,9 +148,6 @@ public class IntakerSubsystem extends SubsystemBase {
         if (currentMode == IntakeMode.EXTENDED_REVERSE) {
             return IntakerRollerParamsNT.outtakeRPS.getValue();
         }
-        if (currentMode == IntakeMode.MAX_INTAKING || currentMode == IntakeMode.DEPOT) {
-            return IntakerRollerParamsNT.intakeRPSmax.getValue();
-        }
         return IntakerRollerParamsNT.intakeRPS.getValue();
     }
 
@@ -179,13 +169,6 @@ public class IntakerSubsystem extends SubsystemBase {
     public Command runIntakeContinuous() {
         return Commands.startEnd(
                 () -> setIntakeMode(IntakeMode.INTAKING),
-                () -> setIntakeMode(IntakeMode.EXTENDED_IDLE),
-                this);
-    }
-
-    public Command runMaxIntakeContinuous() {
-        return Commands.startEnd(
-                () -> setIntakeMode(IntakeMode.MAX_INTAKING),
                 () -> setIntakeMode(IntakeMode.EXTENDED_IDLE),
                 this);
     }

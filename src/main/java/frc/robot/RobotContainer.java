@@ -222,7 +222,7 @@ public class RobotContainer {
                 .whileTrue(intaker.runIntakeContinuous());
         maxIntakeTrigger.whileTrue(intaker.runMaxIntakeContinuous());
         */
-        driverController.leftTrigger().whileTrue(intaker.runMaxIntakeContinuous());
+        driverController.leftTrigger().whileTrue(intaker.runIntakeContinuous());
 
         // Swerve
         // Pass the DRIVER-relative robot pose (not the raw world pose) so "forward" on the stick
