@@ -95,7 +95,8 @@ public class AutoActions {
     // ---- Slope crossing poses. Front = neutral side, End = alliance side (drive-back target).
     // ----
     // Both targets sit WELL PAST the bump so the driveToPose P-controller keeps commanding a strong
-    // velocity all the way across the crest. kSlopeEnd used to be x=3.0, which sat right on the bump
+    // velocity all the way across the crest. kSlopeEnd used to be x=3.0, which sat right on the
+    // bump
     // crest (~x3.3): the P-command decayed to ~0.4 m/s exactly where peak push was needed, so the
     // robot stalled balanced on the slope (see Q41). Pulling it back onto the alliance-side flat
     // keeps ~1 m of error at the crest so it powers over and down. The waitCrossedBump stop still
