@@ -26,7 +26,6 @@ public class AutoAimCommand extends Command {
     private final DoubleSupplier xSupplier;
     private final DoubleSupplier ySupplier;
     private final Supplier<Rotation2d> targetHeading;
-    private final DoubleSupplier targetHeadingRate;
 
     public enum TargetMode {
         AUTO,
@@ -46,10 +45,6 @@ public class AutoAimCommand extends Command {
         return targetMode;
     }
 
-    // Clamp shoot-on-move feedforward so a bad pose/rate sample cannot yank the chassis. Heading
-    // damping uses the direct gyro rate rather than a loop-time-dependent numerical derivative.
-    private static final double FF_CLAMP_RAD_PER_SEC = 2.0;
-
     // O-lock hysteresis: once settled and X-locked, only unlock when the commanded speed/omega
     // exceed the lock thresholds by this factor, so the wheels don't flip X<->drive at the edge.
     private static final double LOCK_EXIT_FACTOR = 2.0;
@@ -57,17 +52,33 @@ public class AutoAimCommand extends Command {
     // True while the chassis is X-locked in the settled state (see execute()). Reset on each start.
     private boolean oLocked = false;
 
-    public AutoAimCommand(
-            Swerve swerve,
-            DoubleSupplier xSupplier,
-            DoubleSupplier ySupplier,
-            Supplier<Rotation2d> targetHeading,
-            DoubleSupplier targetHeadingRate) {
+    public AutoAimCommand(Swerve swerve) {
+        this.swerve = swerve;
+        xSupplier = () -> 0.0;
+        ySupplier = () -> 0.0;
+        targetHeading =
+                () ->
+                        getShooterAimHeading(
+                                RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d());
+        addRequirements(swerve);
+    }
+
+    public AutoAimCommand(Swerve swerve, DoubleSupplier xSupplier, DoubleSupplier ySupplier) {
         this.swerve = swerve;
         this.xSupplier = xSupplier;
         this.ySupplier = ySupplier;
+        targetHeading =
+                () ->
+                        getShooterAimHeading(
+                                RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d());
+        addRequirements(swerve);
+    }
+
+    public AutoAimCommand(Swerve swerve, Supplier<Rotation2d> targetHeading) {
+        this.swerve = swerve;
+        xSupplier = () -> 0.0;
+        ySupplier = () -> 0.0;
         this.targetHeading = targetHeading;
-        this.targetHeadingRate = targetHeadingRate;
         addRequirements(swerve);
     }
 
@@ -192,11 +203,7 @@ public class AutoAimCommand extends Command {
         // ---- 1. Alliance-aware target and shoot-on-move state ----
         Rotation2d target = targetHeading.get();
         double error = target.minus(robotPose.getRotation()).getRadians();
-        double ffVel =
-                MathUtil.clamp(
-                        targetHeadingRate.getAsDouble(),
-                        -FF_CLAMP_RAD_PER_SEC,
-                        FF_CLAMP_RAD_PER_SEC);
+        double ffVel = 0.0;
         double measuredOmega = swerve.getYawVelocityRadPerSec();
 
         // Direct gyro-rate damping is independent of PIDController's assumed 20 ms derivative

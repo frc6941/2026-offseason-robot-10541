@@ -8,6 +8,7 @@ import static edu.wpi.first.units.Units.Degrees;
 import static edu.wpi.first.units.Units.DegreesPerSecond;
 import static edu.wpi.first.units.Units.MetersPerSecond;
 import static edu.wpi.first.units.Units.RadiansPerSecond;
+import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static edu.wpi.first.units.Units.Seconds;
 import static frc.robot.RobotConstants.HAS_SWERVE_IO;
 
@@ -36,11 +37,10 @@ import frc.robot.subsystems.Intaker.*;
 import frc.robot.subsystems.Shooter.HoodParamsNT;
 import frc.robot.subsystems.Shooter.ShooterConfig;
 import frc.robot.subsystems.Shooter.ShooterLowerParamsNT;
+import frc.robot.subsystems.Shooter.ShooterSubsystem;
 import frc.robot.subsystems.Shooter.ShooterUpperParamsNT;
-import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import frc.robot.subsystems.Shooter.ShotSolution;
 import frc.robot.utils.HubShiftUtil;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
 import lib.ironpulse.io.MotorIO;
 import lib.ironpulse.io.MotorIOSim;
 import lib.ironpulse.io.MotorIOTalonFX;
@@ -95,10 +95,10 @@ public class RobotContainer {
             buildShooterFeed();
     private final PositionMotorSubsystem<MotorInputsAutoLogged, MotorIO, Angle> hoodSubsystem =
             buildHood();
-    private final ShootingSuperstructure shootingSuperstructure =
-            new ShootingSuperstructure(
+    private final ShooterSubsystem shooter =
+            new ShooterSubsystem(
                     shooterUpperSubsystem, shooterLowerSubsystem, hoodSubsystem, hopperSubsystem);
-    private final Command shooterDrumStopCommand = shootingSuperstructure.stopDrum();
+    private final Command shooterDrumStopCommand = shooter.stop();
     private final LimelightSubsystem limelightSubsystem = buildLimelight();
 
     @SuppressWarnings("unused")
@@ -130,15 +130,15 @@ public class RobotContainer {
         SwerveModuleIOMK5N.startSyncThread();
         intaker.setDefaultCommand();
         hopperSubsystem.configureDefaultCommand();
-        shootingSuperstructure.configureDefaultCommands();
+        shooter.configureDefaultCommands();
         SmartDashboard.putBoolean(FIXED_SHOT_MODE_KEY, false);
         SmartDashboard.putBoolean(SHOOTER_DRUM_STOP_MODE_KEY, false);
         SmartDashboard.putNumber(FIXED_SHOT_DISTANCE_KEY, selectedFixedShotDistanceMeters);
         // Intake zeroing stays manual-only on D-pad Left.
         configureBindings();
         // Autonomous: PathPlanner path-following routines (see frc.robot.auto).
-        AutoActions.init(swerve, shootingSuperstructure, intaker, this::autoShootCommand);
-        AutoRoutines.init(swerve, shootingSuperstructure, intaker);
+        AutoActions.init(swerve, intaker, shooter);
+        AutoRoutines.init(swerve, intaker, shooter);
         AutoFile.init();
         // Publish the Field2d ("Field") for Elastic + hook PathPlanner active-path logging
         // (one-time).
@@ -293,8 +293,7 @@ public class RobotContainer {
                 .rightTrigger()
                 .onFalse(
                         Commands.parallel(
-                                intaker.returnPivotToIdleFast(),
-                                shootingSuperstructure.idle().withTimeout(0.02)));
+                                intaker.returnPivotToIdleFast(), shooter.idle().withTimeout(0.02)));
     }
 
     private Command aimCommand() {
@@ -303,28 +302,28 @@ public class RobotContainer {
                 new AutoAimCommand(
                         swerve,
                         () -> -driverController.getLeftY(),
-                        () -> -driverController.getLeftX(),
-                        shootingSuperstructure::aimHeading,
-                        shootingSuperstructure::aimHeadingRateRadPerSec));
+                        () -> -driverController.getLeftX()));
     }
 
     private Command shootCommand() {
         return Commands.either(
                 fixedDistanceShootCommand(),
-                buildShootCommand(
-                        () -> 0.0,
-                        () -> 0.0,
-                        intaker.holdRetractedFeedPosition(),
-                        this::operatorMaxHoodRequested),
+                Commands.parallel(
+                        holdAutomaticTargetMode(),
+                        new AutoAimCommand(swerve),
+                        shooter.shoot(() -> operatorMaxHoodOverrideEnabled),
+                        Commands.waitUntil(() -> shooter.upperReady())
+                                .andThen(intaker.holdRetractedFeedPosition())),
                 () -> fixedDistanceShotEnabled);
     }
 
     private Command fixedDistanceShootCommand() {
         return Commands.parallel(
-                shootingSuperstructure.shootAtFixedDistance(
-                        this::fixedShotDistanceMeters, this::operatorMaxHoodRequested),
-                shootingSuperstructure
-                        .waitForFeedStartAtFixedDistance(this::fixedShotDistanceMeters)
+                shooter.shootAtDistance(
+                        () -> selectedFixedShotDistanceMeters,
+                        () -> operatorMaxHoodOverrideEnabled),
+                Commands.waitUntil(
+                                () -> shooter.upperReadyAtDistance(selectedFixedShotDistanceMeters))
                         .andThen(intaker.holdRetractedFeedPosition()));
     }
 
@@ -333,30 +332,19 @@ public class RobotContainer {
                 holdHubTargetMode(),
                 new AutoAimCommand(
                         swerve,
-                        () -> 0.0,
-                        () -> 0.0,
                         () ->
                                 backward
                                         ? fixedShotAimHeading().plus(Rotation2d.k180deg)
-                                        : fixedShotAimHeading(),
-                        () -> 0.0));
+                                        : fixedShotAimHeading()));
     }
 
     private Rotation2d fixedShotAimHeading() {
         Pose2d blueFixedShotPose =
                 new Pose2d(
-                        FieldConstants.Hub.getTarget2d().getX() - fixedShotDistanceMeters(),
+                        FieldConstants.Hub.getTarget2d().getX() - selectedFixedShotDistanceMeters,
                         FieldConstants.LinesHorizontal.center,
                         new Rotation2d());
         return AutoAimCommand.getShooterAimHeading(AllianceFlipUtil.apply(blueFixedShotPose));
-    }
-
-    private double fixedShotDistanceMeters() {
-        return selectedFixedShotDistanceMeters;
-    }
-
-    private boolean operatorMaxHoodRequested() {
-        return operatorMaxHoodOverrideEnabled;
     }
 
     private void toggleFixedDistanceShotMode(double distanceMeters) {
@@ -367,28 +355,6 @@ public class RobotContainer {
         selectedFixedShotDistanceMeters = distanceMeters;
         fixedDistanceShotEnabled = true;
         SmartDashboard.putNumber(FIXED_SHOT_DISTANCE_KEY, selectedFixedShotDistanceMeters);
-    }
-
-    private Command autoShootCommand() {
-        return buildShootCommand(
-                () -> 0.0, () -> 0.0, intaker.holdRetractedFeedMode(), () -> false);
-    }
-
-    private Command buildShootCommand(
-            DoubleSupplier xSupplier,
-            DoubleSupplier ySupplier,
-            Command intakeShootCommand,
-            BooleanSupplier forceMaxHood) {
-        return Commands.parallel(
-                holdAutomaticTargetMode(),
-                new AutoAimCommand(
-                        swerve,
-                        xSupplier,
-                        ySupplier,
-                        shootingSuperstructure::aimHeading,
-                        shootingSuperstructure::aimHeadingRateRadPerSec),
-                shootingSuperstructure.aimAndShoot(forceMaxHood),
-                shootingSuperstructure.waitForFeedStart().andThen(intakeShootCommand));
     }
 
     private Command autoTrenchCommand() {
@@ -463,6 +429,35 @@ public class RobotContainer {
                 swerve.getChassisSpeedsCmd(),
                 RadiansPerSecond.of(swerve.getYawVelocityRadPerSec()));
         RobotStateRecorder.periodic();
+        Pose2d robotPose = RobotStateRecorder.getPoseWorldRobotCurrent().toPose2d();
+        double distance = AutoAimCommand.getDistanceToTarget(robotPose.getTranslation());
+        ShotSolution solution = shooter.solution(distance);
+        Rotation2d aimHeading = AutoAimCommand.getShooterAimHeading(robotPose);
+        boolean shooterAtGoal =
+                shooterUpperSubsystem.velocityAtGoal() && shooterLowerSubsystem.velocityAtGoal();
+        boolean headingAtGoal =
+                Math.abs(robotPose.getRotation().minus(aimHeading).getDegrees())
+                        <= shooter.headingToleranceDegrees();
+        Logger.recordOutput("Shooting/distanceMeters", distance);
+        Logger.recordOutput("Shooting/manualOverride", shooter.manualOverrideEnabled());
+        Logger.recordOutput("Shooting/hoodTargetDeg", solution.hoodAngle().in(Degrees));
+        Logger.recordOutput(
+                "Shooting/shooterUpperTargetRPS", solution.shooterSpeed().in(RotationsPerSecond));
+        Logger.recordOutput("Shooting/shooterLowerTargetRPS", shooter.lowerSpeedRps(solution));
+        Logger.recordOutput("Shooting/shooterAtGoal", shooterAtGoal);
+        Logger.recordOutput("Shooting/headingAtGoal", headingAtGoal);
+        Logger.recordOutput(
+                "Shooting/readyToShoot",
+                headingAtGoal && hoodSubsystem.positionAtGoal() && shooterAtGoal);
+        if (shooterUpperSubsystem.getCurrSetpoint().in(RotationsPerSecond)
+                        > ShooterUpperParamsNT.idleRPS.getValue() + 1.0
+                || shooterLowerSubsystem.getCurrSetpoint().in(RotationsPerSecond)
+                        > ShooterLowerParamsNT.idleRPS.getValue() + 1.0) {
+            Logger.recordOutput(
+                    "Shooting/Viz/Hub", new Pose2d(AutoAimCommand.getTarget(), Rotation2d.kZero));
+            Logger.recordOutput(
+                    "Shooting/Viz/AimPose", new Pose2d(robotPose.getTranslation(), aimHeading));
+        }
 
         // Robot pose on the Field2d for Elastic (the path/target come from PathPlanner's
         // callbacks).

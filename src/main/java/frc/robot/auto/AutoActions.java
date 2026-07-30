@@ -29,7 +29,7 @@ import frc.robot.commands.AutoPilotCommand;
 import frc.robot.commands.AutoPilotParamsNT;
 import frc.robot.subsystems.Configs.SwerveMK5Config;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
-import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import frc.robot.subsystems.Shooter.ShooterSubsystem;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -107,19 +107,13 @@ public class AutoActions {
     public static final Pose2d kSlopeEndL = mirrorY(kSlopeEndR);
 
     private static Swerve swerve;
-    private static ShootingSuperstructure shootingSuperstructure;
     private static IntakerSubsystem intake;
-    private static Supplier<Command> autoShootCommandSupplier;
+    private static ShooterSubsystem shooter;
 
-    public static void init(
-            Swerve swerve,
-            ShootingSuperstructure shootingSuperstructure,
-            IntakerSubsystem intake,
-            Supplier<Command> autoShootCommandSupplier) {
+    public static void init(Swerve swerve, IntakerSubsystem intake, ShooterSubsystem shooter) {
         AutoActions.swerve = swerve;
-        AutoActions.shootingSuperstructure = shootingSuperstructure;
         AutoActions.intake = intake;
-        AutoActions.autoShootCommandSupplier = autoShootCommandSupplier;
+        AutoActions.shooter = shooter;
     }
 
     /** Mirror a blue-frame pose across the field's horizontal centerline (right pose -> left). */
@@ -440,12 +434,7 @@ public class AutoActions {
 
     /** Continuously rotate the chassis so the shooter faces the hub (no translation). */
     public static Command aimAtHub() {
-        return new AutoAimCommand(
-                swerve,
-                () -> 0.0,
-                () -> 0.0,
-                shootingSuperstructure::aimHeading,
-                shootingSuperstructure::aimHeadingRateRadPerSec);
+        return new AutoAimCommand(swerve);
     }
 
     /**
@@ -454,9 +443,17 @@ public class AutoActions {
      */
     public static Command shootAtHub(double feedSeconds) {
         return Commands.deadline(
-                        shootingSuperstructure.shotWindowWhenReadyForSeconds(
-                                AutoShootParamsNT.readyTimeoutSeconds.getValue(), feedSeconds),
-                        autoShootCommandSupplier.get())
+                        Commands.waitUntil(() -> shooter.upperReady())
+                                .withTimeout(AutoShootParamsNT.readyTimeoutSeconds.getValue())
+                                .andThen(
+                                        Commands.either(
+                                                Commands.waitSeconds(feedSeconds),
+                                                Commands.none(),
+                                                () -> shooter.upperReady())),
+                        new AutoAimCommand(swerve),
+                        shooter.shoot(() -> false),
+                        Commands.waitUntil(() -> shooter.upperReady())
+                                .andThen(intake.holdRetractedFeedMode()))
                 .beforeStarting(
                         Commands.runOnce(
                                 () -> {
@@ -489,7 +486,7 @@ public class AutoActions {
                 // to idle RPS (the auto sequence holds the shooter requirement, so its own default
                 // idle can't run on its own).
                 intake.forceExtendedIdle(),
-                shootingSuperstructure.idle().withTimeout(0.02));
+                shooter.idle().withTimeout(0.02));
     }
 
     public static Command aimAndShootAtHub() {
@@ -537,8 +534,7 @@ public class AutoActions {
                                 // spinning drum and feeds immediately. Feed only — no premature
                                 // shots. If drivePastSlope is shorter than the spin-up time, the
                                 // shot's readyTimeout covers the small remainder.
-                                Commands.deadline(
-                                        driveBack, shootingSuperstructure.spinUpForShot())),
+                                Commands.deadline(driveBack, shooter.spinUp())),
                         intake(),
                         Commands.waitUntil(() -> AllianceFlipUtil.applyX(getRobotX()) > 7.0)
                                 .andThen(
@@ -563,7 +559,7 @@ public class AutoActions {
     }
 
     public static Command zeroEverything() {
-        return Commands.parallel(shootingSuperstructure.zeroCommand(), intake.zeroCommand());
+        return Commands.parallel(shooter.zeroHood(), intake.zeroCommand());
     }
 
     /**

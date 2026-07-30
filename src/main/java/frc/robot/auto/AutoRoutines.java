@@ -7,7 +7,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.Intaker.IntakerSubsystem;
-import frc.robot.subsystems.Shooter.ShootingSuperstructure;
+import frc.robot.subsystems.Shooter.ShooterSubsystem;
 import java.util.ArrayList;
 import java.util.List;
 import lib.ironpulse.swerve.Swerve;
@@ -38,14 +38,13 @@ public class AutoRoutines {
     private static final double HUB_BACKUP_DISTANCE_METERS = 0.4;
 
     public static Swerve swerve;
-    public static ShootingSuperstructure shootingSuperstructure;
     public static IntakerSubsystem intake;
+    public static ShooterSubsystem shooter;
 
-    public static void init(
-            Swerve swerve, ShootingSuperstructure shootingSuperstructure, IntakerSubsystem intake) {
+    public static void init(Swerve swerve, IntakerSubsystem intake, ShooterSubsystem shooter) {
         AutoRoutines.swerve = swerve;
-        AutoRoutines.shootingSuperstructure = shootingSuperstructure;
         AutoRoutines.intake = intake;
+        AutoRoutines.shooter = shooter;
     }
 
     /** What to do after the sweep cycles. MIDDLE works both sides; DEPOT options are LEFT-only. */
@@ -131,7 +130,7 @@ public class AutoRoutines {
         Command delayedPath =
                 Commands.sequence(
                         Commands.parallel(
-                                shootingSuperstructure.zeroCommand(),
+                                shooter.zeroHood(),
                                 Commands.waitSeconds(INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS)),
                         Commands.sequence(steps.toArray(Command[]::new)));
         Command intakeHomingAndControl = intake.zeroCommand().andThen(intake.followModePivot());
@@ -205,7 +204,7 @@ public class AutoRoutines {
                         Commands.deadline(
                                 followPathFile("MiddleStartDepot", false),
                                 depotIntake(),
-                                shootingSuperstructure.spinUpForShot()),
+                                shooter.spinUp()),
                         aimAndShootAtHub()));
 
         // 2. Reposition across to the left trench mouth with the intake stowed.
@@ -218,7 +217,7 @@ public class AutoRoutines {
         Command delayedPath =
                 Commands.sequence(
                         Commands.parallel(
-                                shootingSuperstructure.zeroCommand(),
+                                shooter.zeroHood(),
                                 Commands.waitSeconds(INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS)),
                         Commands.sequence(steps.toArray(Command[]::new)));
         Command intakeHomingAndControl = intake.zeroCommand().andThen(intake.followModePivot());
@@ -244,14 +243,14 @@ public class AutoRoutines {
                                     // floor, so use the DEPOT pivot angle, not the floor deploy.
                                     depotIntake(),
                                     // Pre-spin during the depot drive so the shot needs no spin-up.
-                                    shootingSuperstructure.spinUpForShot()),
+                                    shooter.spinUp()),
                             aimAndShootAtHub());
             case DEPOT_DRIVE_THROUGH ->
                     Commands.sequence(
                             Commands.deadline(
                                     followPathFile("LeftDriveDepotDriveThrough", false),
                                     depotIntake(),
-                                    shootingSuperstructure.spinUpForShot()),
+                                    shooter.spinUp()),
                             aimAndShootAtHub());
         };
     }
