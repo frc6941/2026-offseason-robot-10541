@@ -19,6 +19,15 @@ public final class SwerveMK5Config {
     public static final double kSwerveHalfLength = 0.3429;
     public static final double kSwerveHalfWidth = 0.3429;
 
+    // Initial yaw-inertia estimate: uniform rectangular chassis, I = m*(L^2 + W^2)/12.
+    // Replace with CAD or measured inertia when available; do not use another robot's inertia.
+    private static double estimatedMoiZ(double massKg) {
+        return massKg
+                * (4.0 * kSwerveHalfLength * kSwerveHalfLength
+                        + 4.0 * kSwerveHalfWidth * kSwerveHalfWidth)
+                / 12.0;
+    }
+
     // TODO: tune Pigeon IMU mounting angles for this robot (currently copied from competition
     // robot)
     public static final ImuPigeonConfig pigeonConfig =
@@ -201,6 +210,9 @@ public final class SwerveMK5Config {
                     .steerGearRatio(287.0 / 11.0)
                     .driveMotorKt(0.0182)
                     .driveMass(Kilograms.of(22))
+                    .driveMotorR(DCMotor.getKrakenX60Foc(1).rOhms)
+                    .chassisMoiZ(KilogramSquareMeters.of(estimatedMoiZ(22)))
+                    .comOffset(Translation2d.kZero)
                     .driveMotor(DCMotor.getKrakenX60Foc(1))
                     .driveMomentOfInertia(KilogramSquareMeters.of(0.04))
                     .driveStdDevPos(0.0000001)
@@ -227,6 +239,9 @@ public final class SwerveMK5Config {
                     .steerGearRatio(287.0 / 11.0)
                     .driveMotorKt(0.0182)
                     .driveMass(Kilograms.of(46))
+                    .driveMotorR(DCMotor.getKrakenX60Foc(1).rOhms)
+                    .chassisMoiZ(KilogramSquareMeters.of(estimatedMoiZ(46)))
+                    .comOffset(Translation2d.kZero)
                     .pigeonConfig(pigeonConfig)
                     .defaultSwerveLimit(kDefaultSwerveLimit)
                     .defaultSwerveModuleLimit(kDefaultSwerveModuleLimit)

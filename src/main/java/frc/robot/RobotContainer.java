@@ -208,6 +208,7 @@ public class RobotContainer {
                         MetersPerSecond.of(0.03),
                         DegreesPerSecond.of(12)));
 
+        Logger.recordOutput("Swerve/Swerve Pose", swerve.getEstimatedPose());
         // Field-relative heading zero: place the robot on the field facing the correct direction
         // and
         // press Start. Seeds the Pigeon to field yaw (0, or 180 on the flipped alliance) so

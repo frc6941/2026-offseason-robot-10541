@@ -93,6 +93,17 @@ public class SwerveModuleIOSim implements SwerveModuleIO {
     }
 
     @Override
+    public void setDriveCurrent(Current des) {
+        isDriveCloseLoop = false;
+        double rotorRadPerSec = driveMotorSim.getAngularVelocityRadPerSec() * config.driveGearRatio;
+        double volts =
+                des.in(Amps) * config.driveMotor.rOhms
+                        + rotorRadPerSec / config.driveMotor.KvRadPerSecPerVolt;
+        double busVolts = edu.wpi.first.wpilibj.RobotController.getBatteryVoltage();
+        driveMotorAppliedVoltage = edu.wpi.first.math.MathUtil.clamp(volts, -busVolts, busVolts);
+    }
+
+    @Override
     public void setDriveVelocity(LinearVelocity linearVelocityDes) {
         if (!isDriveCloseLoop) {
             isDriveCloseLoop = true;

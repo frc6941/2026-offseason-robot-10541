@@ -4,7 +4,6 @@ import static edu.wpi.first.units.Units.*;
 import static lib.ironpulse.math.MathTools.*;
 
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Twist2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -19,61 +18,127 @@ import lombok.Setter;
 /**
  * "Inspired" by FRC team 254. See the license file in the root directory of this project.
  *
+ * <p>The chassis reference pipe, in order: {@code desired twist → ChassisProfile (rotate by the yaw
+ * increment, then step) → kinematics → desaturate → steer coupling}. The profile shapes the twist
+ * every source asks for into one jerk-limited reference and states its acceleration — inertial,
+ * since its carried vectors are re-expressed in the turned frame before each step; what follows
+ * only expresses what the modules cannot do — a wheel has a free speed, a steer motor has a rate —
+ * and never reshapes the reference for taste. Invariant: {@code
+ * Params/Swerve/Profile/maxLinearVelocity} must sit at or under {@code
+ * SwerveModuleLimit.maxDriveVelocity}, or desaturation rescales a profiled twist and the stated
+ * acceleration overstates what was commanded ({@link Swerve} checks it at construction).
+ *
  * <p>Takes a prior setpoint (ChassisSpeeds), a desired setpoint (from a driver, or from a path
  * follower), and outputs a new setpoint that respects all the kinematic constraints on module
- * rotation speed and wheel velocity/acceleration. By generating a new setpoint every iteration, the
- * robot will converge to the desired setpoint quickly while avoiding any intermediate state that is
- * kinematically infeasible (and can result in wheel slip or robot heading drift as a result).
+ * rotation speed. By generating a new setpoint every iteration, the robot will converge to the
+ * desired setpoint quickly while avoiding any intermediate state that is kinematically infeasible
+ * (and can result in wheel slip or robot heading drift as a result).
  */
 @Builder
 public class SwerveSetpointGenerator {
     private final SwerveDriveKinematics kinematics;
 
-    @Getter @Setter private SwerveLimit chassisLimit;
+    @Getter private final ChassisProfile profile;
     @Getter @Setter private SwerveModuleLimit moduleLimit;
 
+    /** Whether the steer coupling withheld part of the last step: modules were still turning. */
+    @Getter private boolean steerCoupled;
+
+    /** The desaturation factor on this tick's twist, 1.0 when no module saturated. */
+    @Getter @Builder.Default private double desatScale = 1.0;
+
+    @Builder.Default private double desatScalePrev = 1.0;
+
+    /** Whether the previous tick was steer-coupled: its re-sync is what this tick's rate spans. */
+    @Builder.Default private boolean steerCoupledPrev = false;
+
     /**
-     * Generate a feasible setpoint that rotates the chassis about {@code centerOfRotation} rather
-     * than the drivetrain's geometric center.
-     *
-     * <p>{@code centerOfRotation} is expressed in the robot frame, in meters, relative to the
-     * geometric center (the origin of the module locations). {@link Translation2d#kZero} reproduces
-     * the standard center-pivot behavior.
-     *
-     * <p>A rigid-body rotation about an arbitrary point is exactly equivalent to a geometric-center
-     * {@link ChassisSpeeds} — pivoting about {@code c} with {@code (vx, vy, omega)} equals {@code
-     * (vx + omega*c.y, vy - omega*c.x, omega)} about the center. We fold the pivot in once here and
-     * defer to the center-frame generator, so all of its vel/accel limiting stays exact and
-     * self-consistent (no approximation, and the returned {@link ChassisSpeeds} is the true
-     * center-frame motion, correct for odometry).
+     * @param yawDeltaRad how far the chassis turned since the previous call, from the gyro,
+     *     counter-clockwise positive — what the profile's carried vectors are re-expressed through
      */
     public SwerveSetpoint generate(
             ChassisSpeeds desiredChassisSpeed,
             SwerveSetpoint prevSetpoint,
-            double dt,
-            Translation2d centerOfRotation) {
-        double omega = desiredChassisSpeed.omegaRadiansPerSecond;
-        ChassisSpeeds centered =
-                new ChassisSpeeds(
-                        desiredChassisSpeed.vxMetersPerSecond + omega * centerOfRotation.getY(),
-                        desiredChassisSpeed.vyMetersPerSecond - omega * centerOfRotation.getX(),
-                        omega);
-        return generate(centered, prevSetpoint, dt);
+            double yawDeltaRad,
+            double dt) {
+        profile.rotate(yawDeltaRad);
+        ChassisProfile.Reference reference =
+                profile.step(desiredChassisSpeed, profile.limits(), dt);
+        SwerveSetpoint shaped = shape(reference.velocity(), prevSetpoint, dt);
+
+        // What the modules run is s·v, so its rate is s·a + v·ṡ. The scale is a deterministic
+        // function of the profiled twist, so its backward difference is analytic — not a
+        // differentiated measurement — and without it the feedforward states the profile's
+        // acceleration while the commanded twist is being held down by a deepening saturation.
+        // Not across a steer-coupled tick — this one or the previous, whose re-sync this tick's
+        // difference spans: the profile was pulled to what the modules were commanded, so a scale
+        // that jumped across that sync is a change of reference, not a motion. Stating it asked
+        // 444 A and 353 A of one wheel on 2026-08-25 (0.88 → 1.00 and 0.92 → 0.99 in one tick).
+        boolean spansSync = steerCoupled || steerCoupledPrev;
+        double rate = spansSync ? 0.0 : (desatScale - desatScalePrev) / dt;
+        desatScalePrev = desatScale;
+        steerCoupledPrev = steerCoupled;
+        ChassisSpeeds v = reference.velocity();
+        ChassisAccel a = reference.accel();
+        ChassisProfile.Limits limits = profile.limits();
+        return new SwerveSetpoint(
+                shaped.chassisSpeeds(),
+                shaped.moduleStates(),
+                bounded(
+                        a.axMetersPerSecondSq() * desatScale + v.vxMetersPerSecond * rate,
+                        a.ayMetersPerSecondSq() * desatScale + v.vyMetersPerSecond * rate,
+                        a.alphaRadiansPerSecondSq() * desatScale + v.omegaRadiansPerSecond * rate,
+                        ChassisProfile.kClampFactor
+                                * Math.max(limits.maxLinearAccel(), limits.maxBrakeAccel()),
+                        ChassisProfile.kClampFactor * limits.maxAngularAccel()));
     }
 
-    public SwerveSetpoint generate(
-            ChassisSpeeds desiredChassisSpeed, SwerveSetpoint prevSetpoint, double dt) {
-        // apply limit at chassis-level
-        desiredChassisSpeed =
-                chassisLimit.apply(prevSetpoint.chassisSpeeds(), desiredChassisSpeed, dt);
+    /**
+     * The stated acceleration may never exceed what the profile itself is allowed to plan: the rate
+     * term above is exact for a smooth scale, and anything past the profile's own bound is a
+     * discontinuity being differentiated, not a motion the feedforward should chase.
+     */
+    private static ChassisAccel bounded(
+            double ax, double ay, double alpha, double aMax, double alphaMax) {
+        double aNorm = Math.hypot(ax, ay);
+        if (aNorm > aMax) {
+            ax *= aMax / aNorm;
+            ay *= aMax / aNorm;
+        }
+        return new ChassisAccel(
+                ax, ay, edu.wpi.first.math.MathUtil.clamp(alpha, -alphaMax, alphaMax));
+    }
 
+    /** Re-seeds the profile at a measured twist and forgets the desaturation history. */
+    public void reset(ChassisSpeeds measured, boolean clearFault) {
+        profile.reset(measured, clearFault);
+        desatScale = 1.0;
+        desatScalePrev = 1.0;
+        steerCoupledPrev = false;
+    }
+
+    /**
+     * The module-level pass on a profiled twist: desaturation, then the steer coupling. What is
+     * stated to the composer is the commanded twist's own rate, desaturation rate term included;
+     * steer-coupled ticks are re-synced.
+     */
+    private SwerveSetpoint shape(
+            ChassisSpeeds desiredChassisSpeed, SwerveSetpoint prevSetpoint, double dt) {
         // compute module desired states
         SwerveModuleState[] desiredModuleState =
                 kinematics.toSwerveModuleStates(desiredChassisSpeed);
-        if (moduleLimit.maxDriveVelocity().magnitude() > 0.0) {
-            SwerveDriveKinematics.desaturateWheelSpeeds(
-                    desiredModuleState, moduleLimit.maxDriveVelocity().in(MetersPerSecond));
-            desiredChassisSpeed = kinematics.toChassisSpeeds(desiredModuleState);
+        double maxDriveVelocity = moduleLimit.maxDriveVelocity().in(MetersPerSecond);
+        desatScale = 1.0;
+        if (maxDriveVelocity > 0.0) {
+            double fastest = 0.0;
+            for (SwerveModuleState state : desiredModuleState)
+                fastest = Math.max(fastest, Math.abs(state.speedMetersPerSecond));
+            if (fastest > maxDriveVelocity) {
+                desatScale = maxDriveVelocity / fastest;
+                // WPILib 2026 desaturates the module states in place.
+                SwerveDriveKinematics.desaturateWheelSpeeds(desiredModuleState, maxDriveVelocity);
+                desiredChassisSpeed = kinematics.toChassisSpeeds(desiredModuleState);
+            }
         }
 
         int n = kinematics.getModules().length;
@@ -128,10 +193,19 @@ public class SwerveSetpointGenerator {
 
         if (allModulesShouldFlip
                 && !epsilonEquals(toTwist2d(prevSetpoint.chassisSpeeds()), new Twist2d(), 0.001)
-                && !epsilonEquals(toTwist2d(desiredChassisSpeed), new Twist2d(), 0.001))
+                && !epsilonEquals(toTwist2d(desiredChassisSpeed), new Twist2d(), 0.001)) {
             // It will (likely) be faster to stop the robot, rotate the modules in place to
-            // the complement of desired, and accelerate again.
-            return generate(new ChassisSpeeds(), prevSetpoint, dt);
+            // the complement of desired, and accelerate again. That is the steer coupling
+            // withholding the whole step: flag it and pull the profile to the stop it commanded.
+            // The stop needs no desaturation, but the scale this tick states and carries is the
+            // profiled twist's, not the stop's — the recursion must not overwrite it.
+            double scale = desatScale;
+            SwerveSetpoint stopped = shape(new ChassisSpeeds(), prevSetpoint, dt);
+            desatScale = scale;
+            steerCoupled = true;
+            profile.syncVelocity(stopped.chassisSpeeds());
+            return stopped;
+        }
 
         // Compute the deltas between start and goal. We can then interpolate from the
         // start state to the goal state; then find the
@@ -228,48 +302,17 @@ public class SwerveSetpointGenerator {
             sMin = Math.min(sMin, s);
         }
 
-        // Enforce drive wheel acceleration limits. A wheel that is slowing down (braking) is
-        // bounded by maxDriveDeceleration instead of maxDriveAcceleration, so the accel limit can
-        // stay near the traction/skid ceiling (protects wheel odometry) while braking is allowed to
-        // be crisper. Falls back to the symmetric accel limit when no decel limit is configured.
-        final double accel_vel_step =
-                dt * moduleLimit.maxDriveAcceleration().in(MetersPerSecondPerSecond);
-        final double decel_vel_step =
-                dt * moduleLimit.maxDriveDecelerationOrAccel().in(MetersPerSecondPerSecond);
-        for (int i = 0; i < n; ++i) {
-            if (sMin == 0.0) {
-                // No need to carry on.
-                break;
-            }
-            double vx_min_s = sMin == 1.0 ? vxDes[i] : (vxDes[i] - vxPrev[i]) * sMin + vxPrev[i];
-            double vy_min_s = sMin == 1.0 ? vyDes[i] : (vyDes[i] - vyPrev[i]) * sMin + vyPrev[i];
-            // Decelerating iff the (clamped) desired wheel speed is below the previous wheel speed.
-            double prevSpeed = Math.hypot(vxPrev[i], vyPrev[i]);
-            double desSpeed = Math.hypot(vx_min_s, vy_min_s);
-            double max_vel_step = desSpeed < prevSpeed ? decel_vel_step : accel_vel_step;
-            // Find the max s for this drive wheel. Search on the interval between 0 and
-            // min_s, because we already know we can't go
-            // faster than that.
-            final int kMaxIterations = 10;
-            double s =
-                    sMin
-                            * findDriveMaxS(
-                                    vxPrev[i],
-                                    vyPrev[i],
-                                    prevSpeed,
-                                    vx_min_s,
-                                    vy_min_s,
-                                    desSpeed,
-                                    max_vel_step,
-                                    kMaxIterations);
-            sMin = Math.min(sMin, s);
-        }
-
         ChassisSpeeds retSpeeds =
                 new ChassisSpeeds(
                         prevSetpoint.chassisSpeeds().vxMetersPerSecond + sMin * dx,
                         prevSetpoint.chassisSpeeds().vyMetersPerSecond + sMin * dy,
                         prevSetpoint.chassisSpeeds().omegaRadiansPerSecond + sMin * dtheta);
+        // Modules still turning withheld part of the step: pull the profile back to what was
+        // actually commanded so its release is continuous. Desaturation is deliberately not
+        // synced — the profile must be allowed to reach its target and let its acceleration go
+        // to zero while the modules run the scaled twist.
+        steerCoupled = sMin < 1.0;
+        if (steerCoupled) profile.syncVelocity(retSpeeds);
         var retStates = kinematics.toSwerveModuleStates(retSpeeds);
         for (int i = 0; i < n; ++i) {
             final var maybeOverride = overrideSteering.get(i);
@@ -286,7 +329,7 @@ public class SwerveSetpointGenerator {
                 retStates[i].speedMetersPerSecond *= -1.0;
             }
         }
-        return new SwerveSetpoint(retSpeeds, retStates);
+        return new SwerveSetpoint(retSpeeds, retStates, null);
     }
 
     /**
@@ -342,36 +385,6 @@ public class SwerveSetpointGenerator {
             // Use lower bracket.
             return sGuess * findRoot(func, x0, y0, f0, xGuess, yGuess, fGuess, iterationsLeft - 1);
         }
-    }
-
-    /**
-     * Find drive max s.
-     *
-     * @param x0 x value of the lower bracket.
-     * @param y0 y value of the lower bracket.
-     * @param f0 value of 'func' at x_0, y_0.
-     * @param x1 x value of the upper bracket.
-     * @param y1 y value of the upper bracket.
-     * @param f1 value of 'func' at x_1, y_1 (passed in by caller to save a call to 'func' during
-     *     recursion)
-     * @param maxVelStep max vel difference from current.
-     * @param maxIterations number of max iterations.
-     * @return result s.
-     */
-    private double findDriveMaxS(
-            double x0,
-            double y0,
-            double f0,
-            double x1,
-            double y1,
-            double f1,
-            double maxVelStep,
-            int maxIterations) {
-        double diff = f1 - f0;
-        if (Math.abs(diff) < maxVelStep) return 1.0;
-        double offset = f0 + Math.signum(diff) * maxVelStep;
-        Function2d func = (x, y) -> Math.hypot(x, y) - offset;
-        return findRoot(func, x0, y0, f0 - offset, x1, y1, f1 - offset, maxIterations);
     }
 
     /**

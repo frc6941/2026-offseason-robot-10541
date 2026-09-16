@@ -16,6 +16,11 @@ public interface SwerveModuleIO {
 
     default void setDriveOpenLoop(Voltage des) {}
 
+    /** Raw stator torque current composed by the chassis controller. */
+    default void setDriveCurrent(Current des) {
+        throw new UnsupportedOperationException("This module IO does not support torque current");
+    }
+
     default void setDriveVelocity(LinearVelocity des) {}
 
     default void setDriveVelocity(LinearVelocity des, Current ff) {
@@ -40,7 +45,7 @@ public interface SwerveModuleIO {
     class SwerveModuleIOInputs {
         public boolean driveMotorConnected;
         public double driveMotorPositionRad;
-        public double[] driveMotorPositionRadSamples;
+        public double[] driveMotorPositionRadSamples = new double[0];
         public double driveMotorVelocityRadPerSec;
         public double driveMotorTemperatureCel;
         public double driveMotorVoltageVolt;
@@ -49,7 +54,7 @@ public interface SwerveModuleIO {
 
         public boolean steerMotorConnected;
         public double steerMotorPositionRad;
-        public double[] steerMotorPositionRadSamples;
+        public double[] steerMotorPositionRadSamples = new double[0];
         public double steerMotorVelocityRadPerSec;
         public double steerMotorTemperatureCel;
         public double steerMotorVoltageVolt;

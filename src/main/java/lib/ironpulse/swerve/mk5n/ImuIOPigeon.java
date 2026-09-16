@@ -9,6 +9,7 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.units.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
+import edu.wpi.first.units.measure.LinearAcceleration;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import lib.ironpulse.swerve.ImuIO;
@@ -21,6 +22,7 @@ public class ImuIOPigeon implements ImuIO {
 
     private final Pigeon2 pigeon;
     private final SwerveMK5NConfig config;
+    private final ImuPigeonConfig pigeonConfig;
 
     // Status signals
     private final StatusSignal<Angle> yaw;
@@ -29,6 +31,8 @@ public class ImuIOPigeon implements ImuIO {
     private final StatusSignal<AngularVelocity> pitchVelocity;
     private final StatusSignal<Angle> roll;
     private final StatusSignal<AngularVelocity> rollVelocity;
+    private final StatusSignal<LinearAcceleration> accelX;
+    private final StatusSignal<LinearAcceleration> accelY;
 
     // Odometry queues (only for yaw since that's what's needed for pose estimation)
     private Queue<Double> yawPositionQueue;
@@ -38,6 +42,7 @@ public class ImuIOPigeon implements ImuIO {
 
     public ImuIOPigeon(SwerveMK5NConfig config, ImuPigeonConfig pigeonConfig) {
         this.config = config;
+        this.pigeonConfig = pigeonConfig;
 
         System.out.println("ImuIOPigeon: Initializing Pigeon2 with ID " + config.pigeonId);
 
@@ -54,6 +59,8 @@ public class ImuIOPigeon implements ImuIO {
         pitchVelocity = pigeon.getAngularVelocityYWorld();
         roll = pigeon.getRoll();
         rollVelocity = pigeon.getAngularVelocityXWorld();
+        accelX = pigeon.getAccelerationX();
+        accelY = pigeon.getAccelerationY();
 
         Pigeon2Configuration configs = new Pigeon2Configuration();
         // This Pigeon is mounted X-up, so we should mount-pose with Pitch at 90 degrees
@@ -81,7 +88,15 @@ public class ImuIOPigeon implements ImuIO {
         // Register signals with PhoenixUtils for automatic refresh (same as swerve
         // modules)
         PhoenixUtils.registerSignals(
-                config.canivoreCanBus, yaw, yawVelocity, pitch, pitchVelocity, roll, rollVelocity);
+                config.canivoreCanBus,
+                yaw,
+                yawVelocity,
+                pitch,
+                pitchVelocity,
+                roll,
+                rollVelocity,
+                accelX,
+                accelY);
 
         // Register yaw signal for odometry queue (same pattern as swerve modules)
         if (syncThread != null) {
@@ -107,11 +122,13 @@ public class ImuIOPigeon implements ImuIO {
         // High priority signals for control (100Hz = 10ms)
         yaw.setUpdateFrequency(config.odometryFrequency);
         yawVelocity.setUpdateFrequency(config.odometryFrequency);
+        accelX.setUpdateFrequency(config.odometryFrequency);
+        accelY.setUpdateFrequency(config.odometryFrequency);
 
         // Medium priority signals for telemetry (50Hz = 20ms)
-        pitch.setUpdateFrequency(50.0);
+        pitch.setUpdateFrequency(config.odometryFrequency);
         pitchVelocity.setUpdateFrequency(50.0);
-        roll.setUpdateFrequency(50.0);
+        roll.setUpdateFrequency(config.odometryFrequency);
         rollVelocity.setUpdateFrequency(50.0);
     }
 
@@ -138,7 +155,15 @@ public class ImuIOPigeon implements ImuIO {
         // Phoenix utils handles refreshing automatically, so we just read values
         inputs.connected =
                 BaseStatusSignal.isAllGood(
-                        yaw, yawVelocity, pitch, pitchVelocity, roll, rollVelocity);
+                        yaw, yawVelocity, pitch, pitchVelocity, roll, rollVelocity, accelX, accelY);
+
+        ImuIO.rotateAccelToRobot(
+                inputs,
+                accelX.getValue().in(Units.MetersPerSecondPerSecond),
+                accelY.getValue().in(Units.MetersPerSecondPerSecond),
+                pigeonConfig.accelFrameYawDeg());
+        inputs.accelLatencyS =
+                Math.max(accelX.getTimestamp().getLatency(), accelY.getTimestamp().getLatency());
 
         // Current positions and velocities
         inputs.yawPosition = Rotation2d.fromDegrees(yaw.getValueAsDouble());

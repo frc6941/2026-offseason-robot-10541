@@ -7,6 +7,7 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.PositionDutyCycle;
+import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.CANcoder;
@@ -35,6 +36,7 @@ public class SwerveModuleIOMK5N implements SwerveModuleIO {
     private final SwerveConfig.SwerveModuleConfig moduleConfig;
     // control requests
     private final VelocityTorqueCurrentFOC driveVelocityRequest = new VelocityTorqueCurrentFOC(0);
+    private final TorqueCurrentFOC driveCurrentRequest = new TorqueCurrentFOC(0);
     private final VoltageOut driveVoltageRequest = new VoltageOut(0);
     private final PositionDutyCycle steerPositionRequest = new PositionDutyCycle(0);
     private final VoltageOut steerVoltageRequest = new VoltageOut(0);
@@ -346,10 +348,17 @@ public class SwerveModuleIOMK5N implements SwerveModuleIO {
     }
 
     @Override
+    public void setDriveCurrent(Current current) {
+        driveMotor.setControl(driveCurrentRequest.withOutput(current.in(Amp)));
+    }
+
+    @Override
     public void setDriveVelocity(LinearVelocity velocity) {
         double velocityRps = linearVelocityToWheelRPS(velocity.in(MetersPerSecond));
         driveMotor.setControl(
-                driveVelocityRequest.withVelocity(velocityRps * config.driveGearRatio));
+                driveVelocityRequest
+                        .withVelocity(velocityRps * config.driveGearRatio)
+                        .withFeedForward(0.0));
     }
 
     @Override
