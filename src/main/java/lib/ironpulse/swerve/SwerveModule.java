@@ -203,6 +203,11 @@ public class SwerveModule {
         return data.driveMotorVoltageVolt;
     }
 
+    /** Applied voltage on the drive motor (volts), as reported by the module IO. */
+    public double getDriveVoltageVolt() {
+        return getDriveAppliedVolts();
+    }
+
     /** Measured drive supply current — what the module actually draws from the pack. */
     public double getDriveSupplyCurrentAmpere() {
         return data.driveMotorSupplyCurrentAmpere;

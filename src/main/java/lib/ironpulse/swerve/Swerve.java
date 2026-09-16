@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.*;
 
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.Pair;
+import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -232,9 +233,21 @@ public class Swerve extends SubsystemBase implements Localizable {
         ppTauAmps = new double[config.moduleCount()];
 
         // estimator
+        // Odometry state std-devs (x, y, z, angle) raised from the WPILib default 0.1 -> 0.15 on
+        // the translation axes: this robot bumps field elements/other robots, wheels slip, and
+        // wheel dead-reckoning walks the estimate off-field. Raising these tells the estimator to
+        // trust odometry less (and to grow its uncertainty faster during a vision dropout), so
+        // vision re-anchors the pose sooner after a slip. z/angle kept at 0.1. Vision std-devs here
+        // are just an initial default -- every addVisionMeasurement() passes its own per-frame
+        // std-devs (see LimelightSubsystem / LimeLightConfig Params/LL).
         poseEstimator =
                 new SwerveDrivePoseEstimator3d(
-                        kinematics, new Rotation3d(), getModulePositions(), new Pose3d());
+                        kinematics,
+                        new Rotation3d(),
+                        getModulePositions(),
+                        new Pose3d(),
+                        VecBuilder.fill(0.15, 0.15, 0.1, 0.1),
+                        VecBuilder.fill(0.9, 0.9, 0.9, 0.9));
 
         // precompute
         var moduleLocations = config.moduleLocations();
@@ -298,6 +311,9 @@ public class Swerve extends SubsystemBase implements Localizable {
         Logger.recordOutput(config.name + "/Mode", mode);
         Logger.recordOutput(config.name + "/ChassisSpeedCurr", getChassisSpeeds());
         Logger.recordOutput(config.name + "/SwerveModuleStateCurr", getModuleStates());
+        Logger.recordOutput(config.name + "/DriveAppliedVolts", getDriveAppliedVolts());
+        Logger.recordOutput(config.name + "/DriveTorqueCurrentAmps", getDriveTorqueCurrentAmps());
+        Logger.recordOutput(config.name + "/DriveSupplyCurrentAmps", getDriveSupplyCurrentAmps());
         Logger.recordOutput(config.name + "/SwerveModuleStateCmd", setpointCurr.moduleStates());
         Logger.recordOutput(config.name + "/ChassisSpeedCmd", setpointCurr.chassisSpeeds());
 
@@ -835,6 +851,22 @@ public class Swerve extends SubsystemBase implements Localizable {
         for (int i = 0; i < modules.size(); i++)
             states[i] = modules.get(i).getSwerveModulePosition();
         return states;
+    }
+
+    /** Drive-motor torque (stator) current (amps) for each module, indexed by module order. */
+    public double[] getDriveTorqueCurrentAmps() {
+        double[] amps = new double[modules.size()];
+        for (int i = 0; i < modules.size(); i++)
+            amps[i] = modules.get(i).getDriveTorqueCurrentAmpere();
+        return amps;
+    }
+
+    /** Drive-motor supply current (amps) for each module, indexed by module order. */
+    public double[] getDriveSupplyCurrentAmps() {
+        double[] amps = new double[modules.size()];
+        for (int i = 0; i < modules.size(); i++)
+            amps[i] = modules.get(i).getDriveSupplyCurrentAmpere();
+        return amps;
     }
 
     public List<Pair<Double, SwerveModulePosition[]>> getSampledModulePositions() {

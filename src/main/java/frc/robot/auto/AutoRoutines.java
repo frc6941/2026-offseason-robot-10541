@@ -24,12 +24,19 @@ import lib.ironpulse.utils.AllianceFlipUtil;
  *   <li>Follow the <b>start</b> path with the intake running (collect on the way out).
  *   <li>{@code drivePastSlope} back across the bump.
  *   <li>Aim the chassis at the hub and empty the hopper.
- *   <li>{@code driveToPose} to the hardcoded second-sweep start, run the <b>second sweep</b> path
- *       (intake on), come back, aim + shoot again — only when sweep count is 2.
+ *   <li>Run the <b>second sweep</b> path directly from the shoot pose — its start waypoint is the
+ *       first-sweep shoot pose ({@code kSlopeEnd}), so there is no reposition leg — with the intake
+ *       on, come back, aim + shoot again; only when sweep count is 2.
  *   <li>Run the <b>end behaviour</b> (depot paths) with the intake running.
  * </ol>
  */
 public class AutoRoutines {
+    private static final double SHOOT_ONLY_FEED_SECONDS = 3.0;
+    public static final double INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS = 0.5;
+    // Hub-touch shoot: back off the hub toward our alliance wall this far before firing, for
+    // shooter/hood clearance. Tune to whatever gap the shot needs.
+    private static final double HUB_BACKUP_DISTANCE_METERS = 0.4;
+
     public static Swerve swerve;
     public static ShootingSuperstructure shootingSuperstructure;
     public static IntakerSubsystem intake;
@@ -55,7 +62,6 @@ public class AutoRoutines {
             boolean startFromBump,
             Pose2d blueStartPose,
             String startPath,
-            Pose2d blueSecondSweepStart,
             String secondSweepPath,
             int sweepTimes,
             EndBehaviour endBehaviour,
@@ -76,16 +82,20 @@ public class AutoRoutines {
             steps.add(drivePastSlope(isLeft, true));
         }
 
-        // 0b. Trench starts (not bump) open with a fast unguarded dash to the middle before the
-        // actual trench sweep: lift the speed cap, run RightTrenchToMiddle, then drop back to the
-        // default limit so the sweep path itself runs at normal speed.
+        // 0b. Trench starts (not bump) open with a fast dash to the middle. The autonomous speed
+        // cap is configured for the entire autonomous period in Robot.autonomousInit().
         if (!startFromBump) {
-            steps.add(setSwerveLimitUnlimited());
-            steps.add(followPathFile("RightTrenchToMiddle", isLeft));
-            steps.add(setSwerveLimitDefault());
+            // Per-side files (not the auto-mirror): the two sides use non-mirror-symmetric
+            // start headings (right 0 deg, left 180 deg) so the intake faces the driver station
+            // and the robot holds a constant heading through the trench. shouldMirror=false.
+            steps.add(followPathFile(isLeft ? "LeftTrenchToMiddle" : "RightTrenchToMiddle", false));
         }
 
-        // 1. First sweep: collect out, drive back, aim + shoot.
+        // 1. The opening drive may overlap intake homing, but collection must not start until the
+        // pivot has a valid zero. Otherwise finishPivotZeroing() could overwrite the intake mode.
+        steps.add(Commands.waitUntil(intake::isPivotZeroed));
+
+        // First sweep: collect out, drive back, aim + shoot.
         steps.add(sweepCollectShoot(startPath, isLeft));
 
         // 2. Optional second sweep. BUMP_AGAIN repeats the bump cycle so it can follow any first
@@ -100,11 +110,10 @@ public class AutoRoutines {
                 steps.add(drivePastSlope(isLeft, true));
                 steps.add(sweepCollectShoot(bumpPath, isLeft));
             } else {
-                // Reposition to the second-sweep start with Autopilot (straight beeline) rather
-                // than the pose PID — the alliance-side lane here is clear after the shot. The
+                // No reposition leg: the second-sweep path's start waypoint IS the first-sweep
+                // shoot pose (kSlopeEnd), so it flows straight from the shot into the sweep. The
                 // drive-back after this sweep holds -90 deg (blue-right frame; mirrored to +90 on
                 // the left) instead of kSlopeEnd's default rotation.
-                steps.add(driveToPoseAutoPilot(AllianceFlipUtil.apply(blueSecondSweepStart)));
                 steps.add(
                         sweepCollectShoot(
                                 secondSweepPath,
@@ -116,15 +125,18 @@ public class AutoRoutines {
         // 3. End behaviour (intake running throughout).
         steps.add(endBehaviour(endBehaviour, isLeft));
 
-        // Zero the intake pivot and seed the hood at its current stowed position before any auto
-        // movement. Only after zeroing finishes do we start the routine and its pivot manager.
-        // followModePivot continuously drives the pivot to the current intake mode's angle while
-        // the routine runs; the routine is the deadline, so the manager stops when auto finishes.
-        return zeroEverything()
-                .andThen(
-                        Commands.deadline(
-                                Commands.sequence(steps.toArray(Command[]::new)),
-                                intake.followModePivot()))
+        // Start intake and hood hard-stop homing together. The path branch may begin after the
+        // configured delay (and after hood homing), while intake homing continues independently.
+        // Once the intake reaches zero, followModePivot takes over the same pivot requirement.
+        Command delayedPath =
+                Commands.sequence(
+                        Commands.parallel(
+                                shootingSuperstructure.zeroCommand(),
+                                Commands.waitSeconds(INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS)),
+                        Commands.sequence(steps.toArray(Command[]::new)));
+        Command intakeHomingAndControl = intake.zeroCommand().andThen(intake.followModePivot());
+
+        return Commands.deadline(delayedPath, intakeHomingAndControl)
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 
@@ -132,6 +144,86 @@ public class AutoRoutines {
     public static Command shootTestAuto() {
         return zeroEverything()
                 .andThen(Commands.deadline(aimAndShootAtHub(), intake.followModePivot()))
+                .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
+    }
+
+    /**
+     * Zero, optionally wait, back off the hub toward our alliance wall for shooter clearance, shoot
+     * for three seconds, then hold the drivetrain stopped. Used when the robot starts touching the
+     * hub with only its preload to fire.
+     */
+    public static Command shootOnlyAuto(int waitSeconds) {
+        Command shootSequence =
+                Commands.sequence(
+                        Commands.waitSeconds(Math.max(0, waitSeconds)),
+                        backUpTowardAllianceWall(HUB_BACKUP_DISTANCE_METERS),
+                        aimAndShootAtHub(SHOOT_ONLY_FEED_SECONDS),
+                        Commands.run(swerve::runStop, swerve));
+        return zeroEverything()
+                .andThen(Commands.deadline(shootSequence, intake.followModePivot()))
+                .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
+    }
+
+    /**
+     * MIDDLE-start coordination auto (LEFT-only — the depot is physically on the left).
+     *
+     * <p>Starts touching the hub with the preload, then, holding off the trench so an alliance
+     * partner can sweep it first:
+     *
+     * <ol>
+     *   <li>Follow {@code MiddleStartDepot} with the <b>raised depot intake</b> ({@link
+     *       AutoActions#depotIntake}) collecting the depot balls, pre-spinning the flywheel; the
+     *       path ends at the left shoot pose ({@code kSlopeEndL}).
+     *   <li>Aim + empty the hopper — preload plus depot balls in one volley.
+     *   <li>Reposition across to the left trench mouth via {@code DepotToTrench} (intake stowed).
+     *   <li>Run the standard trench sweep (mirrored to the left): collect out, cross back over the
+     *       slope, aim + shoot again.
+     * </ol>
+     *
+     * <p>Coordination is purely sequential: the depot cycle's own duration is the handoff, so by
+     * the time we reach the trench the partner has cleared it. All legs run inside the same
+     * intake-homing / {@code followModePivot} deadline as {@link #competitionAuto}.
+     */
+    public static Command middleDepotTrenchAuto(int waitSeconds) {
+        List<Command> steps = new ArrayList<>();
+
+        // 0. Optional pre-auto delay.
+        if (waitSeconds > 0) {
+            steps.add(Commands.waitSeconds(waitSeconds));
+        }
+
+        // 0a. Sim-only pose reset to the middle hub-touch start.
+        steps.add(resetOnPose(kMiddleHubTouch));
+
+        // 0b. Collection must not start until the pivot has a valid zero (see competitionAuto).
+        steps.add(Commands.waitUntil(intake::isPivotZeroed));
+
+        // 1. Drive the depot with the raised depot intake + pre-spin; the path ends at the left
+        // shoot pose. Then aim and empty the hopper (preload + depot balls).
+        steps.add(
+                Commands.sequence(
+                        Commands.deadline(
+                                followPathFile("MiddleStartDepot", false),
+                                depotIntake(),
+                                shootingSuperstructure.spinUpForShot()),
+                        aimAndShootAtHub()));
+
+        // 2. Reposition across to the left trench mouth with the intake stowed.
+        steps.add(retractIntake());
+        steps.add(followPathFile("DepotToTrench", false));
+
+        // 3. Trench sweep (mirrored to the left): collect out, drive back over the slope, shoot.
+        steps.add(sweepCollectShoot("RightTrenchStart", true));
+
+        Command delayedPath =
+                Commands.sequence(
+                        Commands.parallel(
+                                shootingSuperstructure.zeroCommand(),
+                                Commands.waitSeconds(INTAKE_ZERO_TO_AUTO_PATH_DELAY_SECONDS)),
+                        Commands.sequence(steps.toArray(Command[]::new)));
+        Command intakeHomingAndControl = intake.zeroCommand().andThen(intake.followModePivot());
+
+        return Commands.deadline(delayedPath, intakeHomingAndControl)
                 .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming);
     }
 
@@ -148,7 +240,9 @@ public class AutoRoutines {
                     Commands.sequence(
                             Commands.deadline(
                                     followPathFile("LeftDriveDepot", false),
-                                    intake(),
+                                    // Raised depot intake: the depot balls sit on a frame above the
+                                    // floor, so use the DEPOT pivot angle, not the floor deploy.
+                                    depotIntake(),
                                     // Pre-spin during the depot drive so the shot needs no spin-up.
                                     shootingSuperstructure.spinUpForShot()),
                             aimAndShootAtHub());
@@ -156,7 +250,7 @@ public class AutoRoutines {
                     Commands.sequence(
                             Commands.deadline(
                                     followPathFile("LeftDriveDepotDriveThrough", false),
-                                    intake(),
+                                    depotIntake(),
                                     shootingSuperstructure.spinUpForShot()),
                             aimAndShootAtHub());
         };

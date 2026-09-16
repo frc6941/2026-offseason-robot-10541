@@ -15,7 +15,6 @@ public final class RobotConstants {
     public static final boolean HAS_HOPPER_IO = true;
     public static final boolean HAS_SWERVE_IO = true;
     public static final boolean HAS_SHOOTER_IO = true;
-    public static final boolean HAS_LED_IO = false;
     public static final boolean HAS_HOOD_IO = true;
 
     // NT live-tuning gate. When false, @NTParameter values never poll NetworkTables — they hold

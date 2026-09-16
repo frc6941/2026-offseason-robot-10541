@@ -10,6 +10,7 @@ import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.auto.AutoActions;
 import frc.robot.utils.HubShiftUtil;
 import lib.ironpulse.utils.LoggedTracer;
 import lib.ironpulse.utils.PhoenixUtils;
@@ -69,6 +70,11 @@ public class Robot extends LoggedRobot {
         }
         if (enableNt4 || enableWpilog) {
             Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
+            // Event-branch traceability: record which branch this build came from and whether the
+            // tree was dirty at build time, so a match log unambiguously identifies the code that
+            // ran (e.g. the event/... branch) if a version has to be rolled back.
+            Logger.recordMetadata("GitBranch", BuildConstants.GIT_BRANCH);
+            Logger.recordMetadata("GitDirty", BuildConstants.DIRTY == 0 ? "Clean" : "Dirty");
             Logger.start();
         }
     }
@@ -149,6 +155,7 @@ public class Robot extends LoggedRobot {
     @Override
     public void autonomousInit() {
         HubShiftUtil.initialize();
+        CommandScheduler.getInstance().schedule(AutoActions.setSwerveLimitUnlimited());
         autonomousCommand = robotContainer.getAutonomousCommand();
         DriverStation.reportWarning(
                 "Selected auto: " + robotContainer.getAutoSelectionSummary(), false);
@@ -181,14 +188,14 @@ public class Robot extends LoggedRobot {
             autonomousCommand.cancel();
         }
 
-        // Safety net: guarantee teleop always starts at the default swerve speed cap, even if auto
-        // was interrupted mid-way through its unlimited-speed trench-start dash.
+        // Restore the normal speed cap before teleop control.
         robotContainer.resetSwerveLimitForTeleop();
 
         // Restore brake mode after the post-auto coast so teleop driving is crisp.
         robotContainer.setSwerveDriveBrake(true);
 
-        CommandScheduler.getInstance().schedule(robotContainer.getTeleopIntakeZeroCommand());
+        // Match the operator zero controls: hard-stop zero both pivots when teleop begins.
+        CommandScheduler.getInstance().schedule(robotContainer.getTeleopZeroCommand());
     }
 
     /** This function is called periodically during operator control. */

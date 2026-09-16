@@ -131,6 +131,15 @@ public class AutoFile {
         Side side = orDefault(sideChooser.get(), Side.RIGHT);
         int waitSeconds = waitingChooser.get() != null ? waitingChooser.get() : 0;
         StartBehaviour start = orDefault(startBehaviourChooser.get(), StartBehaviour.TRENCH_START);
+        if (start == StartBehaviour.SHOOT) {
+            rightSideDepotAlert.set(false);
+            return AutoRoutines.shootOnlyAuto(waitSeconds);
+        }
+        if (start == StartBehaviour.MIDDLE_DEPOT_TRENCH) {
+            // Fixed left-only routine: Side / Second Sweep / End choosers do not apply.
+            rightSideDepotAlert.set(false);
+            return AutoRoutines.middleDepotTrenchAuto(waitSeconds);
+        }
         SecondSweepBehaviour secondSweep =
                 orDefault(secondSweepChooser.get(), SecondSweepBehaviour.MIDDLE);
         int sweepTimes = sweepTimesChooser.get() != null ? sweepTimesChooser.get() : 2;
@@ -148,7 +157,6 @@ public class AutoFile {
         }
 
         Pose2d blueStartPose = startPose(start, isLeft);
-        Pose2d blueSecondSweepStart = isLeft ? kSecondSweepStartL : kSecondSweepStartR;
 
         return AutoRoutines.competitionAuto(
                 isLeft,
@@ -156,7 +164,6 @@ public class AutoFile {
                 start == StartBehaviour.BUMP_START,
                 blueStartPose,
                 startPath(start),
-                blueSecondSweepStart,
                 secondSweepPath(secondSweep),
                 sweepTimes,
                 end,
@@ -193,6 +200,32 @@ public class AutoFile {
         EndBehaviour end = orDefault(endBehaviourChooser.get(), EndBehaviour.NONE);
         boolean isLeft = side == Side.LEFT;
 
+        if (start == StartBehaviour.SHOOT) {
+            FieldPublisher.setPreview(List.of());
+            previewAlert.set(false);
+            return;
+        }
+
+        if (start == StartBehaviour.MIDDLE_DEPOT_TRENCH) {
+            // Fixed left-only routine: middle hub-touch -> depot -> shoot -> trench sweep (mirrored
+            // left) -> back to the shoot pose. Ignores Side / Second Sweep / End.
+            try {
+                List<Pose2d> preview = new ArrayList<>();
+                appendPose(preview, alliancePose(kMiddleHubTouch));
+                appendPath(preview, "MiddleStartDepot", false);
+                appendPath(preview, "DepotToTrench", false);
+                appendPath(preview, "RightTrenchStart", true);
+                appendPose(preview, alliancePose(kSlopeEndL));
+                FieldPublisher.setPreview(preview);
+                previewAlert.set(false);
+            } catch (IOException | ParseException e) {
+                FieldPublisher.setPreview(List.of());
+                previewAlert.setText("Failed to build selected auto preview: " + e.getMessage());
+                previewAlert.set(true);
+            }
+            return;
+        }
+
         if (!isLeft && (end == EndBehaviour.DEPOT || end == EndBehaviour.DEPOT_DRIVE_THROUGH)) {
             end = EndBehaviour.NONE;
         }
@@ -204,7 +237,7 @@ public class AutoFile {
             if (start == StartBehaviour.BUMP_START) {
                 appendPose(preview, alliancePose(isLeft ? kSlopeFrontL : kSlopeFrontR));
             } else {
-                appendPath(preview, "RightTrenchToMiddle", isLeft);
+                appendPath(preview, isLeft ? "LeftTrenchToMiddle" : "RightTrenchToMiddle", false);
             }
             appendPath(preview, startPath(start), isLeft);
             appendPose(preview, alliancePose(isLeft ? kSlopeEndL : kSlopeEndR));
@@ -215,9 +248,8 @@ public class AutoFile {
                     appendPose(preview, alliancePose(isLeft ? kSlopeFrontL : kSlopeFrontR));
                     appendPath(preview, startPath(StartBehaviour.BUMP_START), isLeft);
                 } else {
-                    appendPose(
-                            preview,
-                            alliancePose(isLeft ? kSecondSweepStartL : kSecondSweepStartR));
+                    // No reposition pose: the second-sweep path now starts at the shoot pose
+                    // (kSlopeEnd, appended just above), so draw the path straight from there.
                     appendPath(preview, secondSweepPath(secondSweep), isLeft);
                 }
                 appendPose(preview, alliancePose(isLeft ? kSlopeEndL : kSlopeEndR));
@@ -279,6 +311,10 @@ public class AutoFile {
             case TRENCH_START -> "RightTrenchStart";
             case TRENCH_START_SHORT -> "RightTrenchStartShort";
             case BUMP_START -> "RightBumpStart";
+            case SHOOT -> throw new IllegalArgumentException("SHOOT does not use a start path");
+            case MIDDLE_DEPOT_TRENCH ->
+                    throw new IllegalArgumentException(
+                            "MIDDLE_DEPOT_TRENCH runs a fixed routine, not a start path");
         };
     }
 
@@ -288,6 +324,8 @@ public class AutoFile {
                 // neutral.
             case BUMP_START -> isLeft ? kBumpStartL : kBumpStartR;
             case TRENCH_START, TRENCH_START_SHORT -> isLeft ? kTrenchStartL : kTrenchStartR;
+            case SHOOT -> throw new IllegalArgumentException("SHOOT does not use a start pose");
+            case MIDDLE_DEPOT_TRENCH -> kMiddleHubTouch;
         };
     }
 
@@ -314,7 +352,11 @@ public class AutoFile {
     private enum StartBehaviour {
         BUMP_START,
         TRENCH_START,
-        TRENCH_START_SHORT
+        TRENCH_START_SHORT,
+        SHOOT,
+        // Left-only: start touching the hub, take the depot, shoot, then sweep the trench after the
+        // alliance partner. Runs a fixed composed routine (ignores Side / Second Sweep / End).
+        MIDDLE_DEPOT_TRENCH
     }
 
     private enum SecondSweepBehaviour {

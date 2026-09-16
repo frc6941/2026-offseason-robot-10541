@@ -28,6 +28,21 @@ public class ShooterConfig {
     private static final double SHOOTER_FEED_GEAR_RATIO = 20.0 / 35.0;
     private static final double HOOD_GEAR_RATIO = 8.0 / 50.0 * 10.0 / 156.0;
 
+    // Current limits. Bench-tune these — they are the primary lever on battery draw. Every motor,
+    // main AND follower, MUST set its own limit: Phoenix followers do NOT inherit the leader's
+    // limit (see MotorIOTalonFX; an unset limit means UNLIMITED, which is what was flattening a
+    // full battery in ~1 minute). Supply limit caps battery draw; stator limit caps torque/heat.
+    // Drum = 4x Kraken X60, feed = 2x Kraken X60. Supply is per-motor, so the drum group can pull
+    // up to 4x this from the battery — keep the per-motor value modest.
+    public static final double SHOOTER_X60_SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
+    public static final double SHOOTER_X60_STATOR_CURRENT_LIMIT_AMPS = 80.0;
+    // Hood = 1x Kraken X44, light position load; a low cap is plenty and protects against stalls.
+    public static final double HOOD_X44_SUPPLY_CURRENT_LIMIT_AMPS = 20.0;
+    public static final double HOOD_X44_STATOR_CURRENT_LIMIT_AMPS = 40.0;
+    // Safety cap on hood homing so a missed hard-stop detection can't hang zeroEverything() (a
+    // parallel of hood + pivot homing) forever and stall the whole autonomous.
+    public static final double HOOD_ZEROING_TIMEOUT_SECONDS = 2.0;
+
     public static final String SHOOTER_DRUM_NAME = "ShooterDrum";
     public static final String SHOOTER_FEED_NAME = "ShooterFeed";
     public static final String HOOD_NAME = "Hood";
@@ -59,6 +74,8 @@ public class ShooterConfig {
                     .mainBus(CANBUS)
                     .motorInvertedValue(InvertedValue.Clockwise_Positive)
                     .SensorToMechanismRatio(SHOOTER_DRUM_GEAR_RATIO)
+                    .statorCurrentLimitAmps(SHOOTER_X60_STATOR_CURRENT_LIMIT_AMPS)
+                    .supplyCurrentLimitAmps(SHOOTER_X60_SUPPLY_CURRENT_LIMIT_AMPS)
                     .simConfig(
                             SubsystemConfig.SimConfig.builder()
                                     .gearRatio(SHOOTER_DRUM_GEAR_RATIO)
@@ -68,16 +85,28 @@ public class ShooterConfig {
                                 SubsystemConfig.FollowerConfig.builder()
                                         .id(SHOOTER_L2_ID)
                                         .bus(CANBUS)
+                                        .statorCurrentLimitAmps(
+                                                SHOOTER_X60_STATOR_CURRENT_LIMIT_AMPS)
+                                        .supplyCurrentLimitAmps(
+                                                SHOOTER_X60_SUPPLY_CURRENT_LIMIT_AMPS)
                                         .build(),
                                 SubsystemConfig.FollowerConfig.builder()
                                         .id(SHOOTER_R1_ID)
                                         .bus(CANBUS)
                                         .opposeMain(MotorAlignmentValue.Opposed)
+                                        .statorCurrentLimitAmps(
+                                                SHOOTER_X60_STATOR_CURRENT_LIMIT_AMPS)
+                                        .supplyCurrentLimitAmps(
+                                                SHOOTER_X60_SUPPLY_CURRENT_LIMIT_AMPS)
                                         .build(),
                                 SubsystemConfig.FollowerConfig.builder()
                                         .id(SHOOTER_R2_ID)
                                         .bus(CANBUS)
                                         .opposeMain(MotorAlignmentValue.Opposed)
+                                        .statorCurrentLimitAmps(
+                                                SHOOTER_X60_STATOR_CURRENT_LIMIT_AMPS)
+                                        .supplyCurrentLimitAmps(
+                                                SHOOTER_X60_SUPPLY_CURRENT_LIMIT_AMPS)
                                         .build()
                             })
                     .build();
@@ -89,6 +118,8 @@ public class ShooterConfig {
                     .mainBus(CANBUS)
                     .motorInvertedValue(InvertedValue.CounterClockwise_Positive)
                     .SensorToMechanismRatio(SHOOTER_FEED_GEAR_RATIO)
+                    .statorCurrentLimitAmps(SHOOTER_X60_STATOR_CURRENT_LIMIT_AMPS)
+                    .supplyCurrentLimitAmps(SHOOTER_X60_SUPPLY_CURRENT_LIMIT_AMPS)
                     .simConfig(
                             SubsystemConfig.SimConfig.builder()
                                     .gearRatio(SHOOTER_FEED_GEAR_RATIO)
@@ -98,6 +129,10 @@ public class ShooterConfig {
                                 SubsystemConfig.FollowerConfig.builder()
                                         .id(SHOOTER_R4_ID)
                                         .bus(CANBUS)
+                                        .statorCurrentLimitAmps(
+                                                SHOOTER_X60_STATOR_CURRENT_LIMIT_AMPS)
+                                        .supplyCurrentLimitAmps(
+                                                SHOOTER_X60_SUPPLY_CURRENT_LIMIT_AMPS)
                                         .build()
                             })
                     .build();
@@ -112,6 +147,8 @@ public class ShooterConfig {
                     // which is
                     // 1/HOOD_GEAR_RATIO — not HOOD_GEAR_RATIO (~0.023, the reciprocal).
                     .SensorToMechanismRatio(1.0 / HOOD_GEAR_RATIO)
+                    .statorCurrentLimitAmps(HOOD_X44_STATOR_CURRENT_LIMIT_AMPS)
+                    .supplyCurrentLimitAmps(HOOD_X44_SUPPLY_CURRENT_LIMIT_AMPS)
                     .simConfig(
                             SubsystemConfig.SimConfig.builder()
                                     .gearRatio(1.0 / HOOD_GEAR_RATIO)
@@ -131,7 +168,9 @@ public class ShooterConfig {
         public static final double kA = 0.01;
         public static final double kS = 0.01;
 
-        public static final double shootRPS = 80.0;
+        // Match the top of the ShotCalculator table (~64 RPS). Was 80, an unreachable setpoint that
+        // just kept the flywheel chasing max output — extra draw for no extra range.
+        public static final double shootRPS = 65.0;
         public static final double idleRPS = 5.0;
         public static final double stopRPS = 0.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
@@ -152,7 +191,7 @@ public class ShooterConfig {
         public static final double kA = 0.01;
         public static final double kS = 0.0;
 
-        public static final double shootRPS = 80.0;
+        public static final double shootRPS = 65.0;
         public static final double idleRPS = -2.0;
         public static final double velocityAtGoalToleranceRPS = 1.0;
 
